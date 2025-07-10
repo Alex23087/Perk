@@ -1,0 +1,20 @@
+import "stdio.h"
+import "stdlib.h"
+import "string.h"
+
+extern printf : (char*, ...) -> int
+
+model Thing {
+    fun constructor() : void {
+        printf("Thing created\n");
+    },
+
+    fun getName() : char* {
+        return "Thing";
+    }
+}
+
+fun main () : int {
+    summon Thing().getName();
+    return 0;
+}

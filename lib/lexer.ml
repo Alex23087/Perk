@@ -86,9 +86,9 @@ let rec token lexbuf =
   | "do" -> Do
   | "for" -> For
   | "return" -> Return
-  (*| "switch"        -> Switch
-    | "break"         -> Break
-    | "continue"      -> Continue *)
+  (* | "switch"        -> Switch *)
+  | "break"         -> Break
+  | "continue"      -> Continue
   | "skip" -> Skip
   | "let" -> Let
   | "public" -> Public

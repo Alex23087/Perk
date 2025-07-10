@@ -433,4 +433,4 @@ fun main () : int {
     printf("\nprogram result:\t %d\n", res[1]);
 
     return 0;
- }
+}

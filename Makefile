@@ -48,9 +48,9 @@ debug_run:
 	# gcc -o test/normalexec/22-lambda_different_env.out test/normalexec/22-lambda_different_env.c
 	# ./test/normalexec/22-lambda_different_env.out
 
-	OCAMLRUNPARAM=b ./_build/default/bin/perkc.exe ../super_perkio/src/main.perk
-	gcc -o ../super_perkio/out/super_perkio ../super_perkio/src/main.c -lSDL2
-	../super_perkio/out/super_perkio
+	OCAMLRUNPARAM=b ./_build/default/bin/perkc.exe test/spigonzo.perk
+	gcc -o test/spigonzo test/spigonzo.c
+	test/spigonzo
 
 .PHONY: extensions
 extensions:

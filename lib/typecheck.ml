@@ -449,6 +449,8 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       | None ->
           raise_type_error cmd "This return is not supposed to return any value");
       annot_copy cmd (Return (Some e_res))
+  | Continue | Break ->
+      cmd
 
 and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
     expr_a * perktype =
@@ -643,6 +645,8 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       match container_type with
       | _, Arraytype (t, _n), _ ->
           (annot_copy expr (Subscript (container_res, accessor_res)), t)
+      | _, Pointertype (t), _ ->
+          (annot_copy expr (Subscript (container_res, accessor_res)), t)
       | _, Tupletype ts, _ -> (
           match ( $ ) accessor_res with
           | Int i ->
@@ -656,7 +660,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                 "Subscript operator requires constant integer")
       | _ ->
           raise_type_error expr
-            (Printf.sprintf "Subscript operator requires array or tuple, got %s"
+            (Printf.sprintf "Subscript operator requires array, tuple or pointer, got %s"
                (show_perktype container_type)))
   | Summon (typeid, params) -> (
       let typ = lookup_type typeid in

@@ -556,6 +556,10 @@ and codegen_command (cmd : command_a) (indentation : int) : string =
   | Return None -> indent_string ^ Printf.sprintf "return;"
   | Return (Some e) ->
       indent_string ^ Printf.sprintf "return %s;" (codegen_expr e)
+  | Continue ->
+      indent_string ^ Printf.sprintf "continue;"
+  | Break ->
+      indent_string ^ Printf.sprintf "break;"
 
 and codegen_def (t : perkvardesc) (e : expr_a) (deftype : perktype option) :
     string =
@@ -647,14 +651,16 @@ and codegen_expr (e : expr_a) : string =
       match _app_type with
       | None -> (
           match ( $ ) e with
-          | Access (e1, _, acctype, _) -> (
+          | Access (e1, id, acctype, _) -> (
               let e1_str = codegen_expr e1 in
               let args_str =
                 if List.length args = 0 then "" else ", " ^ args_str
               in
               match Option.map resolve_type acctype with
-              | Some (_, Modeltype _, _) ->
-                  Printf.sprintf "%s(%s%s)" expr_str e1_str args_str
+              | Some (_, Modeltype _, _ as typ) ->
+                  let fresh_ide = fresh_var "model_appl" in
+                  let e1_decl_string = Printf.sprintf "%s %s = %s;\n" (codegen_type typ) (fresh_ide) (e1_str) in
+                  Printf.sprintf "%s%s -> %s (%s%s)" e1_decl_string fresh_ide id fresh_ide args_str
               | Some _t ->
                   Printf.sprintf "%s(%s.self%s)" expr_str e1_str
                     args_str (* this is for archetype sums *)
