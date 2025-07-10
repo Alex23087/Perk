@@ -550,18 +550,23 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           let lhs_res, _lhs_type = fill_nothing lhs_res lhs_type res_type in
           let rhs_res, _rhs_type = fill_nothing rhs_res rhs_type res_type in
           (annot_copy expr (Binop (op, lhs_res, rhs_res)), res_type)
-          |> ignore (*TODO: Remove this ignore*)
-      | Eq | Lt | Leq | Gt | Geq | Neq | Land | Lor -> ());
-      (* TODO: Continue here *)
-      let lhs_res, lhs_type = typecheck_expr lhs in
-      let rhs_res, rhs_type = typecheck_expr rhs in
-      let res_type =
-        try match_types lhs_type rhs_type
-        with Type_match_error msg -> raise_type_error expr msg
-      in
-      let lhs_res, _lhs_type = fill_nothing lhs_res lhs_type res_type in
-      let rhs_res, _rhs_type = fill_nothing rhs_res rhs_type res_type in
-      (annot_copy expr (Binop (op, lhs_res, rhs_res)), res_type)
+          |> ignore (*TODO: Remove this ignore*);
+          let lhs_res, lhs_type = typecheck_expr lhs in
+          let rhs_res, rhs_type = typecheck_expr rhs in
+          let res_type =
+            try match_types lhs_type rhs_type
+            with Type_match_error msg -> raise_type_error expr msg
+          in
+          let lhs_res, _lhs_type = fill_nothing lhs_res lhs_type res_type in
+          let rhs_res, _rhs_type = fill_nothing rhs_res rhs_type res_type in
+          (annot_copy expr (Binop (op, lhs_res, rhs_res)), res_type)
+      | Eq | Lt | Leq | Gt | Geq | Neq | Land | Lor -> 
+        (* these comparisons all return bool *)
+        let lhs_res, _ = typecheck_expr lhs in
+        let rhs_res, _ = typecheck_expr rhs in
+        (annot_copy expr (Binop (op, lhs_res, rhs_res)), ([], Basetype("bool"), []))
+        )
+
   | PreUnop (op, e) ->
       let expr_res, expr_type = typecheck_expr e in
       let res_type =
