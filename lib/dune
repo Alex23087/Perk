@@ -1,10 +1,10 @@
 (library
  (name Perkelang)
- (libraries sedlex menhirLib FrontC)
+ (libraries sedlex menhirLib)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq sedlex.ppx)))
 
 (menhir
- (modules parser)
+ (modules parser c_parser)
  (explain true)
  (flags --dump))

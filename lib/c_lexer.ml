@@ -1,5 +1,6 @@
-open Parser
-open Errors
+open C_parser
+
+exception Lexing_error of (int * int)  * (int * int) * string
 
 let string_buffer = Buffer.create 512
 let digit = [%sedlex.regexp? '0' .. '9']
@@ -50,71 +51,23 @@ let unescape ch lexbuf =
       in
       raise (Lexing_error (start_pos, end_pos, "Invalid escape character"))
 
+let type_names = ref ["int";"char";"float";"void"]
+
 let rec token lexbuf =
   match%sedlex lexbuf with
-  | "BEGIN_C" ->
-      Buffer.clear string_buffer;
-      inlineC lexbuf;
-      InlineC (Buffer.contents string_buffer)
-  | "+" -> Plus
-  | "==" -> Eq
-  | "!=" | "≠" -> Neq
-  | "<=" | "≤" -> Leq
-  | "<" -> Lt
-  | ">=" | "≥" -> Geq
-  | ">" -> Gt
-  | "-" -> Minus
-  | "!" | "¬" -> Bang
-  | "and" | "∧" | "&&" -> Land
-  | "or" | "∨" | "||" -> Lor
-  | "fun" -> Fun
-  | "=" -> Assign
-  | "++" -> PlusPlus
-  | "--" -> MinusMinus
-  | "&" -> Ampersand
-  | "." -> Dot
   | "..." -> Ellipsis
-  | "?" -> Question
-  | "nothing" | "none" -> Nothing
-  | "something" | "some" | "just" -> Something
-  | "cast" -> Cast
-  (* | "☠" | "forget" | "forgor" -> Forgor *)
-  | "if" -> If
-  | "then" -> Then
-  | "else" -> Else
-  | "while" -> While
-  | "do" -> Do
-  | "for" -> For
-  | "return" -> Return
-  (* | "switch"        -> Switch *)
-  | "break"         -> Break
-  | "continue"      -> Continue
-  | "skip" -> Skip
-  | "let" -> Let
-  | "public" -> Public
-  | "private" -> Private
-  | "static" -> Static
-  | "extern" -> Extern
+  | "typeref:typename:" -> TypeRefTypeName
+  | "signature:" -> Signature
   | "const" -> Const
+  | "__restrict" -> Restrict
   | "volatile" -> Volatile
-  | "restrict" -> Restrict
-  | "import" -> Import
-  | "open" -> Open
-  (* | "true" -> Integer 1
-     | "false" -> Integer 0 *)
-  | "archetype" | "theory" | "interface" | "prototype" | "trait" | "typeclass"
-    ->
-      Archetype (* TODO reinvent the wheel*)
-  | "model" | "impl" | "class" -> Model
-  | "summon" -> Summon
-  | "banish" -> Banish
-  | "~>" | "as" | "⤳" | "⇝" -> As
-  | "->" | "→" -> Arrow
-  | "=>" | "⇒" -> Bigarrow
-  | "true" -> Boolean true
-  | "false" -> Boolean false
-  | "of" -> Of
-  | identifier -> Ident (Sedlexing.Latin1.lexeme lexbuf)
+  | "long" -> Long
+  | "short" -> Short
+  | "signed" -> Signed
+  | "unsigned" -> Unsigned
+  | identifier -> 
+    let s = (Sedlexing.Latin1.lexeme lexbuf) in
+    if List.mem s !type_names then BaseSort (s) else Ident (s)
   | "0x", hex_number -> Integer (int_of_string (Sedlexing.Latin1.lexeme lexbuf))
   | "0b", Plus ('0' | '1') ->
       Integer (int_of_string (Sedlexing.Latin1.lexeme lexbuf))
@@ -126,25 +79,14 @@ let rec token lexbuf =
            let s = Sedlexing.Latin1.lexeme lexbuf in
            String.sub s 2 (String.length s - 2)))
   | dec_number -> Integer (int_of_string (Sedlexing.Latin1.lexeme lexbuf))
-  | float_number -> Float (float_of_string (Sedlexing.Latin1.lexeme lexbuf))
-  | "'" -> char lexbuf
-  | '"' ->
-      Buffer.clear string_buffer;
-      string_literal lexbuf;
-      String (Buffer.contents string_buffer)
   | white_space -> token lexbuf
   | "," -> Comma
   | ";" -> Semicolon
-  | ":" -> Colon
   | "(" -> LParen
   | ")" -> RParen
   | "{" -> LBrace
   | "}" -> RBrace
-  | "[" -> LBracket
-  | "]" -> RBracket
-  | "!" -> Bang
-  | "*" | "×" -> Star
-  | "/" -> Div
+  | "*" -> Star
   | "//" -> comment lexbuf
   | "/*" -> multiline_comment lexbuf
   | eof -> EOF
@@ -182,22 +124,7 @@ and multiline_comment lexbuf =
   | any -> multiline_comment lexbuf
   | _ -> failwith "Impossible!"
 
-and char lexbuf =
-  match%sedlex lexbuf with
-  | character, "'" -> Character (Sedlexing.Latin1.lexeme lexbuf).[0]
-  | _ ->
-      let start_pos =
-        ( (fst (Sedlexing.lexing_positions lexbuf)).pos_lnum,
-          (fst (Sedlexing.lexing_positions lexbuf)).pos_cnum
-          - (fst (Sedlexing.lexing_positions lexbuf)).pos_bol )
-      in
-      let end_pos =
-        ( (snd (Sedlexing.lexing_positions lexbuf)).pos_lnum,
-          (snd (Sedlexing.lexing_positions lexbuf)).pos_cnum
-          - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol )
-      in
-      raise
-        (Lexing_error (start_pos, end_pos, "Character not closed by a quote!"))
+
 
 and inlineC lexbuf =
   match%sedlex lexbuf with

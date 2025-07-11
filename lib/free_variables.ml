@@ -48,6 +48,7 @@ let rec free_variables_command (cmd : command_a) :
     | DefCmd (((_, id), def), _) ->
         let free, _ = free_variables_expr def in
         (free, [ id ])
+    | Continue | Break -> ([], [])
   in
   let out_free, out_bound = free_variables_command_aux cmd in
   ( List.sort_uniq String.compare out_free,

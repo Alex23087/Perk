@@ -4,9 +4,17 @@ open Utils
 open Type_symbol_table
 open Var_symbol_table
 open Free_variables
+open Parse_tags
+
+let library_functions = get_prototype_types ();;
 
 let rec typecheck_program (ast : topleveldef_a list) : topleveldef_a list =
   push_symbol_table ();
+
+  (* for each library function, if it is not already defined define it *)
+  (* TODO - need to check if already defined because sometimes tags file generates twice: figure out why *)
+  List.iter (fun (id , t) -> if Option.is_none (lookup_var id) then bind_var id t else ()) library_functions;
+
   let res = List.map typecheck_topleveldef ast in
   let res = List.map typecheck_deferred_function res in
   (* Will it do it in the right order?? *)
@@ -35,7 +43,7 @@ and typecheck_deferred_function (tldf : topleveldef_a) : topleveldef_a =
 
 and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
   match ( $ ) tldf with
-  | Import libname -> print_endline (C_symbols.string_of_symbols (C_symbols.get_lib_symbols libname)); tldf
+  | Import _ -> tldf
   | InlineC _ -> tldf
   | Def (((typ, id), expr), _) ->
       if id = "self" then raise_type_error tldf "Identifier self is reserved"
@@ -449,6 +457,8 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       | None ->
           raise_type_error cmd "This return is not supposed to return any value");
       annot_copy cmd (Return (Some e_res))
+  | Continue | Break ->
+      cmd
 
 and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
     expr_a * perktype =
@@ -548,18 +558,23 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           let lhs_res, _lhs_type = fill_nothing lhs_res lhs_type res_type in
           let rhs_res, _rhs_type = fill_nothing rhs_res rhs_type res_type in
           (annot_copy expr (Binop (op, lhs_res, rhs_res)), res_type)
-          |> ignore (*TODO: Remove this ignore*)
-      | Eq | Lt | Leq | Gt | Geq | Neq | Land | Lor -> ());
-      (* TODO: Continue here *)
-      let lhs_res, lhs_type = typecheck_expr lhs in
-      let rhs_res, rhs_type = typecheck_expr rhs in
-      let res_type =
-        try match_types lhs_type rhs_type
-        with Type_match_error msg -> raise_type_error expr msg
-      in
-      let lhs_res, _lhs_type = fill_nothing lhs_res lhs_type res_type in
-      let rhs_res, _rhs_type = fill_nothing rhs_res rhs_type res_type in
-      (annot_copy expr (Binop (op, lhs_res, rhs_res)), res_type)
+          |> ignore (*TODO: Remove this ignore*);
+          let lhs_res, lhs_type = typecheck_expr lhs in
+          let rhs_res, rhs_type = typecheck_expr rhs in
+          let res_type =
+            try match_types lhs_type rhs_type
+            with Type_match_error msg -> raise_type_error expr msg
+          in
+          let lhs_res, _lhs_type = fill_nothing lhs_res lhs_type res_type in
+          let rhs_res, _rhs_type = fill_nothing rhs_res rhs_type res_type in
+          (annot_copy expr (Binop (op, lhs_res, rhs_res)), res_type)
+      | Eq | Lt | Leq | Gt | Geq | Neq | Land | Lor -> 
+        (* these comparisons all return bool *)
+        let lhs_res, _ = typecheck_expr lhs in
+        let rhs_res, _ = typecheck_expr rhs in
+        (annot_copy expr (Binop (op, lhs_res, rhs_res)), ([], Basetype("bool"), []))
+        )
+
   | PreUnop (op, e) ->
       let expr_res, expr_type = typecheck_expr e in
       let res_type =
@@ -643,6 +658,8 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       match container_type with
       | _, Arraytype (t, _n), _ ->
           (annot_copy expr (Subscript (container_res, accessor_res)), t)
+      | _, Pointertype (t), _ ->
+          (annot_copy expr (Subscript (container_res, accessor_res)), t)
       | _, Tupletype ts, _ -> (
           match ( $ ) accessor_res with
           | Int i ->
@@ -656,7 +673,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                 "Subscript operator requires constant integer")
       | _ ->
           raise_type_error expr
-            (Printf.sprintf "Subscript operator requires array or tuple, got %s"
+            (Printf.sprintf "Subscript operator requires array, tuple or pointer, got %s"
                (show_perktype container_type)))
   | Summon (typeid, params) -> (
       let typ = lookup_type typeid in

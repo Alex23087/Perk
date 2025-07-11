@@ -16,7 +16,7 @@
 %token <string> Ident
 %token Comma Semicolon Colon LParen RParen LBrace RBrace LBracket RBracket Bang
 %token Arrow Bigarrow As
-%token Skip Return Let
+%token Skip Return Let Continue Break
 %token Public Private Static Extern
 %token Const Volatile Restrict
 %token <string> InlineC
@@ -99,6 +99,8 @@ command:
   | Return                                                                                                 { annotate_2_code $loc (Ast.Return (None)) }
   | Return e = expr                                                                                        { annotate_2_code $loc (Ast.Return (Some e)) }
   | Banish i = Ident                                                                                       { annotate_2_code $loc (Banish i) }
+  | Continue                                                                                               { annotate_2_code $loc (Ast.Continue) }
+  | Break                                                                                                  { annotate_2_code $loc (Ast.Break) }
 
 
   | error                                                                                                  { raise (ParseError("command expected")) }

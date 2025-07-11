@@ -161,6 +161,8 @@ and command_t =
   | Skip
   | Banish of perkident
   | Return of expr_a option
+  | Break
+  | Continue
 [@@deriving show, eq]
 
 and topleveldef_t =
