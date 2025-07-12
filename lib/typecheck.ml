@@ -56,6 +56,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
                   (* TODO - need to check if already defined because sometimes tags file generates twice: figure out why *)
                 List.iter (fun (id , t) -> if Option.is_none (lookup_var id) then bind_var id t else ()) !library_functions;
                   remove_tags ();
+                  remove_libs_expanded ();
                 tldf
 
   | InlineC _ -> tldf

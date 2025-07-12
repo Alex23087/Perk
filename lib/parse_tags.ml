@@ -178,6 +178,9 @@ let get_pointer_level sl =
 let remove_tags () = 
   let _ = Sys.command "rm tags" in ()
 
+let remove_libs_expanded () = 
+  let _ = Sys.command "rm libs_expanded.h" in ()
+
 let perktype_of_sort s : perktype_partial = match s with
   | CBaseSort x -> (Basetype x)
   | _ -> failwith ""
