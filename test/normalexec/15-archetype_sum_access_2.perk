@@ -1,4 +1,4 @@
-extern printf: (char*, ...) -> void
+import "stdio.h"
 
 archetype StringContainer {
     str: char*

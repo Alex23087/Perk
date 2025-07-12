@@ -1,7 +1,5 @@
 import "stdio.h"
 
-extern printf: (char*, ...) -> void
-
 fun main (): int {
     let x: int = 0;
 

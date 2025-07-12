@@ -1,40 +1,7 @@
 import "stdio.h"
-import "malloc.h"
+import "string.h"
 
-extern printf : (char*, ...) -> int
-
-model Test {
-    let x : int = 0,
-    let y : int = 0,
-
-    let constructor := (x: int, y: int) : void => {
-        self.x = x;
-        self.y = y;
-    },
-
-    let print := () : void => {
-        printf("x: %d\n", self.x);
-    }
-}
-
-fun main(): int {
-    let x := 42696969;
-
-    let test := (y: int): int => {
-        printf("test %d\n", x);
-    };
-    
-    test(5);
-
-    let test2 := summon Test(1, 2);
-    test2.print();
-    banish test2;
-
-    sum(1, 2);
-
+fun main (): int {
+    printf("Hello, world! %ld\n", strlen ("palle"));
     return 0;
-}
-
-fun sum (a: int, b: int): int {
-    return a + b;
 }

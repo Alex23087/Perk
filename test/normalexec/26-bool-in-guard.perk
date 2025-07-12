@@ -1,0 +1,15 @@
+fun main () : int {
+    if(1) {
+        skip
+    };
+    if(true) {
+        skip
+    };
+
+    let x : int = 4;
+    let y : int = 2;
+
+    if((x > y) && true) {
+        skip
+    }
+}

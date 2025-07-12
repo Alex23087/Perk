@@ -1,0 +1,21 @@
+model M {
+    fun banana () : int {
+        return 6
+    },
+    fun constructor () : void {
+        skip
+    }
+}
+
+fun main() : int {
+    let wanana := summon M();
+    if (wanana.banana() == 5) {
+        while (wanana.banana() == 5) {
+            skip
+        }
+    };
+
+    for (let i := 0; i < wanana.banana(); i++){
+        skip
+    }
+}

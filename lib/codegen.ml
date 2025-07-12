@@ -54,6 +54,8 @@ let lambda_environments : (string * string) list ref = ref []
 let lambda_typedefs : string list ref = ref []
 let lambda_capture_dummies : (string * string) list ref = ref []
 
+let generated_freevars = ref ""
+
 let rec codegen_functional ~(is_lambda : bool) (e : expr_a) : string =
   try fst_4 (Hashtbl.find lambdas_hashmap e)
   with Not_found -> (
@@ -415,8 +417,9 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                        Printf.sprintf "self->%s = (%s) %s" id (codegen_type typ)
                          (codegen_functional ~is_lambda:false lambda)
                    | DefVar ((typ, id), expr) ->
-                       Printf.sprintf "self->%s = (%s) %s" id (codegen_type typ)
-                         (codegen_expr expr))
+                      let expr_str, letindefs = codegen_expr_and_letindefs expr in
+                      Printf.sprintf "%s\nself->%s = (%s) %s" letindefs id (codegen_type typ)
+                         (expr_str))
                  defs)
           ^ ";"
       in
@@ -463,7 +466,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
   | Fundef (t, id, args, body) -> indent_string ^ codegen_fundef t id args body
   | Extern _ -> ""
   (* Externs are only useful for type checking. No need to keep it for codegen step *)
-  | Def ((t, e), deftype) -> indent_string ^ codegen_def t e deftype
+  | Def ((t, e), deftype) -> indent_string ^ codegen_def t e deftype indent_string
   | Import lib ->
       add_import lib;
       ""
@@ -471,28 +474,35 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
 
 and codegen_command (cmd : command_a) (indentation : int) : string =
   let indent_string = String.make (4 * indentation) ' ' in
+  let indent_maybe s = (if String.length s != 0 then indent_string else "") in
   match ( $ ) cmd with
   | InlineCCmd s -> s
   | Block c ->
       indent_string ^ "{\n"
       ^ codegen_command c (indentation + 1)
       ^ "\n" ^ indent_string ^ "}"
-  | DefCmd ((t, e), deftype) -> indent_string ^ codegen_def t e deftype
+  | DefCmd ((t, e), deftype) -> codegen_def t e deftype indent_string
   | Assign (l, r, lass_type, _rass_type) ->
       (* Printf.printf "Assignment type: %s\n"
          (match lass_type with Some t -> show_perktype t | None -> "None"); *)
-      indent_string
-      ^ (Printf.sprintf "%s = %s;"
+      let expr_strr, letindefsr = codegen_expr_and_letindefs r in
+      let expr_strl, letindefsl = codegen_expr_and_letindefs l in
+      (Printf.sprintf "%s%s%s%s%s%s = %s;"
+           (indent_maybe letindefsr)
+           (letindefsl)
+           (indent_maybe letindefsr)
+           (letindefsr)
+           (indent_string)
            (match lass_type with
            | Some (_, ArchetypeSum _, _) | Some (_, ArcheType _, _) ->
-               Printf.sprintf "%s" (codegen_expr l)
-           | _ -> Printf.sprintf "%s" (codegen_expr l)))
+               Printf.sprintf "%s" (expr_strl)
+           | _ -> Printf.sprintf "%s" (expr_strl)))
           (match _rass_type with
           | Some (_, Optiontype _t, _) ->
               Printf.sprintf "((%s){1, %s})"
                 (codegen_type (Option.get _rass_type))
-                (codegen_expr r)
-          | _ -> codegen_expr r)
+                (expr_strr)
+          | _ -> expr_strr)
   | Seq (c1, c2) ->
       let c1_code = codegen_command c1 indentation in
       let c2_code = codegen_command c2 indentation in
@@ -500,22 +510,33 @@ and codegen_command (cmd : command_a) (indentation : int) : string =
       else if String.length c2_code = 0 then Printf.sprintf "%s" c1_code
       else Printf.sprintf "%s\n%s" c1_code c2_code
   | IfThenElse (e, c1, c2) ->
-      indent_string
-      ^ Printf.sprintf "if (%s) {\n%s\n%s} else {\n%s\n%s}" (codegen_expr e)
+      let expr_str, letindefs = codegen_expr_and_letindefs e in
+      Printf.sprintf "%s%s%sif (%s) {\n%s\n%s} else {\n%s\n%s}" 
+          (indent_maybe letindefs)
+          letindefs 
+          indent_string
+          (expr_str)
           (codegen_command c1 (indentation + 1))
           indent_string
           (codegen_command c2 (indentation + 1))
           indent_string
   | Whiledo (e, c) ->
-      indent_string
-      ^ Printf.sprintf "while (%s) {\n%s\n%s}" (codegen_expr e)
+    let expr_str, letindefs = codegen_expr_and_letindefs e in
+      Printf.sprintf "%s%s%swhile (%s) {\n%s\n%s}" 
+          letindefs 
+          (indent_maybe letindefs) 
+          indent_string
+          (expr_str)
           (codegen_command c (indentation + 1))
           indent_string
   | Dowhile (e, c) ->
-      indent_string
-      ^ Printf.sprintf "do {\n%s\n%s} while (%s);"
+      let expr_str, letindefs = codegen_expr_and_letindefs e in
+      Printf.sprintf "%s%s%sdo {\n%s\n%s} while (%s);"
+          (indent_maybe letindefs)
+          letindefs 
+          indent_string
           (codegen_command c (indentation + 1))
-          indent_string (codegen_expr e)
+          indent_string (expr_str)
   | For (c1, e2, c3, body) ->
       let c1_code = codegen_command c1 0 in
       let c1_code =
@@ -529,25 +550,32 @@ and codegen_command (cmd : command_a) (indentation : int) : string =
           String.sub c3_code 0 (String.length c3_code - 1)
         else c3_code
       in
-      indent_string
-      ^ Printf.sprintf "for (%s; %s; %s) {\n%s\n%s}" c1_code (codegen_expr e2)
+      let expr_str, letindefs = codegen_expr_and_letindefs e2 in
+      Printf.sprintf "%s%s%sfor (%s; %s; %s) {\n%s\n%s}"
+          (indent_maybe letindefs)
+          letindefs 
+          (indent_string)
+          c1_code (expr_str)
           c3_code
           (codegen_command body (indentation + 1))
           indent_string
-  | Expr e -> indent_string ^ Printf.sprintf "%s;" (codegen_expr e)
+  | Expr e -> let expr_str, letindefs = codegen_expr_and_letindefs e in 
+    Printf.sprintf "%s%s%s%s;" (indent_maybe letindefs) letindefs indent_string expr_str
   | Skip -> "" (*TODO: Should this be ; ?*)
   | Switch (e, cases) ->
-      let cases_str =
-        String.concat "\n"
-          (List.map
-             (fun (e, c) ->
-               indent_string ^ "    "
-               ^ Printf.sprintf "case %s: {\n%s\n}" (codegen_expr e)
-                   (codegen_command c (indentation + 1)))
-             cases)
+      let letindefs_cases, cases_str =
+        
+          let both = (List.map
+             (fun (e, c) -> 
+              let expr_str, letindefs = codegen_expr_and_letindefs e in
+               (indent_string ^ "    "
+               ^ Printf.sprintf "case %s: {\n%s\n}" (expr_str)
+                   (codegen_command c (indentation + 1))), letindefs)
+             cases) in
+          (List.map snd both |> String.concat "\n", List.map fst both |> String.concat "\n")
       in
-      indent_string
-      ^ Printf.sprintf "switch (%s) {\n%s\n%s}" (codegen_expr e) cases_str
+      let expr_str, letindefs = codegen_expr_and_letindefs e in
+      Printf.sprintf "%s%s%sswitch (%s) {%s\n%s}" (indent_maybe (letindefs ^ letindefs_cases)) (letindefs ^ letindefs_cases) indent_string expr_str cases_str
           indent_string
   | Banish name ->
       (* TODO: Automatically banish children *)
@@ -555,20 +583,23 @@ and codegen_command (cmd : command_a) (indentation : int) : string =
         indent_string name
   | Return None -> indent_string ^ Printf.sprintf "return;"
   | Return (Some e) ->
-      indent_string ^ Printf.sprintf "return %s;" (codegen_expr e)
+    let expr_str, letindefs = codegen_expr_and_letindefs e in
+      Printf.sprintf "%s%s%sreturn %s;" (indent_maybe letindefs) letindefs indent_string expr_str
+
   | Continue ->
       indent_string ^ Printf.sprintf "continue;"
   | Break ->
       indent_string ^ Printf.sprintf "break;"
 
-and codegen_def (t : perkvardesc) (e : expr_a) (deftype : perktype option) :
+and codegen_def (t : perkvardesc) (e : expr_a) (deftype : perktype option) (indent_string : string) :
     string =
+  let indent_maybe s = (if String.length s != 0 then indent_string else "") in
   let decl_str = codegen_decl t in
-  let expr_str = codegen_expr e in
+  let expr_str, letindefs = codegen_expr_and_letindefs e in
   match deftype with
   | Some (_, Optiontype _, _) ->
-      Printf.sprintf "%s = {1, %s};" decl_str expr_str
-  | _ -> Printf.sprintf "%s = %s;" decl_str expr_str
+      Printf.sprintf "%s%s%s%s = {1, %s};" (indent_maybe letindefs) letindefs indent_string decl_str expr_str
+  | _ -> Printf.sprintf "%s%s%s%s = %s;" (indent_maybe letindefs) letindefs indent_string decl_str expr_str
 
 and codegen_decl (t : perkvardesc) : string =
   let t, id = t in
@@ -631,6 +662,12 @@ and codegen_qual (qual : perktype_qualifier) : string =
   | Volatile -> "volatile"
   | Restrict -> "restrict"
 
+and codegen_expr_and_letindefs (e : expr_a) : string * string = 
+  generated_freevars := "";
+  let expr_gend = codegen_expr e in
+  let res = expr_gend, !generated_freevars
+in generated_freevars := ""; res
+
 and codegen_expr (e : expr_a) : string =
   let e' = ( $ ) e in
   match e' with
@@ -660,7 +697,8 @@ and codegen_expr (e : expr_a) : string =
               | Some (_, Modeltype _, _ as typ) ->
                   let fresh_ide = fresh_var "model_appl" in
                   let e1_decl_string = Printf.sprintf "%s %s = %s;\n" (codegen_type typ) (fresh_ide) (e1_str) in
-                  Printf.sprintf "%s%s -> %s (%s%s)" e1_decl_string fresh_ide id fresh_ide args_str
+                  generated_freevars := !generated_freevars ^ e1_decl_string;
+                  Printf.sprintf "%s -> %s (%s%s)" fresh_ide id fresh_ide args_str
               | Some _t ->
                   Printf.sprintf "%s(%s.self%s)" expr_str e1_str
                     args_str (* this is for archetype sums *)

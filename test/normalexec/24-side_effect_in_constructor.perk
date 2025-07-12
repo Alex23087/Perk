@@ -2,7 +2,6 @@ import "stdio.h"
 import "stdlib.h"
 import "string.h"
 
-extern printf : (char*, ...) -> int
 
 model Thing {
     fun constructor() : void {

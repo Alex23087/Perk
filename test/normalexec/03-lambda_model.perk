@@ -1,8 +1,6 @@
 import "stdio.h"
 import "malloc.h"
 
-extern printf: (char*, ...) -> void
-
 model XContainer {
     let x: int = 0
 }

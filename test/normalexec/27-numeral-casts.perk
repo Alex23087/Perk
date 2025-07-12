@@ -1,0 +1,4 @@
+fun main () : int {
+    let x := 5;
+    let y := 5 + .5;
+}

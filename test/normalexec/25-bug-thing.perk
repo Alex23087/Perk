@@ -1,0 +1,5 @@
+import "stdio.h"
+
+fun main () : int {
+    skip
+}
