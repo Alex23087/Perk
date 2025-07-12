@@ -2,6 +2,7 @@ import "stdio.h"
 import "stdlib.h"
 import "string.h"
 
+
 model Thing {
     fun constructor() : void {
         printf("Thing created\n");

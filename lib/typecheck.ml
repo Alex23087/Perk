@@ -576,7 +576,6 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           let lhs_res, _lhs_type = fill_nothing lhs_res lhs_type res_type in
           let rhs_res, _rhs_type = fill_nothing rhs_res rhs_type res_type in
           (annot_copy expr (Binop (op, lhs_res, rhs_res)), res_type)
-
       | Eq | Lt | Leq | Gt | Geq | Neq | Land | Lor -> 
         (* these comparisons all return bool *)
         let lhs_res, _ = typecheck_expr lhs in

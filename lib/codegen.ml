@@ -585,6 +585,7 @@ and codegen_command (cmd : command_a) (indentation : int) : string =
   | Return (Some e) ->
     let expr_str, letindefs = codegen_expr_and_letindefs e in
       Printf.sprintf "%s%s%sreturn %s;" (indent_maybe letindefs) letindefs indent_string expr_str
+
   | Continue ->
       indent_string ^ Printf.sprintf "continue;"
   | Break ->
