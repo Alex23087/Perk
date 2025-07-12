@@ -1,7 +1,5 @@
 import "stdio.h"
 
-extern printf : (char*, ...) -> void
-
 model List {
     let head : int = 0,
     let tail : List? = none,

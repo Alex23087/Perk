@@ -140,7 +140,7 @@ and expr_t =
   | Tuple of expr_a list * perktype option
   | As of perkident * perktype list
   | Array of expr_a list
-  (* Cast ((from_type, to_type), expression)*)
+  (** Cast ((from_type, to_type), expression)*)
   | Cast of (perktype * perktype) * expr_a
   | IfThenElseExpr of expr_a * expr_a * expr_a
 [@@deriving show, eq]

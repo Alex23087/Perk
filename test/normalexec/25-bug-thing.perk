@@ -1,7 +1,5 @@
 import "stdio.h"
 
-extern printf : (char*, ...) -> int
-
 fun main () : int {
     skip
 }

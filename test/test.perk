@@ -1,6 +1,7 @@
 import "stdio.h"
+import "string.h"
 
 fun main (): int {
-    printf("Hello, world!\n");
+    printf("Hello, world! %ld\n", strlen ("palle"));
     return 0;
 }

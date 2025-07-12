@@ -1,4 +1,4 @@
-extern printf: (char*, ...) -> void
+import "stdio.h"
 
 archetype Printer {
     fun print : (int) -> void

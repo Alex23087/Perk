@@ -4,6 +4,17 @@ open Ast
 
 type parse_result = Comment | Prototype of string * string * string | Typedef of string | Other
 
+
+let generate_tags lib_paths = 
+  let status = Sys.command (Printf.sprintf "gcc -E -P -dD %s > libs_expanded.h " (String.concat " " lib_paths)) in
+  if status = 0 then 
+    let status = Sys.command (Printf.sprintf "ctags --kinds-C=+p --fields=+Snt libs_expanded.h") in
+    if status = 0 then ()
+  else failwith "lib expansion failed"
+
+else
+  failwith "lib expansion failed"
+
 let string_of_parse_result pr = match pr with
     | Comment -> "comment"
     | Prototype (name, t, signature) -> Printf.sprintf "prototype: %s\t%s\t%s" name t signature
@@ -127,14 +138,31 @@ let is_pointer_level s = match s with
   | PtrLevel _ -> true
   | _ -> false 
 
+let solve_specifiers (s : specifier list) = 
+  let present x = List.mem x s in
+  match (present Short, present Long, present Signed, present Unsigned) with
+  | (true, false, true, false) -> CBaseSort "int16_t"     (* short signed *)
+  | (true, false, false, true) -> CBaseSort "uint16_t"    (* short unsigned *)
+  | (false, true, true, false) -> CBaseSort "int64_t"     (* long signed *)
+  | (false, true, false, true) -> CBaseSort "uint64_t"    (* long unsigned *)
+  | (false, false, false, true) -> CBaseSort "uint32_t"   (* signed *)
+  | (false, false, true, false) -> CBaseSort "int32_t"    (* unsigned *)
+  | (true,  false, false, false) -> CBaseSort "int16_t"   (* short *)
+  | (false, true,  false, false) -> CBaseSort "int64_t"   (* long *)
+  | (false, false, false, false) -> CBaseSort "int"   (* no specifiers *)
+  | _ -> failwith (Printf.sprintf "Invalid or ambiguous specifier combination: %s" (List.map (show_specifier) s |> String.concat ", "))
+
 let get_type_from_spec_list sl = 
   let sorts = List.filter is_spec_type sl in 
   let len = List.length sorts in
   if len = 1 then 
-    List.hd sorts
+    let sort = List.hd sorts in 
+    if sort = CBaseSort "int" then 
+      solve_specifiers sl 
+    else sort
 else if len = 0 then 
-  (* default to int *)
-  CBaseSort "int"
+  solve_specifiers sl 
+
 else failwith "Illegal type - more than one base type"
 
 let get_pointer_level sl = 
@@ -145,26 +173,40 @@ let get_pointer_level sl =
         | PtrLevel x -> x
         | _ -> failwith ""
   else if len = 0 then 0
-  else failwith "Illegal type - multiple pointer levels"
+  else failwith (Printf.sprintf "Illegal type - multiple pointer levels (%s)" (List.map (show_specifier) sl |> String.concat ", "))
 
-let perktype_of_sort s : perktype = match s with
-  | CBaseSort x -> ([], Basetype x, [])
+let remove_tags () = 
+  let _ = Sys.command "rm tags" in ()
+
+let perktype_of_sort s : perktype_partial = match s with
+  | CBaseSort x -> (Basetype x)
   | _ -> failwith ""
 
 (* TODO preserve qualifiers and specifiers of pointer *)
-let rec wrap_perktype_in_ptrs n t = 
-  if n = 0 then t
-  else [], Pointertype (wrap_perktype_in_ptrs (n-1) t), []
+let rec wrap_perktype_in_ptrs n (t : perktype) : perktype_partial = 
+  if n = 0 then failwith "should not call with 0" else 
+  if n = 1 then Pointertype (t)
+  else Pointertype ([], wrap_perktype_in_ptrs (n-1) t, [])
 
-(* TODO add qualifiers and solve specifiers like long long, unsigned long .... to uint64_t et al *)
-let perktype_of_ctype c = match c with
-  | CBaseType specifiers ->(
-    let type_spec = get_type_from_spec_list specifiers in 
-    let pointer_level = get_pointer_level specifiers in
-    perktype_of_sort type_spec |> wrap_perktype_in_ptrs pointer_level
-  )
+let qual_to_perkqual : qualifier -> perktype_qualifier = function
+  | Const -> Const
+  | Volatile -> Volatile
+  | Restrict -> Restrict
 
-let perkvardesc_of_arg (tv) = match tv with
+let perktype_of_ctype c = 
+  let rec aux (sl : specifier list) (curr_sort : specifier list) (perkquals : perktype_qualifier list) : perktype = (match sl with 
+    | (Long|Short|Signed|Unsigned|CBaseSort _ as s) :: rest -> aux rest (curr_sort @ [s]) perkquals
+    | Qual q :: rest -> aux rest (curr_sort) (perkquals @ [qual_to_perkqual q])
+    | PtrLevel n :: rest -> ([], wrap_perktype_in_ptrs n (aux rest curr_sort []), perkquals)
+    | [] -> [], (get_type_from_spec_list curr_sort |> perktype_of_sort), perkquals
+  ) in
+  match c with
+| CBaseType specifiers ->(
+  aux (List.rev specifiers) [] []
+)
+
+
+let perktype_of_arg (tv) : perktype = match tv with
   | TypedVar (t, IdenDecl _name) -> perktype_of_ctype t
   | Ellipsis -> ([], Vararg, [])
 
@@ -178,7 +220,7 @@ let get_prototype_types () : (string * perktype) list =
 
     let proto_type_to_funtype (name, ctyp, args) = 
       let ret_type = perktype_of_ctype ctyp in
-      let arg_types = List.map perkvardesc_of_arg args in
+      let arg_types = List.map perktype_of_arg args in
       name, ([], Funtype (arg_types, ret_type), [])
     in
     List.map proto_type_to_funtype proto_types

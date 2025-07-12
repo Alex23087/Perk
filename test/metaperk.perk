@@ -3,17 +3,17 @@ import "stdlib.h"
 import "ctype.h"
 import "string.h"
 
-extern printf : (char*, ...) -> int
-extern atoi : char* -> int
-extern strcmp : (char*, char*) -> int
-extern exit : int -> void
+// extern printf : (char*, ...) -> int
+// extern atoi : char* -> int
+// extern strcmp : (char*, char*) -> int
+// extern exit : int -> void
 extern isspace : char -> int
 extern isdigit : char -> int
-extern strlen : char* -> int
-extern malloc : int -> void*
-extern strcpy : (char*, char*) -> void
-extern free : void* -> void
-extern puts : char* -> void
+// extern strlen : char* -> int
+// extern malloc : int -> void*
+// extern strcpy : (char*, char*) -> void
+// extern free : void* -> void
+// extern puts : char* -> void
 
 
 model TokenStack {
@@ -87,7 +87,7 @@ fun failwith (msg : char*) : void {
     exit(1);
 }
 
-fun alloc_string (size : int) : char*? {
+fun alloc_string (size : size_t) : char*? {
     let sub : char* = cast(char*, malloc(size + 1));
     let success := 0;
     BEGIN_C
@@ -101,8 +101,8 @@ fun alloc_string (size : int) : char*? {
 }
 
 // curried equality function
-fun streq (s1 : char*) : char* => int {
-    return (s2 : char*) : int {return (strcmp (s1, s2) == 0)}
+fun streq (s1 : char*) : char* => bool {
+    return (s2 : char*) : bool {return (strcmp (s1, s2) == 0)}
 }
 
 // curried get index
@@ -124,14 +124,14 @@ fun str_get_index (s : char*) : int => char {
 
 fun substring (str : char*, start : int, end : int) : char* {
 
-    let len : int = strlen(str);
+    let len : size_t = strlen(str);
 
     if (start > end || start > len || end > len) {
         failwith ("Invalid substring range");
     };
 
     let sublen : int = end - start;
-    let sub : char*? = alloc_string(sublen);
+    let sub : char*? = alloc_string(cast(size_t, sublen));
     
     if (!sub?) {
         failwith("Malloc Failed");
@@ -311,21 +311,21 @@ fun execute_computation (stack_vp : void*) : (void* * int){
             let res1 := execute_computation (cast(void*, stack));
             let res2 := execute_computation (res1[0]);
 
-            return (cast(void*, stack), res1[1] == res2[1])
+            return (cast(void*, stack), cast(int, res1[1] == res2[1]))
         };
         
         if(eq("Lt")) {
             let res1 := execute_computation (cast(void*, stack));
             let res2 := execute_computation (res1[0]);
 
-            return (cast(void*, stack), res1[1] < res2[1])
+            return (cast(void*, stack), cast(int, res1[1] < res2[1]))
         };
 
         if(eq("Neq")) {
             let res1 := execute_computation (cast(void*, stack));
             let res2 := execute_computation (res1[0]);
 
-            return (cast(void*, stack), res1[1] != res2[1])
+            return (cast(void*, stack), cast(int, res1[1] != res2[1]))
         };
 
         if(eq("Minus")) {

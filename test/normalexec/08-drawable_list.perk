@@ -1,7 +1,5 @@
 import "stdio.h"
 
-extern printf: (char*, ...) -> void
-
 archetype Drawable {
     pinselo : int
 }
