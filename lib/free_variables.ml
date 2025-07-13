@@ -1,7 +1,9 @@
+(** Functions for computing the free variables of commands and expressions *)
+
 open Ast
 open Var_symbol_table
 
-(* returns pair of lists: FIRST LIST IS FREE VARS, SECOND LIST IS BOUND *)
+(** Returns pair of lists: FIRST LIST IS FREE VARS, SECOND LIST IS BOUND *)
 let rec free_variables_command (cmd : command_a) :
     perkident list * perkident list =
   let free_variables_command_aux (cmd : command_a) :
@@ -56,6 +58,7 @@ let rec free_variables_command (cmd : command_a) :
   ( List.sort_uniq String.compare out_free,
     List.sort_uniq String.compare out_bound )
 
+(** Returns pair of lists: FIRST LIST IS FREE VARS, SECOND LIST IS BOUND *)
 and free_variables_expr (e : expr_a) : perkident list * perkident list =
   let free_variables_expr (e : expr_a) : perkident list * perkident list =
     ( (match ( $ ) e with

@@ -1,3 +1,6 @@
+(** Defines exceptions for Perk lexing, parsing, type-checking and code
+    generation. *)
+
 open Ast
 
 exception ParseError of string

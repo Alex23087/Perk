@@ -1,3 +1,5 @@
+(** Typechecks a set of toplevel definitions, instancing the inferred types. *)
+
 open Ast
 open Errors
 open Utils
@@ -6,7 +8,11 @@ open Var_symbol_table
 open Free_variables
 open Parse_tags
 
+(** List of library functions and their types :
+    [(perkident * perktype) list ref]*)
 let library_functions = ref []
+
+(** List of import paths *)
 let import_path_list = ref []
 
 (** gathers the path(s) where libraries are located *)
@@ -65,6 +71,7 @@ let rec typecheck_program (ast : topleveldef_a list) : topleveldef_a list =
   (* print_type_symbol_table (); *)
   res
 
+(** Typechecks functions after everything else *)
 and typecheck_deferred_function (tldf : topleveldef_a) : topleveldef_a =
   match ( $ ) tldf with
   | Fundef (ret_type, id, params, body) ->
@@ -84,6 +91,7 @@ and typecheck_deferred_function (tldf : topleveldef_a) : topleveldef_a =
       annot_copy tldf (Fundef (ret_type, id, params, body_res))
   | _ -> tldf
 
+(** Typechecks toplevel definitions *)
 and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
   match ( $ ) tldf with
   | Import s ->
@@ -348,6 +356,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
         fields_res;
       annot_copy tldf (Model (ident, archetypes, fields_res))
 
+(** Typechecks commands *)
 and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
     command_a =
   match ( $ ) cmd with
@@ -505,6 +514,7 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       annot_copy cmd (Return (Some e_res))
   | Continue | Break -> cmd
 
+(** Typechecks expressions *)
 and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
     expr_a * perktype =
   match ( $ ) expr with
@@ -876,6 +886,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       ( annot_copy expr (IfThenElseExpr (guard_res, then_e_res, else_e_res)),
         res_type )
 
+(** Typechecks parameters *)
 and typecheck_expr_list (exprs : expr_a list) (types : perktype list) :
     (expr_a * perktype) list =
   let typecheck_expr_list_aux (exps : expr_a list) (typs : perktype list) =
@@ -906,6 +917,7 @@ and fill_nothing (expr : expr_a) (exprtyp : perktype) (typ : perktype) :
 
 (* Add more type checking logic as needed: pepperepeppe     peppè! culo*)
 
+(** Checks if two types are the same or not. *)
 and match_types ?(coalesce : bool = false) (expected : perktype)
     (actual : perktype) : perktype =
   let expected = resolve_type expected in
@@ -1011,6 +1023,8 @@ and match_types ?(coalesce : bool = false) (expected : perktype)
       ([], Optiontype (match_types_aux t actual), [])
   | _, _, _ -> match_types_aux expected actual
 
+(** CHecks if an argument list and a type list have the same types elementwise.
+*)
 and match_type_list (expected : perktype list)
     (actual : (expr_a * perktype) list) : perktype list =
   let rec match_type_list_aux expected' actual' =

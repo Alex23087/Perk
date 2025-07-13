@@ -1,14 +1,18 @@
+(** Various utilities. *)
+
 open Ast
 open Errors
 
 let static_compilation : bool = false
 
+(** Debug function that can be enabled to track function call numbers. *)
 let rec say_here (_msg : string) : unit =
   (* Printf.printf "%s\n" _msg;
      flush stdout *)
   ()
 
-(* Utility function to add a parameter (i.e., self) to a type, iff it is a functional *)
+(** Utility function to add a parameter (i.e., self) to a type, iff it is a
+    functional *)
 and add_parameter_to_func (param_type : perktype) (func_type : perktype) :
     perktype =
   match func_type with
@@ -20,7 +24,8 @@ and add_parameter_to_func (param_type : perktype) (func_type : perktype) :
       (a, Funtype (new_params, ret), d)
   | _ -> func_type
 
-(* Utility function to add a parameter (i.e., self) to a type, iff it is a function *)
+(** Utility function to add a parameter (i.e., [self]) to a type, iff it is a
+    function *)
 and add_parameter_to_func_only (param_type : perktype) (func_type : perktype) :
     perktype =
   match func_type with
@@ -29,7 +34,8 @@ and add_parameter_to_func_only (param_type : perktype) (func_type : perktype) :
       (a, Funtype (new_params, ret), d)
   | _ -> func_type
 
-(* Utility function to add a parameter (i.e., self) to a type, iff it is a function *)
+(** Utility function to add a parameter (i.e., [self]) to a type, iff it is a
+    function *)
 and add_parameter_to_func_2 (param_type : perktype) (func_type : perktype) :
     perktype =
   match func_type with
@@ -46,6 +52,7 @@ and bool_type : perktype = ([], Basetype "bool", [])
 and void_pointer : perktype = ([], Pointertype ([], Basetype "void", []), [])
 and self_type (name : perkident) : perktype = ([], Basetype name, [])
 
+(** Transorms a lambda to a function *)
 and func_of_lambda_void (t : perktype) : perktype =
   match t with
   | a, Lambdatype (args, ret, _), q ->
@@ -54,17 +61,20 @@ and func_of_lambda_void (t : perktype) : perktype =
         q )
   | _ -> failwith "func_of_lambda_void: not a lambda type"
 
+(** Transforms a function type to a lambda type. *)
 and functype_of_lambdatype (t : perktype) : perktype =
   match t with
   | a, Lambdatype (args, ret, _), q -> (a, Funtype (args, ret), q)
   | _ -> failwith "functype_of_lambdatype: not a lambda type"
 
+(** Transforms a lambda type to a function type. *)
 and lambdatype_of_func (typ : perktype) : perktype =
   match typ with
   | a, Funtype (params, ret), q ->
       (a, Lambdatype (List.map lambdatype_of_func params, ret, []), q)
   | _ -> typ
 
+(** Transforms a function type with a [self] argument to a lambda type *)
 and lambdatype_of_func_with_self (typ : perktype) (selftype : perktype) :
     perktype =
   match typ with
@@ -74,6 +84,8 @@ and lambdatype_of_func_with_self (typ : perktype) (selftype : perktype) :
         q )
   | _ -> typ
 
+(** Transforms a function expression with a self argument to a lambda expression
+*)
 and lambda_expr_of_func_expr_with_self (expr : expr_a) (fromtype : perktype)
     (selftype : perktype) : expr_a =
   match ( $ ) expr with
@@ -82,6 +94,7 @@ and lambda_expr_of_func_expr_with_self (expr : expr_a) (fromtype : perktype)
         (Cast ((fromtype, lambdatype_of_func_with_self fromtype selftype), expr))
   | _ -> expr
 
+(** Transforms a function expression to a lambda expression. *)
 and lambda_expr_of_func_expr (expr : expr_a) (fromtype : perktype) : expr_a =
   match ( $ ) expr with
   | Var _ ->
@@ -96,6 +109,7 @@ and lambda_expr_of_func_expr (expr : expr_a) (fromtype : perktype) : expr_a =
        let new_expr = lambda_expr_of_func_expr_with_self expr typ selftype in
        ((new_typ, id), new_expr) *)
 
+(** Transforms a function definition to a lambda definition *)
 and lambda_def_of_func_def (def : perkdef) : perkdef =
   let (typ, id), expr = def in
   match ( $ ) expr with
@@ -111,14 +125,17 @@ and lambda_def_of_func_def_ (def : perkdef) : perkdef =
       let new_expr = lambda_expr_of_func_expr expr typ in
       ((new_typ, id), new_expr)
 
+(** Discards attributes and qualifiers of a type. *)
 and discard_type_aq (typ : perktype) : perktype_partial =
   let _a, t, _q = typ in
   t
 
+(** Tranforms a function definition to a lambda definition *)
 and lambda_of_func (func : perkfundef) : expr_t =
   let typ, _id, args, body = func in
   Lambda (typ, args, body, [])
 
+(** Transform a variable or function definition to a declaration. *)
 and decl_of_deforfun (def : deforfun_a) : perkdecl =
   match ( $ ) def with
   (* If this def is a function, make its type a function type *)
@@ -134,6 +151,7 @@ and decl_of_deforfun (def : deforfun_a) : perkdecl =
       in *)
       (typ, id)
 
+(** Transform a variable or function declaration to a declaration. *)
 and decl_of_declorfun (def : declorfun_a) : perkdecl =
   match ( $ ) def with
   (* If this def is a function, make its type a function type *)
@@ -156,10 +174,13 @@ and decl_of_declorfun (def : declorfun_a) : perkdecl =
       in *)
       (typ, id)
 
+(** Given a function definition, returns its function type. *)
 and funtype_of_perkfundef (def : perkfundef) : perktype =
   let typ, _id, args, _body = def in
   ([], Funtype (List.map fst args, typ), [])
 
+(** Given a list of annotated variable or function definitions, returns the
+    identifiers of the defined functions *)
 and get_member_functions (defs : deforfun_a list) : perkident list =
   List.filter
     (fun def ->

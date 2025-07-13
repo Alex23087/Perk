@@ -1,13 +1,18 @@
+(** Parses a [ctags]-generated [tags] file. *)
+
 open Ctype_ast
 open C_errors
 open Ast
 
+(** The result of parsing a [tags] file.*)
 type parse_result =
   | Comment
   | Prototype of string * string * string
   | Typedef of string
   | Other
 
+(** Generates the [tags] file, by first expanding the libraries and merging
+    them, and then calling [ctags].*)
 let generate_tags lib_paths =
   let status =
     Sys.command
@@ -22,6 +27,7 @@ let generate_tags lib_paths =
     if status = 0 then () else failwith "lib expansion failed"
   else failwith "lib expansion failed"
 
+(** Debug function to print parsed [tags] file*)
 let string_of_parse_result pr =
   match pr with
   | Comment -> "comment"
@@ -30,6 +36,7 @@ let string_of_parse_result pr =
   | Typedef n -> Printf.sprintf "typedef %s" n
   | Other -> "other"
 
+(** Reads a file.*)
 let read_file filename =
   let lines = ref [] in
   let chan = open_in filename in
@@ -42,6 +49,9 @@ let read_file filename =
     close_in chan;
     List.rev !lines
 
+(** Parses a [tags] line:
+    - [p] means that the line represents a prototype
+    - [t] means the line represents a typedef. *)
 let parse_line s =
   if String.starts_with ~prefix:"!" s then Comment
   else
@@ -57,6 +67,7 @@ let parse_line s =
         Typedef type_name
     | _ -> Other
 
+(** Parses the return type of a C prototype *)
 let parse_ret_type (s : string) : ctype =
   let lexbuf = Sedlexing.Utf8.from_string s in
   let lexer = Sedlexing.with_tokenizer C_lexer.token lexbuf in
@@ -86,6 +97,7 @@ let parse_ret_type (s : string) : ctype =
                - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol ),
              "Unhandled parsing error." ))
 
+(** Parses the signature of a C prototype *)
 let parse_signature (s : string) : typed_var list =
   let lexbuf = Sedlexing.Utf8.from_string s in
   let lexer = Sedlexing.with_tokenizer C_lexer.token lexbuf in
@@ -115,12 +127,15 @@ let parse_signature (s : string) : typed_var list =
                - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol ),
              "Unhandled parsing error." ))
 
+(** Checks if a [parse_result] is a prototype. *)
 let is_proto (p : parse_result) =
   match p with Prototype _ -> true | _ -> false
 
+(** Checks if a [parse_result] is a typedef. *)
 let is_typedef (p : parse_result) =
   match p with Typedef _ -> true | _ -> false
 
+(** Converts a parse result to a C type. *)
 let to_ctypes (p : parse_result) : (string * ctype * typed_var list) option =
   match p with
   | Prototype (name, ret, signature) -> (
@@ -131,6 +146,7 @@ let to_ctypes (p : parse_result) : (string * ctype * typed_var list) option =
       with _ -> None)
   | _ -> failwith ""
 
+(** Debug function to print C prototype types. *)
 let string_of_ctypes ((name, ret, signature) : string * ctype * typed_var list)
     =
   Printf.sprintf "%s : (%s) -> %s" name (show_ctype ret)
@@ -140,6 +156,7 @@ let get_typedef p = match p with Typedef s -> s | _ -> failwith ""
 let is_spec_type s = match s with CBaseSort _ -> true | _ -> false
 let is_pointer_level s = match s with PtrLevel _ -> true | _ -> false
 
+(** Given a C specifier list, converts it to a [stdint] type.*)
 let solve_specifiers (s : specifier list) =
   let present x = List.mem x s in
   match (present Short, present Long, present Signed, present Unsigned) with
@@ -157,6 +174,7 @@ let solve_specifiers (s : specifier list) =
         (Printf.sprintf "Invalid or ambiguous specifier combination: %s"
            (List.map show_specifier s |> String.concat ", "))
 
+(** Given a specifier list, returns the corresponding type. *)
 let get_type_from_spec_list sl =
   let sorts = List.filter is_spec_type sl in
   let len = List.length sorts in
@@ -174,19 +192,23 @@ let remove_libs_expanded () =
   let _ = Sys.command "rm libs_expanded.h" in
   ()
 
+(** Given a basic C sort, returns the corresponding base type *)
 let perktype_of_sort s : perktype_partial =
   match s with CBaseSort x -> Basetype x | _ -> failwith ""
 
+(** Wraps a type in pointers, a positive number of times. *)
 let rec wrap_perktype_in_ptrs n (t : perktype) : perktype_partial =
   if n = 0 then failwith "should not call with 0"
   else if n = 1 then Pointertype t
   else Pointertype ([], wrap_perktype_in_ptrs (n - 1) t, [])
 
+(** Transforms C qualifiers to perk qualifiers *)
 let qual_to_perkqual : qualifier -> perktype_qualifier = function
   | Const -> Const
   | Volatile -> Volatile
   | Restrict -> Restrict
 
+(** Transforms a c type to a perk type *)
 let perktype_of_ctype c =
   let rec aux (sl : specifier list) (curr_sort : specifier list)
       (perkquals : perktype_qualifier list) : perktype =
@@ -201,10 +223,13 @@ let perktype_of_ctype c =
   in
   match c with CBaseType specifiers -> aux (List.rev specifiers) [] []
 
+(** Given a C prototype argument, returns its type. *)
 let perktype_of_arg tv : perktype =
   match tv with
   | TypedVar (t, IdenDecl _name) -> perktype_of_ctype t
   | Ellipsis -> ([], Vararg, [])
+
+(** Returns the perk types of each C prototype in the tags file. *)
 
 let get_prototype_types () : (string * perktype) list =
   let lines = read_file "tags" in

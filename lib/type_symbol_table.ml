@@ -1,3 +1,5 @@
+(** Utils for the type symbol table *)
+
 open Ast
 open Errors
 open Utils

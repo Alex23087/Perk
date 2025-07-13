@@ -1,3 +1,5 @@
+(** Generates C code given a parsed Perk program. *)
+
 open Ast
 open Errors
 open Utils
@@ -27,6 +29,7 @@ let lambdas_hashmap : (expr_a, string * string * string list * string) Hashtbl.t
     =
   Hashtbl.create 10
 
+(** Symbol table of function declarations *)
 let fundecl_symbol_table : (perkident, perktype) Hashtbl.t = Hashtbl.create 10
 
 (** list of imported libraries *)
@@ -36,7 +39,7 @@ let import_list : string list ref = ref []
 let archetype_hashtable : (string, (string, perktype) Hashtbl.t) Hashtbl.t =
   Hashtbl.create 10
 
-(** Adds a new archetype with name $name to the archetype hastable *)
+(** Adds a new archetype with name [name] to the archetype hastable *)
 let add_archetype (name : string) : (string, perktype) Hashtbl.t =
   let new_archetype = Hashtbl.create 10 in
   Hashtbl.add archetype_hashtable name new_archetype;
@@ -48,7 +51,7 @@ let get_archetype (name : string) : (string, perktype) Hashtbl.t =
   with Not_found ->
     raise (TypeError (Printf.sprintf "Archetype %s not found" name))
 
-(** adds the binding ($id, $typ) to archetype with name $name*)
+(** adds the binding [(id, typ)] to archetype with name [name]*)
 let add_binding_to_archetype (name : string) (id : perkident) (typ : perktype) :
     unit =
   let archetype = get_archetype name in
@@ -147,12 +150,15 @@ let rec codegen_functional ~(is_lambda : bool) (e : expr_a) : string =
       (List.map (fun s -> "(void*)" ^ s) free_variables))
    type_descriptor id) *)
 
+(** Binds a function type to the [fundecl_symbol_table]. *)
 and bind_function_type (ident : perkident) (typ : perktype) : unit =
   try
     let _ = Hashtbl.find fundecl_symbol_table ident in
     ()
   with Not_found -> Hashtbl.add fundecl_symbol_table ident typ
 
+(** Transforms a perk program into a string containing the corresponding C
+    program. *)
 and codegen_program (tldfs : topleveldef_a list) : string =
   let s =
     say_here "codegen_program";
@@ -251,6 +257,7 @@ and codegen_program (tldfs : topleveldef_a list) : string =
        !resolve_hit !resolve_miss; *)
   s
 
+(** Generates code for a top level definition. *)
 and codegen_topleveldef (tldf : topleveldef_a) : string =
   (* try *)
   say_here (Printf.sprintf "codegen_topleveldef: %s" (show_topleveldef_a tldf));
@@ -481,6 +488,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
       ""
 (* with Not_inferred s -> raise_type_error tldf s *)
 
+(** Generates code for perk commands. *)
 and codegen_command (cmd : command_a) (indentation : int) : string =
   let indent_string = String.make (4 * indentation) ' ' in
   let indent_maybe s = if String.length s != 0 then indent_string else "" in
@@ -590,6 +598,7 @@ and codegen_command (cmd : command_a) (indentation : int) : string =
   | Continue -> indent_string ^ Printf.sprintf "continue;"
   | Break -> indent_string ^ Printf.sprintf "break;"
 
+(** Generates code for perk definitions. *)
 and codegen_def (t : perkvardesc) (e : expr_a) (deftype : perktype option)
     (indent_string : string) : string =
   let indent_maybe s = if String.length s != 0 then indent_string else "" in
@@ -603,11 +612,13 @@ and codegen_def (t : perkvardesc) (e : expr_a) (deftype : perktype option)
       Printf.sprintf "%s%s%s%s = %s;" (indent_maybe letindefs) letindefs
         indent_string decl_str expr_str
 
+(** Generates code for perk declaration. *)
 and codegen_decl (t : perkvardesc) : string =
   let t, id = t in
   let type_str = codegen_type t in
   Printf.sprintf "%s %s" type_str id
 
+(** Generates code for perk function definitions. *)
 and codegen_fundef (t : perktype) (id : perkident) (args : perkvardesc list)
     (body : command_a) : string =
   let type_str = codegen_type t in
@@ -623,7 +634,7 @@ and codegen_fundef (t : perktype) (id : perkident) (args : perkvardesc list)
   bind_function_type id funtype;
   Printf.sprintf "%s %s(%s) {\n%s\n}" type_str id args_str body_str
 
-(* transforms a perktype into a C type *)
+(**transforms a perktype into a C type *)
 (* TODO figure out details (attrs, quals)...... *)
 and codegen_type ?(expand : bool = false) (t : perktype) : string =
   (* Printf.printf "codegen_type: %s\n" (show_perktype t); flush stdout; *)
@@ -655,15 +666,20 @@ and codegen_type ?(expand : bool = false) (t : perktype) : string =
   else if quals_str = "" then Printf.sprintf "%s %s" attrs_str type_str
   else Printf.sprintf "%s %s %s" attrs_str quals_str type_str
 
+(** Codegens perk attributes. *)
 and codegen_attr (attr : perktype_attribute) : string =
   match attr with Public -> "" | Private -> "static" | Static -> "static"
 
+(** Codegens perk qualifiers. *)
 and codegen_qual (qual : perktype_qualifier) : string =
   match qual with
   | Const -> "const"
   | Volatile -> "volatile"
   | Restrict -> "restrict"
 
+(** Codegens perk expressions (first output string), also returning the code
+    that declares the fresh variables used in generating let...in-like
+    expressions (second output string). *)
 and codegen_expr_and_letindefs (e : expr_a) : string * string =
   generated_freevars := "";
   let expr_gend = codegen_expr e in
@@ -671,6 +687,7 @@ and codegen_expr_and_letindefs (e : expr_a) : string * string =
   generated_freevars := "";
   res
 
+(** Codegen expressions. *)
 and codegen_expr (e : expr_a) : string =
   let e' = ( $ ) e in
   match e' with
@@ -857,7 +874,7 @@ and codegen_expr (e : expr_a) : string =
 
 (* struct {int is_empty; int value;} palle = {0,1}; *)
 
-(* generates code for binary operators *)
+(** generates code for binary operators *)
 and codegen_binop (op : binop) : string =
   match op with
   | Add -> "+"
@@ -873,7 +890,7 @@ and codegen_binop (op : binop) : string =
   | Lor -> "||"
   | Neq -> "!="
 
-(* generates code for prefix unary operators *)
+(** generates code for prefix unary operators *)
 and codegen_preunop (op : preunop) : string =
   match op with
   | Neg -> "-"
@@ -883,7 +900,7 @@ and codegen_preunop (op : preunop) : string =
   | PreIncrement -> "++"
   | PreDecrement -> "--"
 
-(* generates code for postfix unary operators *)
+(** generates code for postfix unary operators *)
 and codegen_postunop (op : postunop) : string =
   match op with
   | PostIncrement -> "++"
@@ -891,7 +908,7 @@ and codegen_postunop (op : postunop) : string =
   | OptionIsSome -> ".is_some"
   | OptionGet _ -> ".contents"
 
-(* generates code for function declarations *)
+(** generates code for function declarations *)
 and codegen_fundecl (id : perkident) (typ : perktype) : string =
   let attrs, t, _ = typ in
   let attrs_str = String.concat " " (List.map codegen_attr attrs) in
@@ -949,6 +966,7 @@ and generate_types () =
   done;
   !out
 
+(** Generates code for type definitions. *)
 and codegen_type_definition (t : perktype) : string =
   let key = type_descriptor_of_perktype t in
   let _t, _code = Hashtbl.find type_symbol_table key in
@@ -1041,8 +1059,6 @@ and codegen_type_definition (t : perktype) : string =
                "Unexpected type generation request: got %s. If you see this \
                 error, please file an issue at https://github.com/"
                (type_descriptor_of_perktype t)))
-
-(* TODO, change these when relambding *)
 
 and codegen_lambda_environment (free_vars : perkvardesc list) :
     bool * string * string =

@@ -1,3 +1,5 @@
+(** Lexer for C types. *)
+
 open C_parser
 
 exception Lexing_error of (int * int) * (int * int) * string

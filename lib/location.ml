@@ -1,3 +1,5 @@
+(** Utils for positions in error-reporting. *)
+
 type location = {
   start_pos : int * int;
   end_pos : int * int;

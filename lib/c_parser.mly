@@ -1,4 +1,6 @@
 %{
+(** Parser for C types. *)
+
   open C_errors
   open Ctype_ast
 %}

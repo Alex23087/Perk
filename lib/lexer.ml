@@ -1,3 +1,5 @@
+(** Perk lexer *)
+
 open Parser
 open Errors
 
@@ -87,8 +89,8 @@ let rec token lexbuf =
   | "for" -> For
   | "return" -> Return
   (* | "switch"        -> Switch *)
-  | "break"         -> Break
-  | "continue"      -> Continue
+  | "break" -> Break
+  | "continue" -> Continue
   | "skip" -> Skip
   | "let" -> Let
   | "public" -> Public

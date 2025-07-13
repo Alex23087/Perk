@@ -1,5 +1,6 @@
 (library
  (name Perkelang)
+ (public_name perkelang)
  (libraries sedlex menhirLib)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq sedlex.ppx)))

@@ -1,3 +1,5 @@
+(** Abstract Syntax Tree of a Perk program. *)
+
 type 'a annotated = {
   loc : Location.location; [@opaque]
   node : 'a;
@@ -45,7 +47,7 @@ type perktype_qualifier =
 (* type of the perk -- giangpt *)
 type perktype_partial =
   | Basetype of string
-  | Funtype of perktype list * perktype
+  | Funtype of perktype list * perktype  (** types of args, return type *)
   | Lambdatype of
       perktype list
       * perktype
@@ -139,8 +141,7 @@ and expr_t =
   | Access of expr_a * perkident * perktype option * perktype option
   | Tuple of expr_a list * perktype option
   | As of perkident * perktype list
-  | Array of expr_a list
-  (** Cast ((from_type, to_type), expression)*)
+  | Array of expr_a list  (** Cast ((from_type, to_type), expression)*)
   | Cast of (perktype * perktype) * expr_a
   | IfThenElseExpr of expr_a * expr_a * expr_a
 [@@deriving show, eq]
