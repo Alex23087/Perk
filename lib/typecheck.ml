@@ -17,6 +17,39 @@ let get_lib_path s =
   in
   Printf.sprintf "/usr/include/%s" (remove_first_last s)
 
+(* TODO handle type aliases *)
+let is_numerical (_, typ, _) =
+  let nums =
+    [
+      Basetype "int";
+      Basetype "float";
+      Basetype "size_t";
+      Basetype "int64_t";
+      Basetype "int32_t";
+      Basetype "int16_t";
+      Basetype "int8_t";
+      Basetype "uint64_t";
+      Basetype "uint32_t";
+      Basetype "uint16_t";
+      Basetype "uint8_t";
+    ]
+  in
+  List.mem typ nums
+
+let numerical_rank : perktype -> int = function
+  | _, Basetype "float", _ -> 11
+  | _, Basetype "int64_t", _ -> 10
+  | _, Basetype "size_t", _ -> 9
+  | _, Basetype "uint64_t", _ -> 8
+  | _, Basetype "int32_t", _ -> 7
+  | _, Basetype "uint32_t", _ -> 6
+  | _, Basetype "int", _ -> 5 (* “int” you can treat as 32‐bit *)
+  | _, Basetype "int16_t", _ -> 4
+  | _, Basetype "uint16_t", _ -> 3
+  | _, Basetype "int8_t", _ -> 2
+  | _, Basetype "uint8_t", _ -> 1
+  | _ -> 0 (* non‐numeric or unknown *)
+
 let rec typecheck_program (ast : topleveldef_a list) : topleveldef_a list =
   push_symbol_table ();
   let res = List.map typecheck_topleveldef ast in
@@ -52,7 +85,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
       generate_tags !import_path_list;
       library_functions := get_prototype_types ();
       (* for each library function, if it is not already defined define it *)
-      (* TODO - need to check if already defined because sometimes tags file generates twice: figure out why *)
+      (* TODO solve conditionally compiled definitions *)
       (* TODO hoist these*)
       List.iter
         (fun (id, t) ->
@@ -186,9 +219,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
                 let t, i = decl_of_deforfun def in
                 if id = i then
                   let _ =
-                    try
-                      match_types t typ
-                      (* TODO: Check very carefully: Should it be t typ or typ t? *)
+                    try match_types t typ
                     with Type_match_error msg -> raise_type_error def msg
                   in
                   true
@@ -381,13 +412,11 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
   | IfThenElse (guard, then_branch, else_branch) ->
       let guard_res, guard_type = typecheck_expr guard in
       (match guard_type with
-      | _, Basetype "bool", _ -> () (* TODO: Decide what TODO with booleans *)
-      | _, Basetype "int", _ -> ()
+      | _, Basetype "bool", _ -> ()
+      | g when is_numerical g -> ()
       | _ ->
           raise_type_error cmd
-            (Printf.sprintf
-               "If guard must be a boolean (or an integer, we are still a bit \
-                confused ok?!?), got %s"
+            (Printf.sprintf "If guard must be a boolean or an int, got %s"
                (show_perktype guard_type)));
       push_symbol_table ();
       let then_branch_res = typecheck_command ~retype then_branch in
@@ -399,13 +428,11 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
   | Whiledo (guard, body) ->
       let guard_res, guard_type = typecheck_expr guard in
       (match guard_type with
-      | _, Basetype "bool", _ -> () (* TODO: Decide what TODO with booleans *)
-      | _, Basetype "int", _ -> ()
+      | _, Basetype "bool", _ -> ()
+      | g when is_numerical g -> ()
       | _ ->
           raise_type_error cmd
-            (Printf.sprintf
-               "If guard must be a boolean (or an integer, we are still a bit \
-                confused ok?!?), got %s"
+            (Printf.sprintf "If guard must be a boolean or an int, got %s"
                (show_perktype guard_type)));
       push_symbol_table ();
       let body_res = typecheck_command ~retype body in
@@ -414,13 +441,11 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
   | Dowhile (guard, body) ->
       let guard_res, guard_type = typecheck_expr guard in
       (match guard_type with
-      | _, Basetype "bool", _ -> () (* TODO: Decide what TODO with booleans *)
-      | _, Basetype "int", _ -> ()
+      | _, Basetype "bool", _ -> ()
+      | g when is_numerical g -> ()
       | _ ->
           raise_type_error cmd
-            (Printf.sprintf
-               "While guard must be a boolean (or an integer, we are still a \
-                bit confused ok?!?), got %s"
+            (Printf.sprintf "While guard must be a boolean or an int, got %s"
                (show_perktype guard_type)));
       push_symbol_table ();
       let body_res = typecheck_command ~retype body in
@@ -430,13 +455,11 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       let initcmd_res = typecheck_command ~retype initcmd in
       let guard_res, guard_type = typecheck_expr guard in
       (match guard_type with
-      | _, Basetype "bool", _ -> () (* TODO: Decide what TODO with booleans *)
-      | _, Basetype "int", _ -> ()
+      | _, Basetype "bool", _ -> ()
+      | g when is_numerical g -> ()
       | _ ->
           raise_type_error cmd
-            (Printf.sprintf
-               "For guard must be a boolean (or an integer, we are still a bit \
-                confused ok?!?), got %s"
+            (Printf.sprintf "For guard must be a boolean or an int, got %s"
                (show_perktype guard_type)));
       let incrcmd_res = typecheck_command ~retype incrcmd in
       push_symbol_table ();
@@ -447,7 +470,7 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
   | Switch _ -> cmd
   | Skip -> cmd
   | Banish id ->
-      (* TODO: Let banish unbind the future *)
+      (* TODO: Let banish unbind the future (unbind banished things after they're banished) *)
       (match Option.map resolve_type (lookup_var id) with
       | None -> raise_syntax_error cmd ("Identifier " ^ id ^ " not found")
       | Some (_, Modeltype _, _) -> ()
@@ -520,39 +543,6 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       ( annot_copy expr (Apply (fun_expr, List.map fst param_rets, apptype)),
         fun_ret_type )
   | Binop (op, lhs, rhs) -> (
-      let is_numerical (_, typ, _) =
-        let nums =
-          [
-            Basetype "int";
-            Basetype "float";
-            Basetype "size_t";
-            Basetype "int64_t";
-            Basetype "int32_t";
-            Basetype "int16_t";
-            Basetype "int8_t";
-            Basetype "uint64_t";
-            Basetype "uint32_t";
-            Basetype "uint16_t";
-            Basetype "uint8_t";
-          ]
-        in
-        List.mem typ nums
-      in
-
-      let numerical_rank : perktype -> int = function
-        | _, Basetype "float", _ -> 11
-        | _, Basetype "int64_t", _ -> 10
-        | _, Basetype "size_t", _ -> 9
-        | _, Basetype "uint64_t", _ -> 8
-        | _, Basetype "int32_t", _ -> 7
-        | _, Basetype "uint32_t", _ -> 6
-        | _, Basetype "int", _ -> 5 (* “int” you can treat as 32‐bit *)
-        | _, Basetype "int16_t", _ -> 4
-        | _, Basetype "uint16_t", _ -> 3
-        | _, Basetype "int8_t", _ -> 2
-        | _, Basetype "uint8_t", _ -> 1
-        | _ -> 0 (* non‐numeric or unknown *)
-      in
       let cast_priority t1 t2 =
         let r1 = numerical_rank t1 in
         let r2 = numerical_rank t2 in
@@ -644,9 +634,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       let op, res_type =
         match (op, resolve_type expr_type) with
         | OptionGet _, (_, Optiontype t, _) -> (OptionGet (Some t), t)
-        | OptionIsSome, (_, Optiontype _t, _) ->
-            (op, ([], Basetype "bool", []))
-            (* TODO: Decide what TODO with bools*)
+        | OptionIsSome, (_, Optiontype _t, _) -> (op, ([], Basetype "bool", []))
         | OptionGet _, _ | OptionIsSome, _ ->
             raise_type_error expr
               (Printf.sprintf "Option operator requires option type, got %s"
@@ -661,7 +649,8 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       let container_res, container_type = typecheck_expr container in
       let accessor_res, accessor_type = typecheck_expr accessor in
       (match accessor_type with
-      | _, Basetype "int", _ -> ()
+      | _, Basetype "int", _ ->
+          () (* TODO this should be any integral numeric type *)
       | _ ->
           raise_type_error expr
             (Printf.sprintf "Subscript operator requires int, got %s"
@@ -785,7 +774,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
   | Tuple (exprs, _) ->
       let exprs_res = List.map typecheck_expr exprs in
       let exprs_res = List.map (fun (a, b) -> fill_nothing a b b) exprs_res in
-      (* TODO: This won't work on typles *)
+      (* TODO: This won't work on typles (and wtf is THAT supposed to mean?!?) *)
       let types = List.map snd exprs_res in
       let tupletype = ([], Tupletype types, []) in
       bind_type_if_needed tupletype;
@@ -860,13 +849,11 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
         typecheck_expr ~expected_return:(Some bool_type) guard
       in
       (match guard_type with
-      | _, Basetype "bool", _ -> () (* TODO: Decide what TODO with booleans *)
-      | _, Basetype "int", _ -> ()
+      | _, Basetype "bool", _ -> ()
+      | g when is_numerical g -> ()
       | _ ->
           raise_type_error expr
-            (Printf.sprintf
-               "If guard must be a boolean (or an integer, we are still a bit \
-                confused ok?!?), got %s"
+            (Printf.sprintf "If guard must be a boolean or an int, got %s"
                (show_perktype guard_type)));
       let then_e_res, then_e_type = typecheck_expr then_e in
       let else_e_res, else_e_type = typecheck_expr else_e in

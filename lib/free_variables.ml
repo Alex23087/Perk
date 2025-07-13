@@ -40,9 +40,11 @@ let rec free_variables_command (cmd : command_a) :
           @ list_minus free_c3 (bound_c1 @ bound_c2),
           bound_c1 @ bound_c2 )
     | Expr e1 -> free_variables_expr e1
-    | Switch _ -> failwith "yomumsaho"
+    | Switch _ -> failwith "yomumsaho: ain't no switches when you're gone"
     | Skip -> ([], [])
-    | Banish id -> ([ id ], []) (* TODO: needda somme morre thinkin' *)
+    | Banish id ->
+        ([ id ], [])
+        (* TODO: needda somme morre thinkin' (can you still reference it?!?!? probly not) *)
     | Return None -> ([], [])
     | Return (Some e1) -> free_variables_expr e1
     | DefCmd (((_, id), def), _) ->

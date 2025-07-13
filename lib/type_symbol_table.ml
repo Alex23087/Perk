@@ -103,7 +103,7 @@ let resolve_type (typ : perktype) : perktype =
                   let ret_t, ret_l =
                     resolve_type_aux ~unfold:(unfold - 1) ret params_l
                   in
-                  (* TODO: Check if free vars need to be resolved *)
+                  (* TODO: Check if free vars need to be resolved (empirically it would seem not) *)
                   ((a, Lambdatype (params_t, ret_t, _free_vars), q), ret_l)
               | Arraytype (t, n) ->
                   let lst = typ :: lst in
@@ -196,8 +196,7 @@ let rec type_descriptor_of_perktype ?(erase_env = true) (t : perktype) : string
   let _, t, _ = t in
   match t with
   | Basetype s -> s
-  | Structtype s ->
-      s (* TODO: This is wrong, fix once structs are properly implemented *)
+  | Structtype _ -> failwith "structn't!" (* TODO: structize *)
   | Funtype (args, ret) ->
       let args_str =
         String.concat "__" (List.map type_descriptor_of_perktype args)
@@ -384,7 +383,7 @@ let dependencies_of_type (typ : perktype) : perkident list =
                 else
                   let decls =
                     List.map
-                      (* TODO: Check very carefully *)
+                      (* TODO: Check very carefully (TOODOO: BE MORE SPECIFIC WITH THE TOODOOS) *)
                       (fun (typ, id) ->
                         match typ with
                         | _a, Lambdatype (_params, _ret, _), _d ->
@@ -466,7 +465,6 @@ let rec bind_type_if_needed (typ : perktype) =
               List.iter bind_type_if_needed _params;
               bind_type_if_needed _ret
           | _, Lambdatype (_params, _ret, _free_variables), _ ->
-              (* TODO: LAMBDA pass env to function *)
               bind_type typ';
               (* Bind the type of the underlying function *)
               bind_type_if_needed (functype_of_lambdatype typ);

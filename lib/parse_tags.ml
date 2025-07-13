@@ -177,7 +177,6 @@ let remove_libs_expanded () =
 let perktype_of_sort s : perktype_partial =
   match s with CBaseSort x -> Basetype x | _ -> failwith ""
 
-(* TODO preserve qualifiers and specifiers of pointer *)
 let rec wrap_perktype_in_ptrs n (t : perktype) : perktype_partial =
   if n = 0 then failwith "should not call with 0"
   else if n = 1 then Pointertype t

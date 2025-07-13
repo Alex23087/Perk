@@ -62,8 +62,6 @@ let rec codegen_functional ~(is_lambda : bool) (e : expr_a) : string =
     let compiled, (free_variables : perkvardesc list), type_descriptor =
       match ( $ ) e with
       | Lambda (retype, args, body, free_variables) -> (
-          (* TODO: LAMBDA *)
-          (* try *)
           let type_str = codegen_type retype in
           let args_str =
             String.concat ", "
@@ -81,7 +79,6 @@ let rec codegen_functional ~(is_lambda : bool) (e : expr_a) : string =
               in
               bind_function_type id lambdatype;
               let type_descriptor = type_descriptor_of_perktype lambdatype in
-              (* codegen_lambda_capture e lambdatype; *)
               ( Printf.sprintf "static %s %s(%s) {\n%s\n}" type_str id args_str
                   body_str,
                 free_variables,
@@ -247,7 +244,6 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
   (* try *)
   say_here (Printf.sprintf "codegen_topleveldef: %s" (show_topleveldef_a tldf));
   let indent_string = "" in
-  (*TODO: Remove*)
   match ( $ ) tldf with
   | Archetype (i, l) ->
       let _ = add_archetype i in
@@ -550,7 +546,7 @@ and codegen_command (cmd : command_a) (indentation : int) : string =
       let expr_str, letindefs = codegen_expr_and_letindefs e in
       Printf.sprintf "%s%s%s%s;" (indent_maybe letindefs) letindefs
         indent_string expr_str
-  | Skip -> "" (*TODO: Should this be ; ?*)
+  | Skip -> ""
   | Switch (e, cases) ->
       let letindefs_cases, cases_str =
         let both =
@@ -572,7 +568,7 @@ and codegen_command (cmd : command_a) (indentation : int) : string =
         (letindefs ^ letindefs_cases)
         indent_string expr_str cases_str indent_string
   | Banish name ->
-      (* TODO: Automatically banish children *)
+      (* TODO: Automatically banish children (possibly add autobanish keyword to models members) *)
       Printf.sprintf "%sfree(%s);\n%s%s = NULL;" indent_string name
         indent_string name
   | Return None -> indent_string ^ Printf.sprintf "return;"
@@ -617,7 +613,7 @@ and codegen_fundef (t : perktype) (id : perkident) (args : perkvardesc list)
   Printf.sprintf "%s %s(%s) {\n%s\n}" type_str id args_str body_str
 
 (* transforms a perktype into a C type *)
-(* TODO figure out details...... *)
+(* TODO figure out details (attrs, quals)...... *)
 and codegen_type ?(expand : bool = false) (t : perktype) : string =
   (* Printf.printf "codegen_type: %s\n" (show_perktype t); flush stdout; *)
   let attrs, t', quals = t in
@@ -674,7 +670,6 @@ and codegen_expr (e : expr_a) : string =
   | String s -> Printf.sprintf "\"%s\"" (String.escaped s)
   | Var id -> id
   | Apply (e, args, _app_type) -> (
-      (* TODO: LAMBDA handle application type *)
       (* Printf.printf "Applying lambda with type %s\n"
          (match _app_type with
          | None -> "None"
@@ -975,8 +970,8 @@ and codegen_type_definition (t : perktype) : string =
               (match u with
               | _, Modeltype _, _ -> "void*"
               | _, Pointertype typ, _ ->
-                  type_descriptor_of_perktype typ
-                  ^ "*" (* TODO REMOVE THIS HORRIBLE FIX *)
+                  type_descriptor_of_perktype typ ^ "*"
+                  (* TODO REMOVE THIS HORRIBLE FIX (is it horrible though?) *)
               | _ -> type_descriptor_of_perktype u)
               key
           in

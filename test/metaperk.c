@@ -559,7 +559,7 @@ static tup_char_ptr__int_le __perkelang_lambda_2(TokenStack self) {
     }
     new_last_elem->next = ((TokenStack_opt) {0, 0});
     tup_char_ptr__int_le res = last_elem->val;
-    if (((int)(((void*)(last_elem)) != ((void*)(self))))) {
+    if (((void*)(last_elem)) != ((void*)(self))) {
         free(last_elem);
         last_elem = NULL;
     } else {
