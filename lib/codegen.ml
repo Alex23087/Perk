@@ -15,22 +15,28 @@ let hashtbl_forall f h = Hashtbl.fold (fun k v acc -> f k v && acc) h true
 let hashtbl_exists f h = Hashtbl.fold (fun k v acc -> f k v || acc) h false
 let fresh_var_counter = ref 0
 
+(** creates a new fresh variable __perkelang_s_n *)
 let fresh_var (s : string) : string =
   let v = !fresh_var_counter in
   fresh_var_counter := v + 1;
   Printf.sprintf "__perkelang_%s_%d" s v
 
-(* Lambda expression, identifier, generated code, capture list, type_descriptor*)
+(** table of lambdas: Lambda expression, identifier, generated code, capture
+    list, type_descriptor*)
 let lambdas_hashmap : (expr_a, string * string * string list * string) Hashtbl.t
     =
   Hashtbl.create 10
 
 let fundecl_symbol_table : (perkident, perktype) Hashtbl.t = Hashtbl.create 10
+
+(** list of imported libraries *)
 let import_list : string list ref = ref []
 
+(** hashtable of archetypes*)
 let archetype_hashtable : (string, (string, perktype) Hashtbl.t) Hashtbl.t =
   Hashtbl.create 10
 
+(** Adds a new archetype with name $name to the archetype hastable *)
 let add_archetype (name : string) : (string, perktype) Hashtbl.t =
   let new_archetype = Hashtbl.create 10 in
   Hashtbl.add archetype_hashtable name new_archetype;
@@ -42,19 +48,24 @@ let get_archetype (name : string) : (string, perktype) Hashtbl.t =
   with Not_found ->
     raise (TypeError (Printf.sprintf "Archetype %s not found" name))
 
+(** adds the binding ($id, $typ) to archetype with name $name*)
 let add_binding_to_archetype (name : string) (id : perkident) (typ : perktype) :
     unit =
   let archetype = get_archetype name in
   if not (Hashtbl.mem archetype id) then Hashtbl.add archetype id typ
 
+(** Adds an import to the import list *)
 let add_import (lib : string) : unit =
   if not (List.mem lib !import_list) then import_list := lib :: !import_list
 
 let lambda_environments : (string * string) list ref = ref []
 let lambda_typedefs : string list ref = ref []
 let lambda_capture_dummies : (string * string) list ref = ref []
+
+(** used to pass the let...in variables in codegen_expr *)
 let generated_freevars = ref ""
 
+(** codegens a function or a lambda *)
 let rec codegen_functional ~(is_lambda : bool) (e : expr_a) : string =
   try fst_4 (Hashtbl.find lambdas_hashmap e)
   with Not_found -> (

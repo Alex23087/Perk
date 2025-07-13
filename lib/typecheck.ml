@@ -9,15 +9,18 @@ open Parse_tags
 let library_functions = ref []
 let import_path_list = ref []
 
-(* TODO actual includepaths *)
+(** gathers the path(s) where libraries are located *)
 let get_lib_path s =
   let remove_first_last s =
     let len = String.length s in
     if len <= 2 then "" else String.sub s 1 (len - 2)
   in
+  (* TODO actual includepaths *)
   Printf.sprintf "/usr/include/%s" (remove_first_last s)
 
 (* TODO handle type aliases *)
+
+(** check if type is numerical *)
 let is_numerical (_, typ, _) =
   let nums =
     [
@@ -36,6 +39,8 @@ let is_numerical (_, typ, _) =
   in
   List.mem typ nums
 
+(** provides an integer ranking of numerical types: higher values are least
+    general types *)
 let numerical_rank : perktype -> int = function
   | _, Basetype "float", _ -> 11
   | _, Basetype "int64_t", _ -> 10
@@ -50,6 +55,7 @@ let numerical_rank : perktype -> int = function
   | _, Basetype "uint8_t", _ -> 1
   | _ -> 0 (* non‐numeric or unknown *)
 
+(** typechecks a set of toplevel definitions, instancing the inferred types *)
 let rec typecheck_program (ast : topleveldef_a list) : topleveldef_a list =
   push_symbol_table ();
   let res = List.map typecheck_topleveldef ast in
