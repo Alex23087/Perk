@@ -12,6 +12,14 @@ nix run github:Alex23087/Perk -- [files]
 
 This will build the `perkc` compiler and run it directly (you can pass any arguments after `--`).
 
+## Documentation
+
+We are using `ocamldoc` to generate the documentation. Use the command `make docs` to generate the documentation.
+
+## Integration with C
+
+Import C libraries using `import "libname.h"`. The compiler will automatically add most of the prototypes from the C source to the typechecker. This is not yet perfect, and does not yet work for custom include paths [(check out this issue)](https://github.com/Alex23087/Perk/issues/12), nor does it currently include macros.
+
 ## Features
 
 - Simple **type inference**
