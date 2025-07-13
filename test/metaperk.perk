@@ -50,7 +50,7 @@ model TokenStack {
         // buggaroni here, type inference does not infer
         let res : (char* * int) = last_elem.val;
 
-        if(cast(int, cast(void*, last_elem) != cast(void*, self))){
+        if(cast(void*, last_elem) != cast(void*, self)){
             banish last_elem;
         };
         

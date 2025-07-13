@@ -6,16 +6,15 @@ open Var_symbol_table
 open Free_variables
 open Parse_tags
 
-let library_functions = ref [];;
-let import_path_list = ref [] 
+let library_functions = ref []
+let import_path_list = ref []
 
-let get_lib_path s = 
+(* TODO actual includepaths *)
+let get_lib_path s =
   let remove_first_last s =
     let len = String.length s in
-    if len <= 2 then
-      ""
-    else
-      String.sub s 1 (len - 2) in 
+    if len <= 2 then "" else String.sub s 1 (len - 2)
+  in
   Printf.sprintf "/usr/include/%s" (remove_first_last s)
 
 let rec typecheck_program (ast : topleveldef_a list) : topleveldef_a list =
@@ -48,17 +47,20 @@ and typecheck_deferred_function (tldf : topleveldef_a) : topleveldef_a =
 
 and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
   match ( $ ) tldf with
-  | Import s -> 
-                import_path_list := (get_lib_path s) :: !import_path_list; 
-                generate_tags !import_path_list;
-                library_functions := get_prototype_types ();
-                  (* for each library function, if it is not already defined define it *)
-                  (* TODO - need to check if already defined because sometimes tags file generates twice: figure out why *)
-                List.iter (fun (id , t) -> if Option.is_none (lookup_var id) then bind_var id t else ()) !library_functions;
-                  remove_tags ();
-                  remove_libs_expanded ();
-                tldf
-
+  | Import s ->
+      import_path_list := get_lib_path s :: !import_path_list;
+      generate_tags !import_path_list;
+      library_functions := get_prototype_types ();
+      (* for each library function, if it is not already defined define it *)
+      (* TODO - need to check if already defined because sometimes tags file generates twice: figure out why *)
+      (* TODO hoist these*)
+      List.iter
+        (fun (id, t) ->
+          if Option.is_none (lookup_var id) then bind_var id t else ())
+        !library_functions;
+      remove_tags ();
+      remove_libs_expanded ();
+      tldf
   | InlineC _ -> tldf
   | Def (((typ, id), expr), _) ->
       if id = "self" then raise_type_error tldf "Identifier self is reserved"
@@ -472,8 +474,7 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       | None ->
           raise_type_error cmd "This return is not supposed to return any value");
       annot_copy cmd (Return (Some e_res))
-  | Continue | Break ->
-      cmd
+  | Continue | Break -> cmd
 
 and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
     expr_a * perktype =
@@ -518,58 +519,60 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       in
       ( annot_copy expr (Apply (fun_expr, List.map fst param_rets, apptype)),
         fun_ret_type )
-  | Binop (op, lhs, rhs) ->
+  | Binop (op, lhs, rhs) -> (
+      let is_numerical (_, typ, _) =
+        let nums =
+          [
+            Basetype "int";
+            Basetype "float";
+            Basetype "size_t";
+            Basetype "int64_t";
+            Basetype "int32_t";
+            Basetype "int16_t";
+            Basetype "int8_t";
+            Basetype "uint64_t";
+            Basetype "uint32_t";
+            Basetype "uint16_t";
+            Basetype "uint8_t";
+          ]
+        in
+        List.mem typ nums
+      in
 
-      let is_numerical (_, typ, _) = 
-        let nums = 
-          [Basetype "int"; 
-          Basetype "float";
-          Basetype "size_t"; 
-          Basetype "int64_t"; 
-          Basetype "int32_t";
-          Basetype "int16_t";
-          Basetype "int8_t";
-          Basetype "uint64_t"; 
-          Basetype "uint32_t";
-          Basetype "uint16_t";
-          Basetype "uint8_t"] in
-          List.mem typ nums in
-      
       let numerical_rank : perktype -> int = function
-        | _, Basetype "float"   , _ ->  11
-        | _, Basetype "int64_t" , _ ->  10
-        | _, Basetype "size_t"  , _ ->  9
-        | _, Basetype "uint64_t", _ ->  8
-        | _, Basetype "int32_t" , _ ->  7
-        | _, Basetype "uint32_t", _ ->  6
-        | _, Basetype "int"     , _ ->  5  (* “int” you can treat as 32‐bit *)
-        | _, Basetype "int16_t" , _ ->  4
-        | _, Basetype "uint16_t", _ ->  3
-        | _, Basetype "int8_t"  , _ ->  2
-        | _, Basetype "uint8_t" , _ ->  1
-        | _                  ->  0  (* non‐numeric or unknown *)
-
-      in let cast_priority t1 t2 =
+        | _, Basetype "float", _ -> 11
+        | _, Basetype "int64_t", _ -> 10
+        | _, Basetype "size_t", _ -> 9
+        | _, Basetype "uint64_t", _ -> 8
+        | _, Basetype "int32_t", _ -> 7
+        | _, Basetype "uint32_t", _ -> 6
+        | _, Basetype "int", _ -> 5 (* “int” you can treat as 32‐bit *)
+        | _, Basetype "int16_t", _ -> 4
+        | _, Basetype "uint16_t", _ -> 3
+        | _, Basetype "int8_t", _ -> 2
+        | _, Basetype "uint8_t", _ -> 1
+        | _ -> 0 (* non‐numeric or unknown *)
+      in
+      let cast_priority t1 t2 =
         let r1 = numerical_rank t1 in
         let r2 = numerical_rank t2 in
-        if r1 >= r2 then
-          t1  (* cast t2 → t1 *)
-        else
-          t2  (* cast t1 → t2 *) in
+        if r1 >= r2 then t1 (* cast t2 → t1 *) else t2
+        (* cast t1 → t2 *)
+      in
 
-      (match op with
+      match op with
       | Add | Sub | Mul | Div ->
           let lhs_res, lhs_type = typecheck_expr lhs in
           let rhs_res, rhs_type = typecheck_expr rhs in
           let lhs_res, lhs_type, rhs_res, rhs_type =
-          if is_numerical lhs_type && is_numerical rhs_type then 
-            let winner_type = cast_priority lhs_type rhs_type in
-            ( annot_copy lhs_res (Cast ((lhs_type, winner_type), lhs_res)),
-            winner_type,
-            annot_copy rhs_res (Cast ((rhs_type, winner_type), rhs_res)),
-            winner_type )
-          
-          else raise_type_error rhs "Numerical type expected" in
+            if is_numerical lhs_type && is_numerical rhs_type then
+              let winner_type = cast_priority lhs_type rhs_type in
+              ( annot_copy lhs_res (Cast ((lhs_type, winner_type), lhs_res)),
+                winner_type,
+                annot_copy rhs_res (Cast ((rhs_type, winner_type), rhs_res)),
+                winner_type )
+            else raise_type_error rhs "Numerical type expected"
+          in
           let res_type =
             try match_types lhs_type rhs_type
             with Type_match_error msg -> raise_type_error expr msg
@@ -577,13 +580,12 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           let lhs_res, _lhs_type = fill_nothing lhs_res lhs_type res_type in
           let rhs_res, _rhs_type = fill_nothing rhs_res rhs_type res_type in
           (annot_copy expr (Binop (op, lhs_res, rhs_res)), res_type)
-      | Eq | Lt | Leq | Gt | Geq | Neq | Land | Lor -> 
-        (* these comparisons all return bool *)
-        let lhs_res, _ = typecheck_expr lhs in
-        let rhs_res, _ = typecheck_expr rhs in
-        (annot_copy expr (Binop (op, lhs_res, rhs_res)), ([], Basetype("bool"), []))
-        )
-
+      | Eq | Lt | Leq | Gt | Geq | Neq | Land | Lor ->
+          (* these comparisons all return bool *)
+          let lhs_res, _ = typecheck_expr lhs in
+          let rhs_res, _ = typecheck_expr rhs in
+          ( annot_copy expr (Binop (op, lhs_res, rhs_res)),
+            ([], Basetype "bool", []) ))
   | PreUnop (op, e) ->
       let expr_res, expr_type = typecheck_expr e in
       let res_type =
@@ -667,7 +669,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       match container_type with
       | _, Arraytype (t, _n), _ ->
           (annot_copy expr (Subscript (container_res, accessor_res)), t)
-      | _, Pointertype (t), _ ->
+      | _, Pointertype t, _ ->
           (annot_copy expr (Subscript (container_res, accessor_res)), t)
       | _, Tupletype ts, _ -> (
           match ( $ ) accessor_res with
@@ -682,7 +684,8 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                 "Subscript operator requires constant integer")
       | _ ->
           raise_type_error expr
-            (Printf.sprintf "Subscript operator requires array, tuple or pointer, got %s"
+            (Printf.sprintf
+               "Subscript operator requires array, tuple or pointer, got %s"
                (show_perktype container_type)))
   | Summon (typeid, params) -> (
       let typ = lookup_type typeid in
@@ -829,7 +832,8 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
   | Something (e, _) ->
       let e_res, e_type = typecheck_expr e in
       (annot_copy expr (Something (e_res, e_type)), ([], Optiontype e_type, []))
-  | Nothing typ -> (expr, (typ)) (* this used to be infer by default, but added "of" syntax *)
+  | Nothing typ ->
+      (expr, typ) (* this used to be infer by default, but added "of" syntax *)
   | Array exprs -> (
       match exprs with
       | [] -> (expr, ([], Infer, []))

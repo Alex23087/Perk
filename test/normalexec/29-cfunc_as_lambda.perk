@@ -1,0 +1,10 @@
+import "stdio.h"
+
+fun f (culo : (char*, ...) -> int, palle : char*) : void {
+    culo(palle);
+} 
+
+fun main () : int {
+    f(printf, "aaaa");
+    return 0
+}

@@ -1,6 +1,6 @@
 open C_parser
 
-exception Lexing_error of (int * int)  * (int * int) * string
+exception Lexing_error of (int * int) * (int * int) * string
 
 let string_buffer = Buffer.create 512
 let digit = [%sedlex.regexp? '0' .. '9']
@@ -51,7 +51,7 @@ let unescape ch lexbuf =
       in
       raise (Lexing_error (start_pos, end_pos, "Invalid escape character"))
 
-let type_names = ref ["int";"char";"float";"void"]
+let type_names = ref [ "int"; "char"; "float"; "void" ]
 
 let rec token lexbuf =
   match%sedlex lexbuf with
@@ -65,9 +65,9 @@ let rec token lexbuf =
   | "short" -> Short
   | "signed" -> Signed
   | "unsigned" -> Unsigned
-  | identifier -> 
-    let s = (Sedlexing.Latin1.lexeme lexbuf) in
-    if List.mem s !type_names then BaseSort (s) else Ident (s)
+  | identifier ->
+      let s = Sedlexing.Latin1.lexeme lexbuf in
+      if List.mem s !type_names then BaseSort s else Ident s
   | "0x", hex_number -> Integer (int_of_string (Sedlexing.Latin1.lexeme lexbuf))
   | "0b", Plus ('0' | '1') ->
       Integer (int_of_string (Sedlexing.Latin1.lexeme lexbuf))
@@ -123,8 +123,6 @@ and multiline_comment lexbuf =
   | eof -> EOF
   | any -> multiline_comment lexbuf
   | _ -> failwith "Impossible!"
-
-
 
 and inlineC lexbuf =
   match%sedlex lexbuf with
