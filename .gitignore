@@ -1,5 +1,9 @@
 _build
 _opam
+docs
+
+perf.*
+*.perf
 
 test/*.out
 test/*.ast

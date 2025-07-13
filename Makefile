@@ -1,11 +1,9 @@
 PREFIX ?= /usr/local/perkelang
 SHELL := /usr/bin/env bash
 
-# .PHONY: compile
-# compile:
-# 	mkdir -p build
-# 	rm -f build/*
-# 	(opam exec -- dune test --force) 2> build/out.asm
+FILE := $(word 2,$(MAKECMDGOALS))
+%:
+	@:
 
 .PHONY: build
 build:
@@ -16,6 +14,7 @@ clean:
 	rm -rf build
 	opam exec dune clean
 	rm -f test/test.out test/test.c
+	rm -fr docs
 
 .PHONY: deps
 deps:
@@ -24,33 +23,32 @@ deps:
 	opam install menhir
 
 run: build
-	./_build/default/bin/perkc.exe test/test.perk
-	gcc -o test/test.out test/test.c
-	./test/test.out
+	./_build/default/bin/perkc.exe $(FILE)
+	$(eval OUTFILE := $(basename $(FILE)).out)
+	$(eval SRCFILE := $(basename $(FILE)).c)
+	gcc -o $(OUTFILE) $(SRCFILE)
+	./$(OUTFILE)
+	@rm -f $(OUTFILE) $(SRCFILE)
 
+# Run with perf profiling of the compilation only
 .PHONY: run_perf
-run_perf:
-	opam exec -- dune build
-	# OCAMLRUNPARAM=b ./_build/default/bin/perkc.exe test/test.perk
-	# gcc -o test/test.out test/test.c
-	# ./test/test.out
+run_perf: build
+	OCAMLRUNPARAM=b perf record -F 1000 --call-graph dwarf ./_build/default/bin/perkc.exe $(FILE)
+	$(eval SRCFILE := $(basename $(FILE)).c)
+	$(eval PERFFILE := $(basename $(FILE)).perf)
+	perf script -F +pid > $(PERFFILE)
+	rm -f $(SRCFILE)
 
-	# perf record -F 1000 --call-graph dwarf ./_build/default/bin/perkc.exe ../super_perkio/src/main.perk
-	./_build/default/bin/perkc.exe ../super_perkio/src/main.perk
-	perf script -F +pid > test.perf
-	gcc -o ../super_perkio/out/super_perkio ../super_perkio/src/main.c -lSDL2
-	../super_perkio/out/super_perkio
-
+# Run with debug information
 .PHONY: debug_run
-debug_run:
+debug_run: build
 	opam exec -- dune build --profile=dev
-	# OCAMLRUNPARAM=b ./_build/default/bin/perkc.exe test/normalexec/22-lambda_different_env.perk
-	# gcc -o test/normalexec/22-lambda_different_env.out test/normalexec/22-lambda_different_env.c
-	# ./test/normalexec/22-lambda_different_env.out
-
-	OCAMLRUNPARAM=b ./_build/default/bin/perkc.exe test/spigonzo.perk
-	gcc -o test/spigonzo test/spigonzo.c
-	test/spigonzo
+	OCAMLRUNPARAM=b ./_build/default/bin/perkc.exe $(FILE)
+	$(eval OUTFILE := $(basename $(FILE)).out)
+	$(eval SRCFILE := $(basename $(FILE)).c)
+	gcc -o $(OUTFILE) $(SRCFILE)
+	./$(OUTFILE)
+	rm -f $(OUTFILE) $(SRCFILE)
 
 .PHONY: extensions
 extensions:
@@ -108,3 +106,9 @@ test: build
 			echo "$$RES" >&2;\
 		fi ;\
 	done
+
+.PHONY: docs
+docs:
+	opam exec -- dune build @doc
+	mkdir -p docs
+	cp -r _build/default/_doc/_html/* docs/
