@@ -1,0 +1,51 @@
+name: Update Docs
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    container:
+      image: ocaml/opam:debian-11-ocaml-5.3
+      options: --user root
+      
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          chown opam:opam .
+          su opam -c 'make deps'
+
+      - name: Generate docs
+        run: su opam -c 'make docs'
+
+      - name: Set up Git
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          git config --global --add safe.directory /__w/Perk/Perk
+
+      - name: Get commit hash
+        id: get_hash
+        run: echo "hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Clone target repository
+        run: git clone ${{ secrets.TARGET_REPO }} target
+
+      - name: Update docs
+        run: |
+          cd target
+          rm -fr docs
+          cp -r ../docs .
+
+      - name: Push changes
+        run: |
+          cd target
+          git add .
+          git commit -m "Automated update from source repository (commit ${{ steps.get_hash.outputs.hash }})"
+          git push ${{ secrets.TARGET_REPO }}

@@ -41,7 +41,7 @@ let rec compile_program input_file =
 and process_file (filename : string) : string * string =
   let inchn = open_in filename in
   let ast_of_channel inchn =
-    let lexbuf = Sedlexing.Latin1.from_channel inchn in
+    let lexbuf = Sedlexing.Utf8.from_channel inchn in
     let lexer = Sedlexing.with_tokenizer Perkelang.Lexer.token lexbuf in
     let parser =
       MenhirLib.Convert.Simplified.traditional2revised Perkelang.Parser.program

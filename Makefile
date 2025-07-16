@@ -25,6 +25,7 @@ deps:
 	opam install ppx_deriving
 	opam install sedlex
 	opam install menhir
+	opam install odoc
 	@if ! command -v gcc >/dev/null 2>&1; then \
 		echo "Warning: gcc is not installed or not in PATH." >&2; \
 	fi

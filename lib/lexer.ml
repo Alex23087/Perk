@@ -60,15 +60,15 @@ let rec token lexbuf =
       InlineC (Buffer.contents string_buffer)
   | "+" -> Plus
   | "==" -> Eq
-  | "!=" | "≠" -> Neq
-  | "<=" | "≤" -> Leq
+  | "!=" | 0x2260 -> Neq (* ≠ *)
+  | "<=" | 0x2264 -> Leq (* ≤ *)
   | "<" -> Lt
-  | ">=" | "≥" -> Geq
+  | ">=" | 0x2265 -> Geq (* ≥ *)
   | ">" -> Gt
   | "-" -> Minus
-  | "!" | "¬" -> Bang
-  | "and" | "∧" | "&&" -> Land
-  | "or" | "∨" | "||" -> Lor
+  | "!" | 0x00AC -> Bang (* ¬ *)
+  | "and" | 0x2227 | "&&" -> Land (* ∧ *)
+  | "or" | 0x2228 | "||" -> Lor (* ∨ *)
   | "fun" -> Fun
   | "=" -> Assign
   | "++" -> PlusPlus
@@ -110,25 +110,25 @@ let rec token lexbuf =
   | "model" | "impl" | "class" -> Model
   | "summon" -> Summon
   | "banish" -> Banish
-  | "~>" | "as" | "⤳" | "⇝" -> As
-  | "->" | "→" -> Arrow
-  | "=>" | "⇒" -> Bigarrow
+  | "~>" | "as" | 0x2933 | 0x21DD -> As (* ⤳ ⇝ *)
+  | "->" | 0x2192 -> Arrow (* → *)
+  | "=>" | 0x21D2 -> Bigarrow (* ⇒ *)
   | "true" -> Boolean true
   | "false" -> Boolean false
   | "of" -> Of
-  | identifier -> Ident (Sedlexing.Latin1.lexeme lexbuf)
-  | "0x", hex_number -> Integer (int_of_string (Sedlexing.Latin1.lexeme lexbuf))
+  | identifier -> Ident (Sedlexing.Utf8.lexeme lexbuf)
+  | "0x", hex_number -> Integer (int_of_string (Sedlexing.Utf8.lexeme lexbuf))
   | "0b", Plus ('0' | '1') ->
-      Integer (int_of_string (Sedlexing.Latin1.lexeme lexbuf))
+      Integer (int_of_string (Sedlexing.Utf8.lexeme lexbuf))
   | "0o", oct_number ->
       Integer
         (int_of_string
            ("0o"
            ^
-           let s = Sedlexing.Latin1.lexeme lexbuf in
+           let s = Sedlexing.Utf8.lexeme lexbuf in
            String.sub s 2 (String.length s - 2)))
-  | dec_number -> Integer (int_of_string (Sedlexing.Latin1.lexeme lexbuf))
-  | float_number -> Float (float_of_string (Sedlexing.Latin1.lexeme lexbuf))
+  | dec_number -> Integer (int_of_string (Sedlexing.Utf8.lexeme lexbuf))
+  | float_number -> Float (float_of_string (Sedlexing.Utf8.lexeme lexbuf))
   | "'" -> char lexbuf
   | '"' ->
       Buffer.clear string_buffer;
@@ -145,12 +145,12 @@ let rec token lexbuf =
   | "[" -> LBracket
   | "]" -> RBracket
   | "!" -> Bang
-  | "*" | "×" -> Star
+  | "*" | 0x00D7 -> Star (* × *)
   | "/" -> Div
   | "//" -> comment lexbuf
   | "/*" -> multiline_comment lexbuf
   | eof -> EOF
-  (* | inline_c_content, "}" -> INLINEC_CONTENT (Sedlexing.Latin1.lexeme lexbuf) *)
+  (* | inline_c_content, "}" -> INLINEC_CONTENT (Sedlexing.Utf8.lexeme lexbuf) *)
   | any ->
       let start_pos =
         ( (fst (Sedlexing.lexing_positions lexbuf)).pos_lnum,
@@ -167,7 +167,7 @@ let rec token lexbuf =
            ( start_pos,
              end_pos,
              Printf.sprintf "Unrecognised character: '%s'"
-               (Sedlexing.Latin1.lexeme lexbuf) ))
+               (Sedlexing.Utf8.lexeme lexbuf) ))
   | _ -> failwith "Impossible!"
 
 and comment lexbuf =
@@ -186,7 +186,7 @@ and multiline_comment lexbuf =
 
 and char lexbuf =
   match%sedlex lexbuf with
-  | character, "'" -> Character (Sedlexing.Latin1.lexeme lexbuf).[0]
+  | character, "'" -> Character (Sedlexing.Utf8.lexeme lexbuf).[0]
   | _ ->
       let start_pos =
         ( (fst (Sedlexing.lexing_positions lexbuf)).pos_lnum,
@@ -205,7 +205,7 @@ and inlineC lexbuf =
   match%sedlex lexbuf with
   | "END_C" -> ()
   | any ->
-      Buffer.add_string string_buffer (Sedlexing.Latin1.lexeme lexbuf);
+      Buffer.add_string string_buffer (Sedlexing.Utf8.lexeme lexbuf);
       inlineC lexbuf
   | _ ->
       let start_pos =
@@ -236,12 +236,12 @@ and string_literal lexbuf =
       in
       raise (Lexing_error (start_pos, end_pos, "Unterminated string"))
   | escape ->
-      let chara = Sedlexing.Latin1.lexeme lexbuf in
+      let chara = Sedlexing.Utf8.lexeme lexbuf in
       Buffer.add_char string_buffer
         (match chara.[0] with '\\' -> unescape chara.[1] lexbuf | c -> c);
       string_literal lexbuf
   | stringchar ->
-      Buffer.add_string string_buffer (Sedlexing.Latin1.lexeme lexbuf);
+      Buffer.add_string string_buffer (Sedlexing.Utf8.lexeme lexbuf);
       string_literal lexbuf
   | _ ->
       (* Handle invalid characters in string literal *)
