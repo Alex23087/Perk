@@ -1,4 +1,8 @@
+import "stdio.h"
+
 fun main () : int {
     let x := 5;
     let y := 5 + .5;
+
+    printf("x: %d, y: %.2f\n", x, y);
 }

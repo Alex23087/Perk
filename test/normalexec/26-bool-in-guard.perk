@@ -1,15 +1,17 @@
+import "stdio.h"
+
 fun main () : int {
     if(1) {
-        skip
+        printf("good1\n");
     };
     if(true) {
-        skip
+        printf("good2\n");
     };
 
     let x : int = 4;
     let y : int = 2;
 
     if((x > y) && true) {
-        skip
+        printf("good3\n");
     }
 }

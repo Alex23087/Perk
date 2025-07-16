@@ -5,6 +5,8 @@ fun f (culo : (char*, ...) -> int, palle : char*) : void {
 } 
 
 fun main () : int {
-    f(printf, "aaaa");
+    // In the following, the cast is only necessary because we don't yet have const in Perk.
+    // Once we have const, we can use printf directly.
+    f(cast((char*, ...) -> int, printf), "aaaa");
     return 0
 }
