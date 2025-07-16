@@ -59,6 +59,7 @@
 %type <Ast.expr_a> expr
 %type <Ast.perkident list> ident_list
 %type <Ast.perktype list> perktype_list
+%type <Ast.command_a> if_command
 
 // %on_error_reduce command
 
@@ -82,12 +83,17 @@ topleveldef:
   | Fun pf = perkfun                                                                                       { annotate_2_code $loc (Ast.Fundef (pf)) }
   | error                                                                                             { raise (ParseError("top-level definition expected")) }
 
+
+if_command:
+  | If LParen e = expr RParen LBrace c1 = command RBrace Else LBrace c2 = command RBrace                   { annotate_2_code $loc (Ast.IfThenElse (e, c1, c2)) }
+  | If LParen e = expr RParen LBrace c1 = command RBrace Else c2 = if_command                              { annotate_2_code $loc (Ast.IfThenElse (e, c1, c2)) }
+  | If LParen e = expr RParen LBrace c1 = command RBrace                                                   { annotate_2_code $loc (Ast.IfThenElse (e, c1, annotate_dummy Ast.Skip)) }
+
 command:
   | ic = InlineC                                                                                           { annotate_2_code $loc (Ast.InlineCCmd(ic)) }
   | d = perkdef                                                                                            { annotate_2_code $loc (Ast.DefCmd (d, None)) }
   | l = expr Assign r = expr                                                                               { annotate_2_code $loc (Ast.Assign (l, r, None, None)) }
-  | If LParen e = expr RParen LBrace c1 = command RBrace Else LBrace c2 = command RBrace                   { annotate_2_code $loc (Ast.IfThenElse (e, c1, c2)) }
-  | If LParen e = expr RParen LBrace c1 = command RBrace                                                   { annotate_2_code $loc (Ast.IfThenElse (e, c1, annotate_dummy Ast.Skip)) }
+  | if_command                                                                                             { $1 }
   | While LParen e = expr RParen LBrace c = command RBrace                                                 { annotate_2_code $loc (Ast.Whiledo (e, c)) }
   | Do LBrace c = command RBrace While LParen e = expr RParen                                              { annotate_2_code $loc (Ast.Dowhile (e, c)) }
   | For LParen c1 = command Semicolon e2 = expr Semicolon c3 = command RParen LBrace body = command RBrace { annotate_2_code $loc (Ast.For (c1, e2, c3, body)) }

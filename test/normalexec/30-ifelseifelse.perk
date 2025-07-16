@@ -1,0 +1,16 @@
+import "stdio.h"
+
+fun main () : int {
+    for(let i := 0; i < 10; i = i + 1) {
+        if (i < 5) {
+            printf("%d < 5\n", i);
+            i = i + 1;
+        } else if (i < 8) {
+            printf("%d < 8\n", i);
+            i = i + 2;
+        } else {
+            printf("%d >= 8\n", i);
+            i = i + 3;
+        }
+    }
+}
