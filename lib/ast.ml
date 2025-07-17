@@ -16,12 +16,12 @@ let annotate (node : 'a) (loc : Location.location) : 'a annotated =
 
 let annotate_2 (loc : Location.location) (node : 'a) = { loc; node }
 
-let annotate_code (node : 'a) (start_pos, end_pos) : 'a annotated =
-  let loc = Location.to_code_position (start_pos, end_pos) in
+let annotate_code (node : 'a) (start_pos, end_pos) filename : 'a annotated =
+  let loc = Location.to_code_position (start_pos, end_pos, filename) in
   { loc; node }
 
-let annotate_2_code (start_pos, end_pos) (node : 'a) : 'a annotated =
-  let loc = Location.to_code_position (start_pos, end_pos) in
+let annotate_2_code filename (start_pos, end_pos) (node : 'a) : 'a annotated =
+  let loc = Location.to_code_position (start_pos, end_pos, filename) in
   { loc; node }
 
 let annotate_dummy (node : 'a) : 'a annotated =

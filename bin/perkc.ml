@@ -15,12 +15,14 @@ let ast_of_filename filename =
   let inchn = open_in filename in
   let ast_of_channel inchn =
     let lexbuf = Sedlexing.Utf8.from_channel inchn in
+    Sedlexing.set_filename lexbuf filename;
     let lexer = Sedlexing.with_tokenizer Perkelang.Lexer.token lexbuf in
     let parser =
       MenhirLib.Convert.Simplified.traditional2revised Perkelang.Parser.program
     in
+    Perkelang.Utils.fnm := filename;
     try parser lexer with
-    | ParseError e ->
+    | ParseError (f, e) ->
         raise
           (Syntax_error
              ( ( (fst (Sedlexing.lexing_positions lexbuf)).pos_lnum,
@@ -29,6 +31,7 @@ let ast_of_filename filename =
                ( (snd (Sedlexing.lexing_positions lexbuf)).pos_lnum,
                  (snd (Sedlexing.lexing_positions lexbuf)).pos_cnum
                  - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol ),
+               f,
                e ))
     | Perkelang.Parser.Error ->
         raise
@@ -39,6 +42,7 @@ let ast_of_filename filename =
                ( (snd (Sedlexing.lexing_positions lexbuf)).pos_lnum,
                  (snd (Sedlexing.lexing_positions lexbuf)).pos_cnum
                  - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol ),
+               filename,
                "Unhandled parsing error. If this happens to you, please open \
                 an issue on https://github.com/Alex23087/Perk/issues" ))
   in
@@ -59,26 +63,30 @@ let rec compile_program input_file =
     output_string oc compiled;
     close_out oc
   with
-  | Syntax_error ((start_line, start_col), (end_line, end_col), msg) ->
+  | Syntax_error ((start_line, start_col), (end_line, end_col), input_file, msg)
+    ->
       Printf.eprintf
         "\027[31mSyntax error at line %d, column %d: %s, ending at line %d, \
-         column %d\027[0m\n"
-        start_line start_col msg end_line end_col;
+         column %d in file %s\027[0m\n"
+        start_line start_col msg end_line end_col input_file;
       exit 1
-  | Lexing_error ((start_line, start_col), (end_line, end_col), msg) ->
+  | Lexing_error ((start_line, start_col), (end_line, end_col), input_file, msg)
+    ->
       Printf.eprintf
         "\027[31mLexing error at line %d, column %d: %s, ending at line %d, \
-         column %d\027[0m\n"
-        start_line start_col msg end_line end_col;
+         column %d in file %s\027[0m\n"
+        start_line start_col msg end_line end_col input_file;
       exit 1
-  | Type_error ((start_line, start_col), (end_line, end_col), msg) ->
+  | Type_error ((start_line, start_col), (end_line, end_col), input_file, msg)
+    ->
       Printf.eprintf
         "\027[31mType error at line %d, column %d: %s, ending at line %d, \
-         column %d\027[0m\n"
-        start_line start_col msg end_line end_col;
+         column %d in file %s\027[0m\n"
+        start_line start_col msg end_line end_col input_file;
       exit 1
   | Perkelang.Parser.Error ->
-      Printf.eprintf "\027[31mParsing error: unexpected token\027[0m\n";
+      Printf.eprintf
+        "\027[31mParsing error: unexpected token in file %s\027[0m\n" input_file;
       exit 1
 
 and process_file (filename : string) : string * string =
@@ -116,23 +124,29 @@ and expand_opens (dir : string) (ast : topleveldef_a list) : topleveldef_a list
 
 and check_file (filename : string) : unit =
   try process_file filename |> ignore with
-  | Syntax_error ((start_line, start_col), (end_line, end_col), msg) ->
+  | Syntax_error ((start_line, start_col), (end_line, end_col), input_file, msg)
+    ->
       Printf.printf
         "{\"error\": \"syntax\", \"start_line\": %d, \"start_col\": %d, \
-         \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\"}\n"
-        start_line start_col end_line end_col (String.escaped msg);
+         \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
+         \"%s\"}\n"
+        start_line start_col end_line end_col (String.escaped msg) input_file;
       exit 0
-  | Lexing_error ((start_line, start_col), (end_line, end_col), msg) ->
+  | Lexing_error ((start_line, start_col), (end_line, end_col), input_file, msg)
+    ->
       Printf.printf
         "{\"error\": \"lexing\", \"start_line\": %d, \"start_col\": %d, \
-         \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\"}\n"
-        start_line start_col end_line end_col (String.escaped msg);
+         \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
+         \"%s\"}\n"
+        start_line start_col end_line end_col (String.escaped msg) input_file;
       exit 0
-  | Type_error ((start_line, start_col), (end_line, end_col), msg) ->
+  | Type_error ((start_line, start_col), (end_line, end_col), input_file, msg)
+    ->
       Printf.printf
         "{\"error\": \"typecheck\", \"start_line\": %d, \"start_col\": %d, \
-         \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\"}\n"
-        start_line start_col end_line end_col (String.escaped msg);
+         \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
+         \"%s\"}\n"
+        start_line start_col end_line end_col (String.escaped msg) input_file;
       exit 0
 
 let () =

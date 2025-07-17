@@ -3,6 +3,7 @@
 open Ast
 open Errors
 
+let fnm = ref ""
 let static_compilation : bool = false
 
 (** Debug function that can be enabled to track function call numbers. *)
