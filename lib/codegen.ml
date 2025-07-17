@@ -486,6 +486,10 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
   | Import lib ->
       add_import lib;
       ""
+  | Open _ ->
+      raise_compilation_error tldf
+        "Opens should not reach this point (codegen). If you see this error, \
+         please open an issue at https://github.com/Alex23087/Perk/issues"
 (* with Not_inferred s -> raise_type_error tldf s *)
 
 (** Generates code for perk commands. *)

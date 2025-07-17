@@ -101,6 +101,8 @@ let rec token lexbuf =
   | "volatile" -> Volatile
   | "restrict" -> Restrict
   | "import" -> Import
+  | "import_local" ->
+      ImportLocal (* TODO: This token is as ugly as it gets, change *)
   | "open" -> Open
   (* | "true" -> Integer 1
      | "false" -> Integer 0 *)
