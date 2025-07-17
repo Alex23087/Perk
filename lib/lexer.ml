@@ -1,6 +1,7 @@
 (** Perk lexer *)
 
 open Parser
+open Utils
 open Errors
 
 let string_buffer = Buffer.create 512
@@ -50,7 +51,8 @@ let unescape ch lexbuf =
           (snd (Sedlexing.lexing_positions lexbuf)).pos_cnum
           - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol )
       in
-      raise (Lexing_error (start_pos, end_pos, "Invalid escape character"))
+      raise
+        (Lexing_error (start_pos, end_pos, !fnm, "Invalid escape character"))
 
 let rec token lexbuf =
   match%sedlex lexbuf with
@@ -168,6 +170,7 @@ let rec token lexbuf =
         (Lexing_error
            ( start_pos,
              end_pos,
+             !fnm,
              Printf.sprintf "Unrecognised character: '%s'"
                (Sedlexing.Utf8.lexeme lexbuf) ))
   | _ -> failwith "Impossible!"
@@ -201,7 +204,8 @@ and char lexbuf =
           - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol )
       in
       raise
-        (Lexing_error (start_pos, end_pos, "Character not closed by a quote!"))
+        (Lexing_error
+           (start_pos, end_pos, !fnm, "Character not closed by a quote!"))
 
 and inlineC lexbuf =
   match%sedlex lexbuf with
@@ -220,7 +224,8 @@ and inlineC lexbuf =
           (snd (Sedlexing.lexing_positions lexbuf)).pos_cnum
           - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol )
       in
-      raise (Lexing_error (start_pos, end_pos, "Inline C not closed by END_C!"))
+      raise
+        (Lexing_error (start_pos, end_pos, !fnm, "Inline C not closed by END_C!"))
 
 and string_literal lexbuf =
   match%sedlex lexbuf with
@@ -236,7 +241,7 @@ and string_literal lexbuf =
           (snd (Sedlexing.lexing_positions lexbuf)).pos_cnum
           - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol )
       in
-      raise (Lexing_error (start_pos, end_pos, "Unterminated string"))
+      raise (Lexing_error (start_pos, end_pos, !fnm, "Unterminated string"))
   | escape ->
       let chara = Sedlexing.Utf8.lexeme lexbuf in
       Buffer.add_char string_buffer
@@ -258,6 +263,7 @@ and string_literal lexbuf =
           - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol )
       in
       raise
-        (Lexing_error (start_pos, end_pos, "Invalid character in string literal"))
+        (Lexing_error
+           (start_pos, end_pos, !fnm, "Invalid character in string literal"))
 
 let tokenize (lexbuf : Sedlexing.lexbuf) = token lexbuf
