@@ -47,5 +47,9 @@ jobs:
         run: |
           cd target
           git add .
-          git commit -m "Automated update from source repository (commit ${{ steps.get_hash.outputs.hash }})"
-          git push ${{ secrets.TARGET_REPO }}
+          if git diff-index --quiet HEAD; then
+            echo "Nothing to commit, succeeding quietly"
+          else
+            git commit -m "Automated update from source repository (commit ${{ steps.get_hash.outputs.hash }})"
+            git push ${{ secrets.TARGET_REPO }}
+          fi
