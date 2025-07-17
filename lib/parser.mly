@@ -20,7 +20,7 @@
 %token Public Private Static Extern
 %token Const Volatile Restrict
 %token <string> InlineC
-%token Import Open
+%token Import ImportLocal Open
 %token Archetype Model Summon Banish Cast
 %token Nothing Something Of
 
@@ -73,15 +73,16 @@ program:
 
 topleveldef:
   | Import i = String                                                                                      { annotate_2_code $loc (Ast.Import ("<" ^ i ^ ">")) }
-  | Open i = String                                                                                        { annotate_2_code $loc (Ast.Import ("\"" ^ i ^ "\"")) }
+  | ImportLocal i = String                                                                                 { annotate_2_code $loc (Ast.Import ("\"" ^ i ^ "\"")) }
+  | Open i = String                                                                                        { annotate_2_code $loc (Ast.Open i) }
   | Extern id = Ident Colon t = perktype                                                                   { annotate_2_code $loc (Ast.Extern (id, t)) }
   | ic = InlineC                                                                                           { annotate_2_code $loc (Ast.InlineC(ic)) }
   | d = perkdef                                                                                            { annotate_2_code $loc (Ast.Def (d, None)) }
-  | Archetype i = Ident LBrace l = perkdeclorfun_list RBrace                                                 { annotate_2_code $loc (Ast.Archetype (i, l)) }
-  | Model i = Ident Colon il = ident_list LBrace l = perkdeforfun_list RBrace                                   { annotate_2_code $loc (Ast.Model (i, il, l)) }
-  | Model i = Ident LBrace l = perkdeforfun_list RBrace                                                         { annotate_2_code $loc (Ast.Model (i, [], l)) }
+  | Archetype i = Ident LBrace l = perkdeclorfun_list RBrace                                               { annotate_2_code $loc (Ast.Archetype (i, l)) }
+  | Model i = Ident Colon il = ident_list LBrace l = perkdeforfun_list RBrace                              { annotate_2_code $loc (Ast.Model (i, il, l)) }
+  | Model i = Ident LBrace l = perkdeforfun_list RBrace                                                    { annotate_2_code $loc (Ast.Model (i, [], l)) }
   | Fun pf = perkfun                                                                                       { annotate_2_code $loc (Ast.Fundef (pf)) }
-  | error                                                                                             { raise (ParseError("top-level definition expected")) }
+  | error                                                                                                  { raise (ParseError("top-level definition expected")) }
 
 
 if_command:
@@ -135,7 +136,7 @@ perkfun:
 
 perkvardesc:
   | i = Ident Colon t = perktype                                                                           { (t, i) }
-  | i = Ident Colon                                                                                             { (([], Ast.Infer, []), i) }
+  | i = Ident Colon                                                                                        { (([], Ast.Infer, []), i) }
   | error { raise (ParseError("variable descriptor expected (e.g. banana : int)")) }
   | Ident error { raise (ParseError("variable descriptor expected (e.g. banana : int)")) }
 
@@ -198,9 +199,9 @@ expr:
   | LParen tl = perktype_list RParen Arrow tf = perktype                                                   { Ast.Funtype (tl, tf) }
 
 %inline perklamtype:
-  | t1 = perktype Bigarrow t2 = perktype                                                                      { Ast.Lambdatype ([t1], t2, []) }
-  | LParen RParen Bigarrow t = perktype                                                                       { Ast.Lambdatype ([], t, []) }
-  | LParen tl = perktype_list RParen Bigarrow tf = perktype                                                   { Ast.Lambdatype (tl, tf, []) }
+  | t1 = perktype Bigarrow t2 = perktype                                                                   { Ast.Lambdatype ([t1], t2, []) }
+  | LParen RParen Bigarrow t = perktype                                                                    { Ast.Lambdatype ([], t, []) }
+  | LParen tl = perktype_list RParen Bigarrow tf = perktype                                                { Ast.Lambdatype (tl, tf, []) }
 
 perktype:
   | t = perktype_partial q = list(perktype_qualifier)                                                      { ([], t, q) }

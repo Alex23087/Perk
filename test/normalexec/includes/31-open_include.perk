@@ -1,0 +1,6 @@
+open "../31-open.perk"
+import "stdio.h"
+
+fun f (): void {
+  printf("Hello from f!");
+}

@@ -108,6 +108,10 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
       remove_tags ();
       remove_libs_expanded ();
       tldf
+  | Open _ ->
+      raise_compilation_error tldf
+        "Opens should not reach this point (typecheck). If you see this error, \
+         please open an issue at https://github.com/Alex23087/Perk/issues"
   | InlineC _ -> tldf
   | Def (((typ, id), expr), _) ->
       if id = "self" then raise_type_error tldf "Identifier self is reserved"

@@ -1,0 +1,5 @@
+open "includes/31-open_include.perk"
+
+fun main (): void {
+  f();
+}

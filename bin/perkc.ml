@@ -3,6 +3,49 @@ open Perkelang.Codegen
 open Perkelang.Errors (*EWWOWS*)
 open Perkelang.Typecheck
 
+let opens_hashmap : (string, unit) Hashtbl.t = Hashtbl.create 16
+
+let add_import (import : string) : bool =
+  if Hashtbl.mem opens_hashmap import then false
+  else (
+    Hashtbl.add opens_hashmap import ();
+    true)
+
+let ast_of_filename filename =
+  let inchn = open_in filename in
+  let ast_of_channel inchn =
+    let lexbuf = Sedlexing.Utf8.from_channel inchn in
+    let lexer = Sedlexing.with_tokenizer Perkelang.Lexer.token lexbuf in
+    let parser =
+      MenhirLib.Convert.Simplified.traditional2revised Perkelang.Parser.program
+    in
+    try parser lexer with
+    | ParseError e ->
+        raise
+          (Syntax_error
+             ( ( (fst (Sedlexing.lexing_positions lexbuf)).pos_lnum,
+                 (fst (Sedlexing.lexing_positions lexbuf)).pos_cnum
+                 - (fst (Sedlexing.lexing_positions lexbuf)).pos_bol ),
+               ( (snd (Sedlexing.lexing_positions lexbuf)).pos_lnum,
+                 (snd (Sedlexing.lexing_positions lexbuf)).pos_cnum
+                 - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol ),
+               e ))
+    | Perkelang.Parser.Error ->
+        raise
+          (Syntax_error
+             ( ( (fst (Sedlexing.lexing_positions lexbuf)).pos_lnum,
+                 (fst (Sedlexing.lexing_positions lexbuf)).pos_cnum
+                 - (fst (Sedlexing.lexing_positions lexbuf)).pos_bol ),
+               ( (snd (Sedlexing.lexing_positions lexbuf)).pos_lnum,
+                 (snd (Sedlexing.lexing_positions lexbuf)).pos_cnum
+                 - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol ),
+               "Unhandled parsing error. If this happens to you, please open \
+                an issue on https://github.com/Alex23087/Perk/issues" ))
+  in
+  let ast = ast_of_channel inchn in
+  close_in inchn;
+  ast
+
 let rec compile_program input_file =
   let out_file = Filename.chop_suffix input_file ".perk" ^ ".c" in
 
@@ -39,45 +82,37 @@ let rec compile_program input_file =
       exit 1
 
 and process_file (filename : string) : string * string =
-  let inchn = open_in filename in
-  let ast_of_channel inchn =
-    let lexbuf = Sedlexing.Utf8.from_channel inchn in
-    let lexer = Sedlexing.with_tokenizer Perkelang.Lexer.token lexbuf in
-    let parser =
-      MenhirLib.Convert.Simplified.traditional2revised Perkelang.Parser.program
-    in
-    try parser lexer with
-    | ParseError e ->
-        raise
-          (Syntax_error
-             ( ( (fst (Sedlexing.lexing_positions lexbuf)).pos_lnum,
-                 (fst (Sedlexing.lexing_positions lexbuf)).pos_cnum
-                 - (fst (Sedlexing.lexing_positions lexbuf)).pos_bol ),
-               ( (snd (Sedlexing.lexing_positions lexbuf)).pos_lnum,
-                 (snd (Sedlexing.lexing_positions lexbuf)).pos_cnum
-                 - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol ),
-               e ))
-    | Perkelang.Parser.Error ->
-        raise
-          (Syntax_error
-             ( ( (fst (Sedlexing.lexing_positions lexbuf)).pos_lnum,
-                 (fst (Sedlexing.lexing_positions lexbuf)).pos_cnum
-                 - (fst (Sedlexing.lexing_positions lexbuf)).pos_bol ),
-               ( (snd (Sedlexing.lexing_positions lexbuf)).pos_lnum,
-                 (snd (Sedlexing.lexing_positions lexbuf)).pos_cnum
-                 - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol ),
-               "Unhandled parsing error. If this happens to you, please open \
-                an issue on https://github.com/Alex23087/Perkelang/issues" ))
+  let filename_canonical =
+    Fpath.to_string (Fpath.normalize (Fpath.v filename))
   in
-
-  let ast = ast_of_channel inchn in
+  add_import filename_canonical |> ignore;
+  let dirname = Filename.dirname filename in
+  let ast = ast_of_filename filename in
+  let ast = expand_opens dirname ast in
   let ast = typecheck_program ast in
   let out =
     ( String.concat "\n" (List.map show_topleveldef_a ast),
       ast |> codegen_program )
   in
-  close_in inchn;
   out
+
+and expand_opens (dir : string) (ast : topleveldef_a list) : topleveldef_a list
+    =
+  match ast with
+  | { loc = _; node = Open i } :: rest ->
+      let open_filename =
+        if Fpath.is_rel (Fpath.v i) then
+          Fpath.(to_string (normalize (v dir // v i)))
+        else Fpath.(to_string (normalize (v i)))
+      in
+      let did_add = add_import open_filename in
+      if did_add then
+        expand_opens
+          (Filename.dirname open_filename)
+          (ast_of_filename open_filename @ rest)
+      else expand_opens dir rest
+  | x :: rest -> x :: expand_opens dir rest
+  | [] -> []
 
 and check_file (filename : string) : unit =
   try process_file filename |> ignore with

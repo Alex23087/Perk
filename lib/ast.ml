@@ -169,6 +169,7 @@ and command_t =
 and topleveldef_t =
   | InlineC of string
   | Import of string
+  | Open of string
   | Extern of perkident * perktype
   | Def of perkdef * perktype option
   | Fundef of perkfundef
