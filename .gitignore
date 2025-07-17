@@ -5,11 +5,9 @@ docs
 perf.*
 *.perf
 
-test/*.out
-test/*.ast
-test/test.c
-
-test/normalexec/**/*.c
+test/**/*.out
+test/**/*.ast
+test/**/*.c
 
 perkelang-vscode-lsp/node_modules
 perkelang-vscode-lsp/out
