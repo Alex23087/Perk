@@ -69,8 +69,9 @@
 /* Grammar specification */
 
 program:
-  | defs = list(topleveldef) EOF                                    { defs }
+  | defs = nonempty_list(topleveldef) EOF                                                                  { defs }
   | separated_list(Semicolon, topleveldef) error                                                           { raise (ParseError(!fnm, "unexpected token after program (Perhaps you forgot a ; ?)")) }
+  | EOF                                                                                                    { raise (ParseError(!fnm, "empty program")) }
 
 topleveldef:
   | Import i = String                                                                                      { annotate_2_code !fnm $loc (Ast.Import ("<" ^ i ^ ">")) }
