@@ -1,0 +1,5 @@
+import "stdio.h"
+
+fun main() {
+    printf("This file is expected to fail due to a missing return type.");
+}

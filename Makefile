@@ -113,14 +113,15 @@ uninstall:
 
 # Test target: run tests on the compiler
 # If FILE is specified, run a single test file; otherwise, run all tests
-.PHONY: test
-test: build
+.PHONY: test_pass
+test_pass: build
+	@echo "Testing programs that are expected to pass..."
 	@if [ -n "$(FILE)" ]; then \
-		if [ ! -e test/normalexec/"$(FILE)"*.perk ]; then \
+		if [ ! -e test/pass/"$(FILE)"*.perk ]; then \
 			echo "File starting with $(FILE) does not exist." >&2; \
 			exit 1; \
 		fi ;\
-		FILE=$$(ls test/normalexec/$(FILE)*.perk | head -n 1) ;\
+		FILE=$$(ls test/pass/$(FILE)*.perk | head -n 1) ;\
 		echo "Testing single file: $$FILE"; \
 		BASENAME="$${FILE%.*}"; \
 		EXPECTED="$${BASENAME}.expected"; \
@@ -143,10 +144,18 @@ test: build
 			echo "$$RES" >&2;\
 		fi ;\
 	else \
-		COUNT=$$(ls -1 test/normalexec/*.perk | wc -l) ;\
+		if [ ! -d "test/pass" ]; then \
+			echo "Error: test/pass directory does not exist." >&2; \
+			exit 1; \
+		fi ;\
+		if [ ! -n "$$(ls -A test/pass/*.perk 2>/dev/null)" ]; then \
+			echo "Error: No .perk files found in test/pass directory." >&2; \
+			exit 1; \
+		fi ;\
+		COUNT=$$(ls -1 test/pass/*.perk | wc -l) ;\
 		CURRENT=0 ;\
-		IGNORE=(18) ;\
-		for f in test/normalexec/*.perk ; \
+		IGNORE=() ;\
+		for f in test/pass/*.perk ; \
 		do \
 			CURRENT=$$((CURRENT+1)) ;\
 			if printf '%s\n' "$${IGNORE[@]}" | grep -q "^$$CURRENT$$"; then \
@@ -178,6 +187,72 @@ test: build
 			fi ;\
 		done ;\
 	fi
+
+# Test programs that are expected to fail
+.PHONY: test_fail
+test_fail: build
+	@echo "Testing programs that are expected to fail..."
+	@if [ -n "$(FILE)" ]; then \
+		if [ ! -e test/fail/"$(FILE)"*.perk ]; then \
+			echo "File starting with $(FILE) does not exist." >&2; \
+			exit 1; \
+		fi ;\
+		FILE=$$(ls test/fail/$(FILE)*.perk | head -n 1) ;\
+		echo "Testing single file: $$FILE"; \
+		BASENAME="$${FILE%.*}"; \
+		CFILE="$${BASENAME}.c"; \
+		RES=$$(_build/default/bin/perkc.exe "$$FILE" 2>&1); \
+		EXIT_CODE=$$?; \
+		rm -f "$$(dirname $$FILE)/a.out" "$$CFILE"; \
+		if [ $$EXIT_CODE -ne 0 ]; then \
+			# echo "$$RES" ;\
+			:;\
+		else \
+			echo "Expected failure, but the test passed." >&2;\
+			echo "File: $$FILE" >&2;\
+			echo "Output: $$RES" >&2;\
+			exit 1;\
+		fi ;\
+	else \
+		if [ ! -d "test/fail" ]; then \
+			echo "Error: test/fail directory does not exist." >&2; \
+			exit 1; \
+		fi ;\
+		if [ ! -n "$$(ls -A test/fail/*.perk 2>/dev/null)" ]; then \
+			echo "Error: No .perk files found in test/fail directory." >&2; \
+			exit 1; \
+		fi ;\
+		COUNT=$$(ls -1 test/fail/*.perk | wc -l) ;\
+		CURRENT=0 ;\
+		IGNORE=() ;\
+		for f in test/fail/*.perk ; \
+		do \
+			CURRENT=$$((CURRENT+1)) ;\
+			if printf '%s\n' "$${IGNORE[@]}" | grep -q "^$$CURRENT$$"; then \
+				# echo "[$$CURRENT/$$COUNT] Ignoring $$(basename "$${f%.*}")" ;\
+				continue ;\
+			fi ;\
+			echo "[$$CURRENT/$$COUNT] Testing $$(basename "$${f%.*}")" ; \
+			RES=$$(_build/default/bin/perkc.exe "$$f" 2>&1) ; \
+			EXIT_CODE=$$?; \
+			rm -f "$$(dirname $$f)/a.out" "$${f%.*}.c" ;\
+			if [ $$EXIT_CODE -ne 0 ]; then \
+				# echo "$$RES" ;\
+				:;\
+			else \
+				echo "Expected failure, but the test passed." >&2;\
+				echo "File: $$(basename $${f%.*})" >&2;\
+				echo "Output: $$RES" >&2;\
+			fi ;\
+		done ;\
+	fi
+
+# Run all tests (both pass and fail)
+.PHONY: test
+test:
+	@echo "Running all tests..."
+	@$(MAKE) test_pass
+	@$(MAKE) test_fail
 
 # Generate documentation
 .PHONY: docs
