@@ -9,20 +9,17 @@ jobs:
   update-docs:
     runs-on: ubuntu-latest
     container:
-      image: ocaml/opam:debian-11-ocaml-5.3
+      image: alex23087/perkc_builder:latest
       options: --user root
       
     steps:
       - name: Checkout source repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          chown opam:opam .
-          su opam -c 'make deps'
-
       - name: Generate docs
-        run: su opam -c 'make docs'
+        run: |
+          chown -R opam:opam .
+          su opam -c 'make docs'
 
       - name: Set up Git
         run: |
