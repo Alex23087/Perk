@@ -1,0 +1,7 @@
+import "stdio.h"
+
+fun main(): void {
+    if ("true") {
+        printf("Hello, World!");
+    }
+}

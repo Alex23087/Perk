@@ -1,0 +1,22 @@
+name: Run Tests
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    container:
+      image: alex23087/perkc_builder:latest
+      options: --user root
+      
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+
+      - name: Run tests
+        run: |
+          chown -R opam:opam .
+          su opam -c 'make test'
