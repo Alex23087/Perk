@@ -1,4 +1,4 @@
 (executable
- (name test_Perkelang)
- (modules test_Perkelang)
- (libraries Perkelang))
+ (name test_Perk)
+ (modules test_Perk)
+ (libraries Perk))

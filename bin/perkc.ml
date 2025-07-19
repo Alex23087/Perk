@@ -1,4 +1,4 @@
-open Perkelang.Compile_utils
+open Perk.Compile_utils
 
 let () =
   if Array.length Sys.argv < 2 then (

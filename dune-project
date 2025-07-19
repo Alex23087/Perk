@@ -2,12 +2,12 @@
 
 (using menhir 3.0)
 
-(name perkelang)
+(name perk)
 
 (generate_opam_files true)
 
 (source
- (github Alex23087/Perkelang))
+ (github Alex23087/Perk))
 
 (authors "Alex23087" "mell-o-tron")
 
@@ -15,14 +15,13 @@
 
 (license LICENSE)
 
-(documentation https://url/to/documentation)
+(documentation https://perklang.org/docs/perk/Perk/index.html)
 
 (package
- (name perkelang)
- (synopsis "A short synopsis")
- (description "A longer description")
+ (name perk)
+ (synopsis "A modern, ergonomic, low level programming language.")
+ (description
+  "Perk is a modern low level programming language, compiled to C. It builds on C's simplicity, adding features such as option types, lambdas and typeclasses. Its current goal is to replace C in the implementation of the MellOS operating system.")
  (depends ocaml dune)
  (tags
-  (topics "to describe" your project)))
-
-; See the complete stanza docs at https://dune.readthedocs.io/en/stable/reference/dune-project/index.html
+  ("programming language" "compiler" "lambda functions" "low-level")))

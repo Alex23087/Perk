@@ -1,5 +1,5 @@
 {
-  description = "Perkelang development environment";
+  description = "Perk development environment";
 
   inputs = {
     nixpkgs.url = "nixpkgs/nixos-unstable";
@@ -13,7 +13,7 @@
         ocamlPkgs = pkgs.ocamlPackages;
       in {
         devShells.default = pkgs.mkShell {
-          name = "perkelang-dev";
+          name = "perk-dev";
 
           buildInputs = [
             ocamlPkgs.ocaml
@@ -54,7 +54,7 @@
 
           src = builtins.path {
             path = ./.;
-            name = "perkelang-src";
+            name = "perk-src";
           };
 
           nativeBuildInputs = [

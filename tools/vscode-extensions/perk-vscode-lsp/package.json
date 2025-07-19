@@ -1,8 +1,8 @@
 {
-  "name": "perkelang-vscode-lsp",
-  "displayName": "Perkelang Language Server",
+  "name": "perk-vscode-lsp",
+  "displayName": "Perk Language Server",
   "version": "1.0.0",
-  "description": "A VSCode extension for the Perkelang language.",
+  "description": "A VSCode extension for the Perk language.",
   "publisher": "Perkelo",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -11,7 +11,7 @@
     "vscode": "^1.80.0"
   },
   "keywords": [
-    "Perkelang",
+    "Perk",
     "language",
     "extension"
   ],
@@ -26,9 +26,9 @@
   "contributes": {
     "languages": [
       {
-        "id": "perkelang",
+        "id": "perk",
         "aliases": [
-          "Perkelang"
+          "Perk"
         ],
         "extensions": [
           ".perk"

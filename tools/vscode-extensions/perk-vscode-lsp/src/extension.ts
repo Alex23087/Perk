@@ -5,11 +5,11 @@ import * as path from 'path';
 import { execSync } from 'child_process';
 
 export function activate(context: vscode.ExtensionContext) {
-    const diagnosticCollection = vscode.languages.createDiagnosticCollection('Perkelang');
+    const diagnosticCollection = vscode.languages.createDiagnosticCollection('Perk');
 
     vscode.workspace.onDidChangeTextDocument((event) => {
         const document = event.document;
-        if (document.languageId === 'perkelang') {
+        if (document.languageId === 'perk') {
             const diagnostics: vscode.Diagnostic[] = [];
 
             // Run your compiler and get errors

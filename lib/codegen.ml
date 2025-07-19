@@ -17,11 +17,11 @@ let hashtbl_forall f h = Hashtbl.fold (fun k v acc -> f k v && acc) h true
 let hashtbl_exists f h = Hashtbl.fold (fun k v acc -> f k v || acc) h false
 let fresh_var_counter = ref 0
 
-(** creates a new fresh variable __perkelang_s_n *)
+(** creates a new fresh variable __perk_s_n *)
 let fresh_var (s : string) : string =
   let v = !fresh_var_counter in
   fresh_var_counter := v + 1;
-  Printf.sprintf "__perkelang_%s_%d" s v
+  Printf.sprintf "__perk_%s_%d" s v
 
 (** table of lambdas: Lambda expression, identifier, generated code, capture
     list, type_descriptor*)
@@ -202,13 +202,13 @@ and codegen_program (tldfs : topleveldef_a list) : string =
        #define CALL_LAMBDA(l, t, ...) (__lambdummy = (__lambdummy_type \
        *)l,       ((t)(__lambdummy->func))(__VA_ARGS__))" ^ "\n\n"
     (* ^ "#define CAST_LAMBDA(name, from_type, to_type, func_type) \
-          ((__perkelang_capture_dummy_##from_type = name, (to_type) \
-          {__perkelang_capture_dummy_##from_type.env, \
-          (func_type)__perkelang_capture_dummy_##from_type.func}))\n"
-       ^ "#define CALL_LAMBDA0(l, t) (__perkelang_capture_dummy_##t = l, \
-          __perkelang_capture_dummy_##t.func(&(__perkelang_capture_dummy_##t.env)))\n"
-       ^ "#define CALL_LAMBDA(l, t, ...) (__perkelang_capture_dummy_##t = l, \
-          __perkelang_capture_dummy_##t.func(&(__perkelang_capture_dummy_##t.env), \
+          ((__perk_capture_dummy_##from_type = name, (to_type) \
+          {__perk_capture_dummy_##from_type.env, \
+          (func_type)__perk_capture_dummy_##from_type.func}))\n"
+       ^ "#define CALL_LAMBDA0(l, t) (__perk_capture_dummy_##t = l, \
+          __perk_capture_dummy_##t.func(&(__perk_capture_dummy_##t.env)))\n"
+       ^ "#define CALL_LAMBDA(l, t, ...) (__perk_capture_dummy_##t = l, \
+          __perk_capture_dummy_##t.func(&(__perk_capture_dummy_##t.env), \
           __VA_ARGS__))\n" ^ "\n\n" *)
     (* Write typedefs for functions*)
     (* ^ Hashtbl.fold
@@ -359,7 +359,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
               with Failure _ ->
                 raise_type_error tldf
                   "constructor has 0 arguments. If you see this error, please \
-                   open an issue at https://github.com/Alex23087/Perkelang"
+                   open an issue at https://github.com/Alex23087/Perk"
             in
             let params = List.map fst params in
             ( String.concat ", "
@@ -1161,4 +1161,4 @@ and codegen_lambda_capture (lamtype : perktype) : string =
       failwith
         "Impossible: codegen_lambda_capture: not a lambda expression. If you \
          see this error please file an issue at \
-         https://github.com/Alex23087/Perkelang/issues"
+         https://github.com/Alex23087/Perk/issues"

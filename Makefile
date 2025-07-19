@@ -1,4 +1,4 @@
-PREFIX ?= /usr/local/perkelang
+PREFIX ?= /usr/local/perk
 SHELL := /usr/bin/env bash
 
 # The following lines allow targets to take arguments from the command line
@@ -91,9 +91,9 @@ extensions:
 		echo "Error: tsc is not installed" >&2; \
 		exit 1; \
 	fi
-	cd perkelang-extension && \
+	cd tools/vscode-extensions/perk-syntax && \
 	vsce package --allow-missing-repository
-	cd perkelang-vscode-lsp && \
+	cd tools/vscode-extensions/perk-vscode-lsp && \
 	npx tsc && \
 	vsce package --allow-missing-repository
 
