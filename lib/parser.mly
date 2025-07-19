@@ -123,8 +123,8 @@ command:
   
 
 deforfun:
-  | d = perkdef                                                                                            {annotate_2_code !fnm $loc (Ast.DefVar(d))}
-  | Fun d = perkfun                                                                                        {annotate_2_code !fnm $loc (Ast.DefFun(d))}
+  | d = perkdef                                                                                            {annotate_2_code !fnm $loc (Ast.DefVar([], d))}
+  | Fun d = perkfun                                                                                        {annotate_2_code !fnm $loc (Ast.DefFun([], d))}
 
 perkdef:
   | Let vd = perkvardesc Assign e = expr                                                                   { (vd, e) }
@@ -279,7 +279,9 @@ perktype_list:
 
 perkdeforfun_list:
   | t = deforfun { [t] }
+  | a = nonempty_list(perktype_attribute) t = deforfun { [add_attrs_to_deforfun a t] }
   | tl = deforfun Comma t = perkdeforfun_list { tl :: t }
+  | a = nonempty_list(perktype_attribute) tl = deforfun Comma t = perkdeforfun_list { (add_attrs_to_deforfun a tl) :: t }
   | error { raise (ParseError(!fnm, "definition expected")) }
   | deforfun error { raise (ParseError(!fnm, "unexpected definition")) }
 

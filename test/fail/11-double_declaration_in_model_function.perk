@@ -1,0 +1,4 @@
+model Test {
+    fun f(): void { skip },
+    fun f(): void { skip } // This should not be allowed, as 'f' is already declared
+}

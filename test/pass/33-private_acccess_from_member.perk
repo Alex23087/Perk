@@ -1,0 +1,19 @@
+import "stdio.h"
+
+model User {
+  let id: char* = "",
+  let name: char* = "",
+  public let email: char* = "",
+  private let password: char* = "",
+
+  fun getPassword(): char* {
+    return self.password; // This method can access the private field
+  }
+}
+
+fun main (): void {
+  let user := summon User();
+  user.id = "12345"; // This should be allowed
+  user.email = "user@example.com"; // This should also be allowed
+  printf(user.getPassword()); // This should be allowed
+}

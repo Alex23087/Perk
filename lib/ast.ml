@@ -59,10 +59,10 @@ type perktype_partial =
   | Modeltype of
       perkident
       * perkident list
-      * perkdecl list
+      * (perktype_attribute list * perkdecl) list
       * perktype list
       * perkident list
-    (* name, archetypes, fields, constructor_params, member functions*)
+    (* name, archetypes, fields (with access attributes), constructor_params, member functions*)
   | Optiontype of perktype
   | Tupletype of perktype list
   | ArchetypeSum of perktype list
@@ -177,8 +177,8 @@ and topleveldef_t =
   | Model of perkident * perkident list * deforfun_a list
 
 and deforfun_t =
-  | DefVar of perkdef
-  | DefFun of perkfundef
+  | DefVar of perktype_attribute list * perkdef
+  | DefFun of perktype_attribute list * perkfundef
 
 and declorfun_t =
   | DeclVar of perkdecl

@@ -143,11 +143,11 @@ let resolve_type (typ : perktype) : perktype =
                   let lst = typ :: lst in
                   let decls_t, decls_l =
                     List.fold_right
-                      (fun (param, ide) (acc, lst) ->
+                      (fun (attr, (param, ide)) (acc, lst) ->
                         let res_t, res_l =
                           resolve_type_aux ~unfold:(unfold - 1) param lst
                         in
-                        ((res_t, ide) :: acc, res_l))
+                        ((attr, (res_t, ide)) :: acc, res_l))
                       decls ([], lst)
                   in
                   ( ( a,
@@ -386,16 +386,18 @@ let dependencies_of_type (typ : perktype) : perkident list =
                   let decls =
                     List.map
                       (* TODO: Check very carefully (TOODOO: BE MORE SPECIFIC WITH THE TOODOOS) *)
-                      (fun (typ, id) ->
+                      (fun (attr, (typ, id)) ->
                         match typ with
                         | _a, Lambdatype (_params, _ret, _), _d ->
-                            (add_parameter_to_func (self_type name) typ, id)
-                        | _ -> (typ, id))
+                            ( attr,
+                              (add_parameter_to_func (self_type name) typ, id)
+                            )
+                        | _ -> (attr, (typ, id)))
                       decls
                   in
                   let decls_t, lst =
                     List.fold_right
-                      (fun (param, _ide) (acc, lst) ->
+                      (fun (_attr, (param, _ide)) (acc, lst) ->
                         let res_t, res_l =
                           dependencies_of_type_aux ~voidize param lst
                         in

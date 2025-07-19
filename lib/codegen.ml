@@ -320,19 +320,20 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
         List.map
           (fun def ->
             match ( $ ) def with
-            | DefFun (typ, id, params, cmd) ->
+            | DefFun (attrs, (typ, id, params, cmd)) ->
                 annot_copy def
                   (DefFun
-                     ( add_parameter_to_func selftype typ,
-                       id,
-                       (selftype, "self") :: params,
-                       cmd ))
-            | DefVar ((typ, id), expr) -> (
+                     ( attrs,
+                       ( add_parameter_to_func selftype typ,
+                         id,
+                         (selftype, "self") :: params,
+                         cmd ) ))
+            | DefVar (attrs, ((typ, id), expr)) -> (
                 match (typ, ( $ ) expr) with
                 | (_, Funtype (_, _), _), Lambda (_, _, _, _) ->
                     raise_type_error expr
                       "impossible: free vars should be empty in funtype"
-                | _ -> annot_copy def (DefVar ((typ, id), expr))))
+                | _ -> annot_copy def (DefVar (attrs, ((typ, id), expr)))))
           defs
       in
 
@@ -341,8 +342,8 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
         List.find_opt
           (fun def ->
             match ( $ ) def with
-            | DefFun (_, id, _, _) -> id = "constructor"
-            | DefVar ((_, id), expr) ->
+            | DefFun (_, (_, id, _, _)) -> id = "constructor"
+            | DefVar (_, ((_, id), expr)) ->
                 if id = "constructor" then
                   raise_type_error expr "Constructor cannot be a lambda"
                 else false)
@@ -354,7 +355,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
       let params_str_with_types, params_str, params_typ =
         match constructor with
         | None -> ("", "", [])
-        | Some (DefFun (_typ, _, params, _)) ->
+        | Some (DefFun (_, (_typ, _, params, _))) ->
             let params =
               try List.tl params
               with Failure _ ->
@@ -392,7 +393,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
               (indent_string ^ "    "
               ^ String.concat
                   (";\n" ^ indent_string ^ "    ")
-                  (List.map codegen_decl mems))
+                  (List.map codegen_decl (List.map snd mems)))
               ^ ";")
            (if List.length il = 0 then ""
             else
@@ -423,14 +424,14 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
               (List.map
                  (fun def ->
                    match ( $ ) def with
-                   | DefFun func ->
+                   | DefFun (_, func) ->
                        (* Synthesize lambda for more homogeneous treatment 👍 *)
                        let _typ, id, _params, _cmd = func in
                        let typ = funtype_of_perkfundef func in
                        let lambda = annot_copy def (lambda_of_func func) in
                        Printf.sprintf "self->%s = (%s) %s" id (codegen_type typ)
                          (codegen_functional ~is_lambda:false lambda)
-                   | DefVar ((typ, id), expr) ->
+                   | DefVar (_, ((typ, id), expr)) ->
                        let expr_str, letindefs =
                          codegen_expr_and_letindefs expr
                        in

@@ -234,7 +234,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
           match
             List.exists
               (fun def ->
-                let t, i = decl_of_deforfun def in
+                let _, (t, i) = decl_of_deforfun def in
                 if id = i then
                   let _ =
                     try match_types t typ
@@ -271,8 +271,8 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
         List.find_opt
           (fun def ->
             match ( $ ) def with
-            | DefFun (_, id, _, _) -> id = "constructor"
-            | DefVar ((_, id), expr) ->
+            | DefFun (_, (_, id, _, _)) -> id = "constructor"
+            | DefVar (_, ((_, id), expr)) ->
                 if id = "constructor" then
                   raise_type_error expr "Constructor must be a function"
                 else false)
@@ -280,7 +280,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
       in
       let constr_params =
         match Option.map ( $ ) constr with
-        | Some (DefFun (ret, _, params, _)) ->
+        | Some (DefFun (_, (ret, _, params, _))) ->
             (* Check that constructor returns void *)
             let _ =
               try match_types ([], Basetype "void", []) ret
@@ -297,7 +297,6 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
       (* Check that all the fields defined in the model are well-typed *)
       push_symbol_table ();
       (* !!!!!WARNING!!!!! THIS CANNOT BE DONE LIKE THAT. MUST BE CHECKED AS FOR PROGRAM FOR HOISTED FUNCTIONS !!!!!WARNING!!!!! *)
-      (* TODO: For some reason, you can write things like member[0] instead of self.member[0]. Investigate *)
       let temp_model_type =
         ( [],
           Modeltype
@@ -310,11 +309,13 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
       in
       bind_type_if_needed temp_model_type;
       bind_var "self" temp_model_type;
+      (* The following local symbol table is used to check for duplicate definitions in the model, without accidentally defining names at a wrong level *)
+      let local_symbol_table = ref [ Hashtbl.create 10 ] in
       let fields_res =
         List.map
           (fun def ->
             match ( $ ) def with
-            | DefFun (ret, id, params, body) ->
+            | DefFun (attrs, (ret, id, params, body)) ->
                 push_symbol_table ();
                 List.iter
                   (fun (typ, id) ->
@@ -323,16 +324,21 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
                   params;
                 let body_res = typecheck_command ~retype:(Some ret) body in
                 pop_symbol_table ();
-                annot_copy def (DefFun (ret, id, params, body_res))
-            | DefVar ((typ, id), expr) ->
+                (try
+                   bind_var_local local_symbol_table id
+                     ([], Funtype (List.map fst params, ret), [])
+                 with Double_declaration msg -> raise_type_error def msg);
+                annot_copy def (DefFun (attrs, (ret, id, params, body_res)))
+            | DefVar (attrs, ((typ, id), expr)) ->
                 let expr_res, expr_type = typecheck_expr expr in
                 let expr_res, expr_type = fill_nothing expr_res expr_type typ in
                 let typ' =
                   try match_types typ expr_type
                   with Type_match_error msg -> raise_type_error expr msg
                 in
-                bind_var id typ';
-                annot_copy def (DefVar ((typ', id), expr_res)))
+                (try bind_var_local local_symbol_table id typ'
+                 with Double_declaration msg -> raise_type_error def msg);
+                annot_copy def (DefVar (attrs, ((typ', id), expr_res))))
           fields
       in
       pop_symbol_table ();
@@ -351,12 +357,12 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
       List.iter
         (fun def ->
           match ( $ ) def with
-          | DefFun (typ, _, params, _) ->
+          | DefFun (_, (typ, _, params, _)) ->
               (* Generate type binding for functions. Need to add virtual self to the parameters *)
               ([], Funtype (List.map fst params, typ), [])
               |> add_parameter_to_func modeltype
               |> bind_type_if_needed
-          | DefVar ((typ, _), _) -> bind_type_if_needed typ)
+          | DefVar (_, ((typ, _), _)) -> bind_type_if_needed typ)
         fields_res;
       annot_copy tldf (Model (ident, archetypes, fields_res))
 
@@ -720,7 +726,10 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                     %d, got %d%s"
                    (List.length constr_params)
                    (List.length param_rets)
-                   (if List.exists (fun (_typ, id) -> id = "constructor") fields
+                   (if
+                      List.exists
+                        (fun (_a, (_typ, id)) -> id = "constructor")
+                        fields
                     then ""
                     else ". Constructor is not defined"))
             else
@@ -744,14 +753,25 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       )
   | Access (expr, ide, _, _) ->
       let expr_res, expr_type = typecheck_expr expr in
-      let res_type, access_type, rightype =
+      let ( (res_type : perktype),
+            (access_type : perktype option),
+            (rightype : perktype option) ) =
+        let is_self =
+          match ( $ ) expr_res with Var "self" -> true | _ -> false
+        in
         match resolve_type expr_type with
         | ( _,
             Modeltype (name, _archetypes, fields, _constr_params, _member_funcs),
             _ ) -> (
-            let field = List.find_opt (fun (_, id) -> id = ide) fields in
+            let field = List.find_opt (fun (_, (_, id)) -> id = ide) fields in
             match field with
-            | Some (typ, _) -> (typ, Some expr_type, Some typ)
+            | Some (attrs, (typ, _))
+              when is_self || not (List.mem Private attrs) ->
+                (typ, Some expr_type, Some typ)
+            | Some (_, (_, _)) ->
+                raise_type_error expr
+                  (Printf.sprintf
+                     "Trying to access private field %s of model %s" ide name)
             | None ->
                 raise_type_error expr
                   (Printf.sprintf "Field %s not found in model %s" ide name))
@@ -996,14 +1016,19 @@ and match_types ?(coalesce : bool = false) (expected : perktype)
              && List.equal String.equal member_funcs1 member_funcs2 ->
           let decls_types =
             List.map2
-              (fun (t1, id1) (t2, id2) ->
-                if id1 = id2 then (match_types_aux t1 t2, id1)
+              (fun (a1, (t1, id1)) (a2, (t2, id2)) ->
+                if a1 = a2 then
+                  if id1 = id2 then (a1, (match_types_aux t1 t2, id1))
+                  else
+                    raise
+                      (Type_match_error
+                         (Printf.sprintf
+                            "Model %s has different field names: %s and %s"
+                            name1 id1 id2))
                 else
                   raise
                     (Type_match_error
-                       (Printf.sprintf
-                          "Model %s has different field names: %s and %s" name1
-                          id1 id2)))
+                       (Printf.sprintf "Model %s has different attributes" name1)))
               decls1 decls2
           in
           let constr_types =

@@ -1,0 +1,4 @@
+model Test {
+    let a: char* = "test",
+    let a: char* = "test"
+}

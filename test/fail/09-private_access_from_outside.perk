@@ -1,0 +1,13 @@
+model User {
+  let id: char* = "",
+  let name: char* = "",
+  public let email: char* = "",
+  private let password: char* = ""
+}
+
+fun main (): void {
+  let user := summon User();
+  user.password = "new_password"; // This should not be allowed
+  user.id = "12345"; // This should be allowed
+  user.email = "user@example.com"; // This should also be allowed
+}

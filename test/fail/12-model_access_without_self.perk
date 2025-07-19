@@ -1,0 +1,6 @@
+model Test {
+    let a := 10,
+    fun f(): int {
+        return a; // This should not be allowed, as you need to use 'self' to access model fields
+    }
+}

@@ -140,20 +140,20 @@ and lambda_of_func (func : perkfundef) : expr_t =
   Lambda (typ, args, body, [])
 
 (** Transform a variable or function definition to a declaration. *)
-and decl_of_deforfun (def : deforfun_a) : perkdecl =
+and decl_of_deforfun (def : deforfun_a) : perktype_attribute list * perkdecl =
   match ( $ ) def with
   (* If this def is a function, make its type a function type *)
-  | DefFun (typ, id, params, _) ->
+  | DefFun (attr, (typ, id, params, _)) ->
       let new_typ = ([], Funtype (List.map fst params, typ), []) in
-      (new_typ, id)
+      (attr, (new_typ, id))
   (* If this def is a lambda, make its type a lambda type *)
-  | DefVar ((typ, id), _) ->
+  | DefVar (attr, ((typ, id), _)) ->
       (* let new_typ =
         match typ with
         | a, Funtype (params, ret), d -> (a, Lambdatype (params, ret, []), d)
         | _ -> typ
       in *)
-      (typ, id)
+      (attr, (typ, id))
 
 (** Transform a variable or function declaration to a declaration. *)
 and decl_of_declorfun (def : declorfun_a) : perkdecl =
@@ -189,10 +189,18 @@ and get_member_functions (defs : deforfun_a list) : perkident list =
   List.filter
     (fun def ->
       match ( $ ) def with
-      | DefFun (_, _, _, _) -> true
-      | DefVar ((_, _), _) -> false)
+      | DefFun (_, (_, _, _, _)) -> true
+      | DefVar (_, ((_, _), _)) -> false)
     defs
   |> List.map (fun f ->
          match ( $ ) f with
-         | DefFun (_, id, _, _) -> id
+         | DefFun (_, (_, id, _, _)) -> id
          | _ -> failwith "impossible: vars have been already filtered away")
+
+and add_attrs_to_deforfun (attrs : perktype_attribute list) (def : deforfun_a) :
+    deforfun_a =
+  match ( $ ) def with
+  | DefFun (old_attrs, (ret, id, params, body)) ->
+      annot_copy def (DefFun (attrs @ old_attrs, (ret, id, params, body)))
+  | DefVar (old_attrs, ((typ, id), expr)) ->
+      annot_copy def (DefVar (attrs @ old_attrs, ((typ, id), expr)))
