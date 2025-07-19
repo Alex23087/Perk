@@ -1,6 +1,6 @@
 (executable
  (name perkc)
  (public_name Perkelang)
- (libraries Perkelang menhirLib fpath)
+ (libraries Perkelang)
  (flags
   (:standard -g)))
