@@ -1,0 +1,28 @@
+import "stdio.h"
+
+archetype XDim {
+  x: int
+}
+
+archetype YDim {
+  y: int
+}
+
+model Point: XDim, YDim {
+  let x := 0,
+  let y := 0
+}
+
+fun main (): void {
+  let p := summon Point();
+  let xy := p as XDim+YDim;
+  let x := xy ~> XDim;
+  printf("X: %d\n", x.x);
+  let y := xy ~> YDim;
+  printf("Y: %d\n", y.y);
+
+  y.y = 10;
+  printf("Updated Y: %d\n", y.y);
+  printf("Point: (%d, %d)\n", p.x, p.y);
+  printf("Point as XYDim: (%d, %d)\n", xy.x, xy.y);
+}

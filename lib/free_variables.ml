@@ -82,7 +82,7 @@ and free_variables_expr (e : expr_a) : perkident list * perkident list =
       | Access (e1, _id, _, _) -> fst (free_variables_expr e1)
       | Tuple (el, _) | Array el ->
           List.flatten (List.map (fun x -> fst (free_variables_expr x)) el)
-      | As (id, _) -> [ id ]
+      | As (id, _, _) -> [ id ]
       | Cast (_, e1) -> fst (free_variables_expr e1)
       | IfThenElseExpr (e1, e2, e3) ->
           fst (free_variables_expr e1)

@@ -3,7 +3,10 @@
 open Ast
 open Errors
 
+(** Filename of the current perk file being processed *)
 let fnm = ref ""
+
+(** Internal flag to denote whether the current compilation mode is static *)
 let static_compilation : bool = false
 
 (** Debug function that can be enabled to track function call numbers. *)

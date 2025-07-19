@@ -172,7 +172,7 @@ expr:
   | Something e = expr                                                                                     { annotate_2_code !fnm $loc (Ast.Something (e, ([], Ast.Infer, []))) }
   | LParen RParen                                                                                          { annotate_2_code !fnm $loc (Ast.Tuple ([], None)) }
   | LParen e = expr_list RParen                                                                            { annotate_2_code !fnm $loc (Ast.Tuple (e, None)) }
-  | id = Ident As tl = separated_nonempty_list (Plus, perktype)                                            { annotate_2_code !fnm $loc (Ast.As (id, tl)) }
+  | id = Ident As tl = separated_nonempty_list (Plus, perktype)                                            { annotate_2_code !fnm $loc (Ast.As (id, tl, None)) }
   | LBracket RBracket                                                                                      { annotate_2_code !fnm $loc (Ast.Array [])}
   | LBracket l = separated_nonempty_list (Comma, expr) RBracket                                            { annotate_2_code !fnm $loc (Ast.Array l)}
   | Cast LParen typ = perktype Comma e = expr RParen                                                       { annotate_2_code !fnm $loc (Ast.Cast ((([],Ast.Infer,[]), typ), e)) }

@@ -828,8 +828,13 @@ and codegen_expr (e : expr_a) : string =
         (String.concat ", "
            (List.map (fun e -> Printf.sprintf "%s" (codegen_expr e)) es))
   | TupleSubscript (e, i) -> Printf.sprintf "%s._%d" (codegen_expr e) i
-  | As (id, typlist) ->
-      (* let _ = get_tuple  *)
+  | As (id, typlist, typ) ->
+      if Option.is_none typ then
+        raise_compilation_error e
+          "The type for 'as' expression has not been tagged during typecheck. \
+           If this happens, please open an issue at \
+           https://github.com/Alex23087/Perk/issues";
+      let typ = Option.get typ in
       let sum_type_descr = codegen_type ([], ArchetypeSum typlist, []) in
       Printf.sprintf "((%s) {%s%s})" sum_type_descr
         (if List.length typlist = 0 then ""
@@ -837,10 +842,26 @@ and codegen_expr (e : expr_a) : string =
            String.concat ", "
              (List.map
                 (fun t ->
-                  Printf.sprintf "%s->%s" id (codegen_type t ~expand:true))
+                  (* Structs representing archetypes are accessed differently depending on
+                  whether the variable is a model or an archetype sum *)
+                  match typ with
+                  | _, Modeltype _, _ ->
+                      Printf.sprintf "%s->%s" id (codegen_type t ~expand:true)
+                  | _, ArchetypeSum _, _ ->
+                      Printf.sprintf "%s.%s" id (codegen_type t ~expand:true)
+                  | _ ->
+                      raise_compilation_error e
+                        "as expression can only be used with models or \
+                         archetypes")
                 typlist)
            ^ ", ")
-        id
+        (* If the variable is an archetype sum, the internal self pointer is passed *)
+        (match typ with
+        | _, Modeltype _, _ -> id
+        | _, ArchetypeSum _, _ -> Printf.sprintf "%s.self" id
+        | _ ->
+            raise_compilation_error e
+              "as expression can only be used with models or archetypes")
   | Nothing t -> (
       match t with
       | _, Infer, _ ->
