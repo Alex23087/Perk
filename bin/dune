@@ -1,6 +1,6 @@
 (executable
  (name perkc)
  (public_name Perk)
- (libraries Perk)
+ (libraries Perk cmdliner)
  (flags
   (:standard -g)))

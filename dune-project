@@ -22,6 +22,6 @@
  (synopsis "A modern, ergonomic, low level programming language.")
  (description
   "Perk is a modern low level programming language, compiled to C. It builds on C's simplicity, adding features such as option types, lambdas and typeclasses. Its current goal is to replace C in the implementation of the MellOS operating system.")
- (depends ocaml dune)
+ (depends ocaml dune cmdliner)
  (tags
   ("programming language" "compiler" "lambda functions" "low-level")))

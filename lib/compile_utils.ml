@@ -52,12 +52,19 @@ let ast_of_filename filename =
   Utils.fnm := old_fnm;
   ast
 
-let rec compile_program (input_file : string) =
-  let out_file = Filename.chop_suffix input_file ".perk" ^ ".c" in
+let rec compile_program ?(dir : string option) (input_file : string)
+    (output_file : string option) =
+  let out_file =
+    if Option.is_some output_file then Option.get output_file
+    else Filename.chop_suffix input_file ".perk" ^ ".c"
+  in
 
   (* let out_ast_file = Filename.chop_suffix input_file ".perk" ^ ".ast" in *)
   try
-    let _ast, compiled = process_file input_file in
+    let _ast, compiled =
+      if Option.is_some dir then process_file ?dir input_file
+      else process_file input_file
+    in
 
     (* let oaf = open_out out_ast_file in
     output_string oaf ast; *)
@@ -98,12 +105,20 @@ let rec compile_program (input_file : string) =
         start_line start_col msg end_line end_col input_file;
       exit 1
 
-and process_file (filename : string) : string * string =
+and process_file ?(dir : string option) (filename : string) : string * string =
+  let filename =
+    (* If a directory override is provided, behave as if the file were in that directory *)
+    if Option.is_some dir then
+      Filename.concat (Option.get dir) (Filename.basename filename)
+    else filename
+  in
   let filename_canonical =
     Fpath.to_string (Fpath.normalize (Fpath.v filename))
   in
   add_import filename_canonical |> ignore;
-  let dirname = Filename.dirname filename in
+  let dirname =
+    if dir = None then Filename.dirname filename else Option.get dir
+  in
   let ast = ast_of_filename filename in
   let ast = expand_opens dirname ast in
   let ast = typecheck_program ast in
@@ -135,8 +150,8 @@ and expand_opens (dir : string) (ast : topleveldef_a list) : topleveldef_a list
   | x :: rest -> x :: expand_opens dir rest
   | [] -> []
 
-and check_file (filename : string) : unit =
-  try process_file filename |> ignore with
+and check_file ?dir (filename : string) : unit =
+  try process_file ?dir filename |> ignore with
   | Syntax_error ((start_line, start_col), (end_line, end_col), input_file, msg)
     ->
       Printf.printf

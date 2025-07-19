@@ -6,4 +6,5 @@ RUN opam update && opam install -y \
     ppx_deriving \
     sedlex \
     menhir \
-    odoc
+    odoc \
+    cmdliner
