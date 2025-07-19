@@ -179,7 +179,8 @@ and codegen_program (tldfs : topleveldef_a list) : string =
     (* Write includes *)
     "#include <malloc.h>\n#include <string.h>\n#include <stdbool.h>\n"
     ^ String.concat "\n"
-        (List.map (fun lib -> Printf.sprintf "#include %s" lib) !import_list)
+        (List.rev
+           (List.map (fun lib -> Printf.sprintf "#include %s" lib) !import_list))
     ^ "\n\n"
     (* Write macros *)
     (* ^ "typedef struct env_ {} env_;\n" *)
