@@ -12,6 +12,8 @@ let add_import (import : string) : bool =
     true)
 
 let ast_of_filename filename =
+  let old_fnm = !Perkelang.Utils.fnm in
+  Perkelang.Utils.fnm := filename;
   let inchn = open_in filename in
   let ast_of_channel inchn =
     let lexbuf = Sedlexing.Utf8.from_channel inchn in
@@ -20,7 +22,6 @@ let ast_of_filename filename =
     let parser =
       MenhirLib.Convert.Simplified.traditional2revised Perkelang.Parser.program
     in
-    Perkelang.Utils.fnm := filename;
     try parser lexer with
     | ParseError (f, e) ->
         raise
@@ -48,9 +49,10 @@ let ast_of_filename filename =
   in
   let ast = ast_of_channel inchn in
   close_in inchn;
+  Perkelang.Utils.fnm := old_fnm;
   ast
 
-let rec compile_program input_file =
+let rec compile_program (input_file : string) =
   let out_file = Filename.chop_suffix input_file ".perk" ^ ".c" in
 
   (* let out_ast_file = Filename.chop_suffix input_file ".perk" ^ ".ast" in *)
@@ -88,6 +90,13 @@ let rec compile_program input_file =
       Printf.eprintf
         "\027[31mParsing error: unexpected token in file %s\027[0m\n" input_file;
       exit 1
+  | Compilation_error
+      ((start_line, start_col), (end_line, end_col), input_file, msg) ->
+      Printf.eprintf
+        "\027[31mCompilation error at line %d, column %d: %s, ending at line \
+         %d, column %d in file %s\027[0m\n"
+        start_line start_col msg end_line end_col input_file;
+      exit 1
 
 and process_file (filename : string) : string * string =
   let filename_canonical =
@@ -107,17 +116,21 @@ and process_file (filename : string) : string * string =
 and expand_opens (dir : string) (ast : topleveldef_a list) : topleveldef_a list
     =
   match ast with
-  | { loc = _; node = Open i } :: rest ->
+  | ({ loc = _; node = Open i } as node) :: rest ->
       let open_filename =
         if Fpath.is_rel (Fpath.v i) then
           Fpath.(to_string (normalize (v dir // v i)))
         else Fpath.(to_string (normalize (v i)))
       in
       let did_add = add_import open_filename in
+      if not (Sys.file_exists open_filename) then
+        raise_compilation_error node
+          (Printf.sprintf "File %s does not exist" open_filename);
       if did_add then
         expand_opens
           (Filename.dirname open_filename)
-          (ast_of_filename open_filename @ rest)
+          (ast_of_filename open_filename)
+        @ expand_opens dir rest
       else expand_opens dir rest
   | x :: rest -> x :: expand_opens dir rest
   | [] -> []
@@ -144,6 +157,19 @@ and check_file (filename : string) : unit =
     ->
       Printf.printf
         "{\"error\": \"typecheck\", \"start_line\": %d, \"start_col\": %d, \
+         \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
+         \"%s\"}\n"
+        start_line start_col end_line end_col (String.escaped msg) input_file;
+      exit 0
+  | Perkelang.Parser.Error ->
+      Printf.printf
+        "{\"error\": \"parse\", \"message\": \"Unexpected token in file %s\"}\n"
+        !Perkelang.Utils.fnm;
+      exit 0
+  | Compilation_error
+      ((start_line, start_col), (end_line, end_col), input_file, msg) ->
+      Printf.printf
+        "{\"error\": \"compilation\", \"start_line\": %d, \"start_col\": %d, \
          \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
          \"%s\"}\n"
         start_line start_col end_line end_col (String.escaped msg) input_file;
