@@ -1,7 +1,7 @@
 (library
- (name Perkelang)
- (public_name perkelang)
- (libraries sedlex menhirLib)
+ (name Perk)
+ (public_name perk)
+ (libraries sedlex menhirLib fpath)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq sedlex.ppx)))
 

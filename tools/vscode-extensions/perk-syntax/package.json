@@ -1,0 +1,32 @@
+{
+  "name": "perk-syntax",
+  "displayName": "Perk Syntax",
+  "description": "Syntax highlighting for the Perk language",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.50.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "perk",
+        "extensions": [
+          ".perk"
+        ],
+        "aliases": [
+          "Perk"
+        ]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "perk",
+        "scopeName": "source.perk",
+        "path": "./syntaxes/perk.tmLanguage.json"
+      }
+    ]
+  }
+}

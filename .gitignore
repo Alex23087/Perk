@@ -1,6 +1,7 @@
 _build
 _opam
 docs
+perk.opam
 
 perf.*
 *.perf
@@ -9,7 +10,7 @@ test/**/*.out
 test/**/*.ast
 test/**/*.c
 
-perkelang-vscode-lsp/node_modules
-perkelang-vscode-lsp/out
+tools/vscode-extensions/perk-vscode-lsp/node_modules
+tools/vscode-extensions/perk-vscode-lsp/out
 node_modules
 .vscode/settings.json

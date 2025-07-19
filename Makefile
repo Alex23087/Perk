@@ -1,4 +1,4 @@
-PREFIX ?= /usr/local/perkelang
+PREFIX ?= /usr/local/perk
 SHELL := /usr/bin/env bash
 
 # The following lines allow targets to take arguments from the command line
@@ -22,10 +22,7 @@ clean:
 # Install dependencies
 .PHONY: deps
 deps:
-	opam install ppx_deriving
-	opam install sedlex
-	opam install menhir
-	opam install odoc
+	opam install -y ppx_deriving sedlex menhir odoc cmdliner
 	@if ! command -v gcc >/dev/null 2>&1; then \
 		echo "Warning: gcc is not installed or not in PATH." >&2; \
 	fi
@@ -91,9 +88,9 @@ extensions:
 		echo "Error: tsc is not installed" >&2; \
 		exit 1; \
 	fi
-	cd perkelang-extension && \
+	cd tools/vscode-extensions/perk-syntax && \
 	vsce package --allow-missing-repository
-	cd perkelang-vscode-lsp && \
+	cd tools/vscode-extensions/perk-vscode-lsp && \
 	npx tsc && \
 	vsce package --allow-missing-repository
 

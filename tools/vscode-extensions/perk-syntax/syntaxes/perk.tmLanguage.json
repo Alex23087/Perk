@@ -1,6 +1,6 @@
 {
-  "scopeName": "source.perkelang",
-  "name": "Perkelang",
+  "scopeName": "source.perk",
+  "name": "Perk",
   "patterns": [
     {
       "include": "#comments"
@@ -31,11 +31,11 @@
     "comments": {
       "patterns": [
         {
-          "name": "comment.line.double-slash.perkelang",
+          "name": "comment.line.double-slash.perk",
           "match": "//.*$"
         },
         {
-          "name": "comment.block.perkelang",
+          "name": "comment.block.perk",
           "begin": "/\\*",
           "end": "\\*/"
         }
@@ -44,23 +44,23 @@
     "strings": {
       "patterns": [
         {
-          "name": "string.quoted.double.perkelang",
+          "name": "string.quoted.double.perk",
           "begin": "\"",
           "end": "\"",
           "patterns": [
             {
-              "name": "constant.character.escape.perkelang",
+              "name": "constant.character.escape.perk",
               "match": "\\\\."
             }
           ]
         },
         {
-          "name": "string.quoted.single.perkelang",
+          "name": "string.quoted.single.perk",
           "begin": "'",
           "end": "'",
           "patterns": [
             {
-              "name": "constant.character.escape.perkelang",
+              "name": "constant.character.escape.perk",
               "match": "\\\\."
             }
           ]
@@ -70,23 +70,23 @@
     "numbers": {
       "patterns": [
         {
-          "name": "constant.numeric.hex.perkelang",
+          "name": "constant.numeric.hex.perk",
           "match": "\\b0x[0-9a-fA-F]+\\b"
         },
         {
-          "name": "constant.numeric.octal.perkelang",
+          "name": "constant.numeric.octal.perk",
           "match": "\\b0o[0-7]+\\b"
         },
         {
-          "name": "constant.numeric.binary.perkelang",
+          "name": "constant.numeric.binary.perk",
           "match": "\\b0b[01]+\\b"
         },
         {
-          "name": "constant.numeric.float.perkelang",
+          "name": "constant.numeric.float.perk",
           "match": "\\b\\d+\\.\\d+\\b"
         },
         {
-          "name": "constant.numeric.perkelang",
+          "name": "constant.numeric.perk",
           "match": "\\b\\d+\\b"
         }
       ]
@@ -94,15 +94,15 @@
     "keywords": {
       "patterns": [
         {
-          "name": "keyword.control.perkelang",
-          "match": "\\b(let|import|extern|archetype|model|fun|for|while|do|if|then|else|return|summon|banish|cast|of|just|nothing)\\b"
+          "name": "keyword.control.perk",
+          "match": "\\b(let|import|open|extern|archetype|model|fun|for|while|do|if|then|else|return|summon|banish|cast|of|just|nothing)\\b"
         },
         {
-          "name": "keyword.other.begin-c.perkelang",
+          "name": "keyword.other.begin-c.perk",
           "match": "\\bBEGIN_C\\b"
         },
         {
-          "name": "keyword.other.end-c.perkelang",
+          "name": "keyword.other.end-c.perk",
           "match": "\\bEND_C\\b"
         }
       ]
@@ -110,7 +110,7 @@
     "types": {
       "patterns": [
         {
-          "name": "storage.type.perkelang",
+          "name": "storage.type.perk",
           "match": "\\b(int|void|uint8_t|uint16_t|uint32_t|uint64_t|float|double|bool|char)\\b"
         }
       ]
@@ -118,11 +118,11 @@
     "functions": {
       "patterns": [
         {
-          "name": "entity.name.function.definition.perkelang",
+          "name": "entity.name.function.definition.perk",
           "match": "\\bfun\\s+(\\w+)"
         },
         {
-          "name": "entity.name.function.perkelang",
+          "name": "entity.name.function.perk",
           "match": "\\blet\\s+(\\w+)\\s*:"
         }
       ]
@@ -130,7 +130,7 @@
     "embedded-c": {
       "patterns": [
         {
-          "name": "source.c.embedded.perkelang",
+          "name": "source.c.embedded.perk",
           "begin": "\\bBEGIN_C\\b",
           "end": "\\bEND_C\\b",
           "patterns": [

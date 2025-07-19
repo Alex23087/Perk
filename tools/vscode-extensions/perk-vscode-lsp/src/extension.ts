@@ -5,15 +5,15 @@ import * as path from 'path';
 import { execSync } from 'child_process';
 
 export function activate(context: vscode.ExtensionContext) {
-    const diagnosticCollection = vscode.languages.createDiagnosticCollection('Perkelang');
+    const diagnosticCollection = vscode.languages.createDiagnosticCollection('Perk');
 
     vscode.workspace.onDidChangeTextDocument((event) => {
         const document = event.document;
-        if (document.languageId === 'perkelang') {
+        if (document.languageId === 'perk') {
             const diagnostics: vscode.Diagnostic[] = [];
 
             // Run your compiler and get errors
-            const errors = runCompiler(document.getText());
+            const errors = runCompiler(document.getText(), document.uri.fsPath);
 
             errors.forEach((error) => {
                 // Ensure the range is valid
@@ -40,17 +40,17 @@ export function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() { }
 
-function runCompiler(sourceCode: string): { errorType: string; startLine: number; characterStart: number; endLine: number; characterEnd: number; message: string }[] {
+function runCompiler(sourceCode: string, dir: string | undefined): { errorType: string; startLine: number; characterStart: number; endLine: number; characterEnd: number; message: string }[] {
     const errors: { errorType: string; startLine: number; characterStart: number; endLine: number; characterEnd: number; message: string }[] = [];
 
     // Create a temporary file to store the source code
     const tmpDir: string = os.tmpdir();
-    const tmpFile: string = path.join(tmpDir, `source-${Date.now()}.tmp`);
+    const tmpFile: string = path.join(tmpDir, dir ? path.basename(dir) : `source-${Date.now()}.tmp`);
 
     fs.writeFileSync(tmpFile, sourceCode, 'utf8');
 
-    // Example shell command to run a compiler
-    const command = `perkc --check ${tmpFile}`;
+    // Run the perkc compiler. Use the --check option to get errors and the --dir option to specify the directory if provided
+    const command = `perkc --check ${tmpFile}${dir ? ` --dir ${path.dirname(dir)}` : ''}`;
 
     // Wait for the command to finish
     try {
