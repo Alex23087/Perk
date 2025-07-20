@@ -54,7 +54,7 @@ type perktype_partial =
       * perkvardesc list (* last member is free var list *)
   | Pointertype of perktype
   | Arraytype of perktype * int option
-  | Structtype of string
+  | Structtype of string * perkdecl list
   | ArcheType of perkident * perkdecl list
   | Modeltype of
       perkident
@@ -175,6 +175,7 @@ and topleveldef_t =
   | Fundef of perkfundef
   | Archetype of perkident * declorfun_a list
   | Model of perkident * perkident list * deforfun_a list
+  | Struct of perkident * perkdef list
 
 and deforfun_t =
   | DefVar of perktype_attribute list * perkdef

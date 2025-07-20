@@ -378,6 +378,25 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
           | DefVar (_, ((typ, _), _)) -> bind_type_if_needed typ)
         fields_res;
       annot_copy tldf (Model (ident, archetypes, fields_res))
+  | Struct (ident, fields) ->
+      let local_symbol_table = ref [ Hashtbl.create 10 ] in
+      let (fields_res : perkdef list) =
+        List.map
+          (fun ((typ, id), expr) ->
+            (try bind_var_local local_symbol_table id typ
+             with Double_declaration msg -> raise_type_error tldf msg);
+            let typ' = resolve_type typ in
+            let expr_res, expr_type = typecheck_expr expr in
+            let field_type = match_types typ' expr_type in
+            ((field_type, id), expr_res))
+          fields
+      in
+      bind_type_if_needed
+        ( [],
+          Structtype
+            (ident, List.map (fun ((typ, id), _) -> (typ, id)) fields_res),
+          [] );
+      annot_copy tldf (Struct (ident, fields_res))
 
 (** Typechecks commands *)
 and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
@@ -1018,7 +1037,8 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
       | Arraytype (t1, Some n1), Arraytype (t2, Some n2)
         when t1 = t2 && array_init && n1 >= n2 ->
           ([], Arraytype (t1, Some n1), [])
-      | Structtype t1, Structtype t2 when t1 = t2 -> actual
+      | Structtype (t1, _), Structtype (t2, _) when t1 = t2 ->
+          actual (* TODO: Needs deeper matching *)
       | ArcheType (name1, decls1), ArcheType (name2, decls2)
         when name1 = name2 && List.length decls1 = List.length decls2 ->
           let decls_types =

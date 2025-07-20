@@ -284,7 +284,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
         l;
       add_code_to_type_binding
         ([], ArcheType (i, l), [])
-        (Printf.sprintf "\n%sstruct %s {\n%s\n};\ntypedef struct %s %s;"
+        (Printf.sprintf "\n%sstruct %s {\n%s\n};\ntypedef struct %s %s;\n"
            indent_string i
            (if List.length l = 0 then ""
             else
@@ -492,6 +492,20 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
         indent_string name name params_str_with_types indent_string name name
         initializers_str archetypes_substruct_str constructor_call_str
         indent_string
+  | Struct (id, fields) ->
+      let fields_decl = List.map fst fields in
+      add_code_to_type_binding
+        ([], Structtype (id, fields_decl), [])
+        (Printf.sprintf "\n%stypedef struct %s {\n%s\n} %s;\n" indent_string id
+           (if List.length fields_decl = 0 then ""
+            else
+              (indent_string ^ "    "
+              ^ String.concat
+                  (";\n" ^ indent_string ^ "    ")
+                  (List.map codegen_decl fields_decl))
+              ^ ";")
+           id);
+      ""
   | InlineC s -> s
   | Fundef (t, id, args, body) -> indent_string ^ codegen_fundef t id args body
   | Extern _ -> ""
@@ -663,7 +677,7 @@ and codegen_type ?(expand : bool = false) (t : perktype) : string =
   let type_str =
     match t' with
     | Basetype s -> s
-    | Structtype s -> "struct " ^ s
+    | Structtype (id, _) -> id
     | Funtype _ -> type_descriptor_of_perktype t
     | Lambdatype _ -> type_descriptor_of_perktype t
     | Pointertype ([], Structtype _, _) when expand -> "void*"

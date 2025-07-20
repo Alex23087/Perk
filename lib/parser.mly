@@ -22,6 +22,7 @@
 %token <string> InlineC
 %token Import ImportLocal Open
 %token Archetype Model Summon Banish Cast
+%token Struct
 %token Nothing Something Of
 
 /* Precedence and associativity specification */
@@ -83,6 +84,7 @@ topleveldef:
   | Archetype i = Ident LBrace l = perkdeclorfun_list RBrace                                               { annotate_2_code !fnm $loc (Ast.Archetype (i, l)) }
   | Model i = Ident Colon il = ident_list LBrace l = perkdeforfun_list RBrace                              { annotate_2_code !fnm $loc (Ast.Model (i, il, l)) }
   | Model i = Ident LBrace l = perkdeforfun_list RBrace                                                    { annotate_2_code !fnm $loc (Ast.Model (i, [], l)) }
+  | Struct i = Ident LBrace l = separated_list(Comma, perkdef) RBrace                                      { annotate_2_code !fnm $loc (Ast.Struct (i, l)) }
   | Fun pf = perkfun                                                                                       { annotate_2_code !fnm $loc (Ast.Fundef (pf)) }
   | error                                                                                                  { raise (ParseError(!fnm, "top-level definition expected")) }
 

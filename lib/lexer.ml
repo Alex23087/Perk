@@ -114,6 +114,7 @@ let rec token lexbuf =
   | "model" | "impl" | "class" -> Model
   | "summon" -> Summon
   | "banish" -> Banish
+  | "struct" -> Struct
   | "~>" | "as" | 0x2933 | 0x21DD -> As (* ⤳ ⇝ *)
   | "->" | 0x2192 -> Arrow (* → *)
   | "=>" | 0x21D2 -> Bigarrow (* ⇒ *)
