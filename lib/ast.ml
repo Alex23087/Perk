@@ -54,7 +54,7 @@ type perktype_partial =
       * perkvardesc list (* last member is free var list *)
   | Pointertype of perktype
   | Arraytype of perktype * int option
-  | Structtype of string * perkdecl list
+  | Structtype of string * perkdef list
   | ArcheType of perkident * perkdecl list
   | Modeltype of
       perkident
@@ -78,7 +78,7 @@ and perktype =
 and perkvardesc = perktype * perkident [@@deriving show, eq]
 and perkdecl = perkvardesc [@@deriving show, eq]
 
-type binop =
+and binop =
   | Add
   | Sub
   | Mul
@@ -94,7 +94,7 @@ type binop =
 (*  ... boolean and bitwise ops and all that  *)
 [@@deriving show, eq]
 
-type preunop =
+and preunop =
   | Neg
   | Not
   | Dereference
@@ -103,7 +103,7 @@ type preunop =
   | PreDecrement
 [@@deriving show, eq]
 
-type postunop =
+and postunop =
   | PostIncrement
   | PostDecrement
   | OptionGet of perktype option
@@ -138,6 +138,7 @@ and expr_t =
   | Subscript of expr_a * expr_a
   | TupleSubscript of expr_a * int
   | Summon of perkident * expr_a list
+  | Make of perkident * (perkident * expr_a) list
   | Access of expr_a * perkident * perktype option * perktype option
   | Tuple of expr_a list * perktype option
   | As of perkident * perktype list * perktype option

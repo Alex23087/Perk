@@ -356,7 +356,19 @@ let dependencies_of_type (typ : perktype) : perkident list =
                   ret_l @ underlying_l )
             | Arraytype (t, _) ->
                 dependencies_of_type_aux ~voidize t (typ :: lst)
-            | Structtype _ -> ([], lst) (* TODO: Struct dependencies *)
+            | Structtype (_, fields) ->
+                let field_types =
+                  List.map (fun ((typ, _id), _) -> typ) fields
+                in
+                let lst = typ :: lst in
+                List.fold_left
+                  (fun (acc, lst) field ->
+                    let res_t, res_l =
+                      dependencies_of_type_aux ~voidize field lst
+                    in
+                    (res_t @ acc, res_l))
+                  ([ type_descriptor_of_perktype typ ], lst)
+                  field_types
             | ArcheType (name, decls) ->
                 let lst = typ :: lst in
                 let decls_t, decls_l =
@@ -480,7 +492,7 @@ let rec bind_type_if_needed (typ : perktype) =
               bind_type_if_needed t
           | _, Structtype (_id, fields), _ ->
               bind_type typ;
-              List.iter (fun (typ, _id) -> bind_type_if_needed typ) fields
+              List.iter (fun ((typ, _id), _) -> bind_type_if_needed typ) fields
           | _, ArcheType (_name, _decls), _ ->
               bind_type typ';
               List.iter (fun (typ, _id) -> bind_type_if_needed typ) _decls

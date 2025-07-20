@@ -391,11 +391,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
             ((field_type, id), expr_res))
           fields
       in
-      bind_type_if_needed
-        ( [],
-          Structtype
-            (ident, List.map (fun ((typ, id), _) -> (typ, id)) fields_res),
-          [] );
+      bind_type_if_needed ([], Structtype (ident, fields_res), []);
       annot_copy tldf (Struct (ident, fields_res))
 
 (** Typechecks commands *)
@@ -848,6 +844,13 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
         | _, Arraytype (_t, None), _ when ide = "length" ->
             raise_type_error expr
               "Cannot access length of an array with unknown size"
+        | _, Structtype (name, fields), _ -> (
+            let field = List.find_opt (fun ((_, id), _) -> id = ide) fields in
+            match field with
+            | Some ((typ, _), _) -> (typ, Some expr_type, Some typ)
+            | None ->
+                raise_type_error expr
+                  (Printf.sprintf "Field %s not found in struct %s" ide name))
         | _ ->
             raise_type_error expr
               (Printf.sprintf "Cannot access field %s of non-model type %s" ide
@@ -974,6 +977,42 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       in
       ( annot_copy expr (IfThenElseExpr (guard_res, then_e_res, else_e_res)),
         res_type )
+  | Make (id, inits) -> (
+      let structype = lookup_type id in
+      let structype =
+        match structype with
+        | Some t -> t
+        | None ->
+            raise_type_error expr (Printf.sprintf "Struct %s is not defined" id)
+      in
+
+      match structype with
+      | _, Structtype (_name, fields), _ ->
+          let local_symbol_table = ref [ Hashtbl.create 10 ] in
+          List.iter
+            (fun (id, expr) ->
+              (try bind_var_local local_symbol_table id ([], Infer, [])
+               with Double_declaration _msg ->
+                 raise_type_error expr
+                   (Printf.sprintf "Trying to initialize field %s twice" id));
+              let field =
+                List.assoc_opt id
+                  (List.map (fun ((typ, id), _) -> (id, typ)) fields)
+              in
+              match field with
+              | Some typ -> (
+                  let _expr_res, expr_type = typecheck_expr expr in
+                  try match_types typ expr_type |> ignore
+                  with Type_match_error msg -> raise_type_error expr msg)
+              | _ ->
+                  raise_type_error expr
+                    (Printf.sprintf "Field %s not found in struct %s" id _name))
+            inits;
+          List.map (fun ((typ, _), _) -> typ) fields |> ignore;
+          (expr, structype)
+      | _ ->
+          raise_type_error expr
+            (Printf.sprintf "Cannot make struct %s, as it is not defined" id))
 
 (** Typechecks parameters *)
 and typecheck_expr_list (exprs : expr_a list) (types : perktype list) :

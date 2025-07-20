@@ -495,7 +495,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
   | Struct (id, fields) ->
       let fields_decl = List.map fst fields in
       add_code_to_type_binding
-        ([], Structtype (id, fields_decl), [])
+        ([], Structtype (id, fields), [])
         (Printf.sprintf "\n%stypedef struct %s {\n%s\n} %s;\n" indent_string id
            (if List.length fields_decl = 0 then ""
             else
@@ -821,6 +821,8 @@ and codegen_expr (e : expr_a) : string =
       | Some (_, Modeltype _, _) ->
           Printf.sprintf "%s->%s" (codegen_expr e1) ide
       | Some (_, Arraytype (_t, Some n), _) -> string_of_int n
+      | Some (_, Structtype (_id, _), _) ->
+          Printf.sprintf "%s.%s" (codegen_expr e1) ide
       | Some t -> (
           match Option.map discard_type_aq rightype with
           | Some (Lambdatype _) | Some (Funtype _) ->
@@ -926,6 +928,25 @@ and codegen_expr (e : expr_a) : string =
   | IfThenElseExpr (guard, then_e, else_e) ->
       Printf.sprintf "(%s ? %s : %s)" (codegen_expr guard) (codegen_expr then_e)
         (codegen_expr else_e)
+  | Make (id, inits) ->
+      let fields =
+        match lookup_type id with
+        | Some (_, Structtype (_, fields), _) -> fields
+        | _ ->
+            raise_type_error e
+              (Printf.sprintf "There is no struct with name %s" id)
+      in
+      Printf.sprintf "{%s}"
+        (String.concat ", "
+           (List.map
+              (fun ((_typ, field), expr) ->
+                let initialiser =
+                  List.find_opt (fun (f, _) -> f = field) inits
+                in
+                match initialiser with
+                | Some (_, e) -> codegen_expr e
+                | None -> codegen_expr expr)
+              fields))
 
 (* struct {int is_empty; int value;} palle = {0,1}; *)
 

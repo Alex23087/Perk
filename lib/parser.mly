@@ -22,7 +22,7 @@
 %token <string> InlineC
 %token Import ImportLocal Open
 %token Archetype Model Summon Banish Cast
-%token Struct
+%token Struct Make
 %token Nothing Something Of
 
 /* Precedence and associativity specification */
@@ -170,6 +170,8 @@ expr:
   | e1 = expr LBracket e2 = expr RBracket                                                                  { annotate_2_code !fnm $loc (Ast.Subscript (e1, e2)) }
   | Summon i = Ident LParen l = expr_list RParen                                                           { annotate_2_code !fnm $loc (Summon (i, l)) }
   | Summon i = Ident LParen RParen                                                                         { annotate_2_code !fnm $loc (Summon (i, [])) }
+  | Make i = Ident LParen RParen                                                                           { annotate_2_code !fnm $loc (Ast.Make (i, [])) }
+  | Make i = Ident LParen l = initializer_list RParen                                                      { annotate_2_code !fnm $loc (Ast.Make (i, l)) }
   | e1 = expr Dot i = Ident                                                                                { annotate_2_code !fnm $loc (Ast.Access (e1, i, None, None)) }
   | Nothing                                                                                                { annotate_2_code !fnm $loc (Ast.Nothing ([], Ast.Infer, [])) }
   | Nothing Of t=perktype                                                                                  { annotate_2_code !fnm $loc (Ast.Nothing (t)) }
@@ -300,6 +302,10 @@ perkdeclorfun_list:
   | tl = declorfun Comma t = perkdeclorfun_list { tl :: t }
   | error { raise (ParseError(!fnm, "variable descriptor expected")) }
   | declorfun error { raise (ParseError(!fnm, "unexpected variable descriptor")) }
+
+initializer_list:
+  | i = Ident Assign e = expr { [(i, e)] }
+  | i = Ident Assign e = expr Comma il = initializer_list { (i, e) :: il }
 
 spanish_inquisition:
   | error { raise (ParseError(!fnm, "Nobody expects the Spanish Inquisition!")) }
