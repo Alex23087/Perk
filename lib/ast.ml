@@ -142,6 +142,7 @@ and expr_t =
   | Access of expr_a * perkident * perktype option * perktype option
   | Tuple of expr_a list * perktype option
   | As of perkident * perktype list * perktype option
+    (* TODO: This needs to be from expr_a, not from perkident. Issues with side effects, needs to be handled by creating temp vars *)
   | Array of expr_a list  (** Cast ((from_type, to_type), expression)*)
   | Cast of (perktype * perktype) * expr_a
   | IfThenElseExpr of expr_a * expr_a * expr_a
