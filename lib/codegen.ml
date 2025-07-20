@@ -431,12 +431,25 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                        let lambda = annot_copy def (lambda_of_func func) in
                        Printf.sprintf "self->%s = (%s) %s" id (codegen_type typ)
                          (codegen_functional ~is_lambda:false lambda)
-                   | DefVar (_, ((typ, id), expr)) ->
+                   | DefVar (_, ((typ, id), expr)) -> (
                        let expr_str, letindefs =
                          codegen_expr_and_letindefs expr
                        in
-                       Printf.sprintf "%s\nself->%s = (%s) %s" letindefs id
-                         (codegen_type typ) expr_str)
+                       match ( $ ) expr with
+                       | Array _ ->
+                           (* Workaround for array initialization in models: Create a fresh array and copy it to the model *)
+                           let fv = fresh_var "array_init" in
+                           let cdg_type = codegen_type typ in
+                           Printf.sprintf
+                             "%s\n\
+                              %s    %s %s = %s;\n\
+                              %s    memcpy(&self->%s, &%s, sizeof(%s))"
+                             letindefs indent_string cdg_type fv expr_str
+                             indent_string id fv fv
+                       | _ ->
+                           Printf.sprintf "%s\n%s    self->%s = (%s) %s"
+                             letindefs indent_string id (codegen_type typ)
+                             expr_str))
                  defs)
           ^ ";"
       in
@@ -793,6 +806,7 @@ and codegen_expr (e : expr_a) : string =
       match Option.map resolve_type acctype with
       | Some (_, Modeltype _, _) ->
           Printf.sprintf "%s->%s" (codegen_expr e1) ide
+      | Some (_, Arraytype (_t, Some n), _) -> string_of_int n
       | Some t -> (
           match Option.map discard_type_aq rightype with
           | Some (Lambdatype _) | Some (Funtype _) ->

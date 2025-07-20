@@ -1,0 +1,16 @@
+import "stdio.h"
+
+let ar: [int 3] = [2,3]
+
+model ArrayConstantInitialization {
+    let a: [int 3] = [42,89,3]
+}
+
+fun main(): void {
+    let a: [int 3] = [4,5];
+    let armodel := summon ArrayConstantInitialization();
+
+    printf("a elements: %d, %d, %d\n", a[0], a[1], a[2]);
+    printf("ar elements: %d, %d, %d\n", ar[0], ar[1], ar[2]);
+    printf("amodel elements: %d, %d, %d\n", armodel.a[0], armodel.a[1], armodel.a[2]);
+}

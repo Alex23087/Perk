@@ -124,12 +124,17 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
           | (_, Infer, _), _ -> expr_type
           | _ -> expr_type
         in
+        let array_init =
+          match (typ', ( $ ) expr_res) with
+          | (_, Arraytype (_, Some _n), _), Array _ -> true
+          | _ -> false
+        in
         let typ'' =
-          try match_types ~coalesce:true typ' expr_type
+          try match_types ~coalesce:true ~array_init typ' expr_type
           with Type_match_error msg -> raise_type_error tldf msg
         in
         let typ''_nocoal =
-          try match_types ~coalesce:false typ' expr_type
+          try match_types ~coalesce:false ~array_init typ' expr_type
           with Type_match_error _ -> ([], Infer, [])
         in
         let deftype =
@@ -332,8 +337,16 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
             | DefVar (attrs, ((typ, id), expr)) ->
                 let expr_res, expr_type = typecheck_expr expr in
                 let expr_res, expr_type = fill_nothing expr_res expr_type typ in
+                (* TODO: usual array initialization doesn't work for models, as
+                the fields are defined first and then assigned, and C doesn't allow
+                this for array expressions. Figure out a way to deal with this *)
+                let array_init =
+                  match (typ, ( $ ) expr_res) with
+                  | (_, Arraytype (_, Some _n), _), Array _ -> true
+                  | _ -> false
+                in
                 let typ' =
-                  try match_types typ expr_type
+                  try match_types ~array_init typ expr_type
                   with Type_match_error msg -> raise_type_error expr msg
                 in
                 (try bind_var_local local_symbol_table id typ'
@@ -388,12 +401,17 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
           | (_, Infer, _), _ -> expr_type
           | _ -> expr_type
         in
+        let array_init =
+          match (typ', ( $ ) expr_res) with
+          | (_, Arraytype (_, Some _n), _), Array _ -> true
+          | _ -> false
+        in
         let typ'' =
-          try match_types ~coalesce:true typ' expr_type
+          try match_types ~coalesce:true ~array_init typ' expr_type
           with Type_match_error msg -> raise_type_error cmd msg
         in
         let typ''_nocoal =
-          try match_types ~coalesce:false typ' expr_type
+          try match_types ~coalesce:false ~array_init typ' expr_type
           with Type_match_error _ -> ([], Infer, [])
         in
         let deftype =
@@ -759,7 +777,8 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
         let is_self =
           match ( $ ) expr_res with Var "self" -> true | _ -> false
         in
-        match resolve_type expr_type with
+        let expr_type' = resolve_type expr_type in
+        match expr_type' with
         | ( _,
             Modeltype (name, _archetypes, fields, _constr_params, _member_funcs),
             _ ) -> (
@@ -805,6 +824,11 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                   (Printf.sprintf
                      "Field %s not found in archetypes implemented by variable"
                      ide)) *)
+        | _, Arraytype (_t, Some _n), _ when ide = "length" ->
+            (([], Basetype "int", []), Some expr_type, None)
+        | _, Arraytype (_t, None), _ when ide = "length" ->
+            raise_type_error expr
+              "Cannot access length of an array with unknown size"
         | _ ->
             raise_type_error expr
               (Printf.sprintf "Cannot access field %s of non-model type %s" ide
@@ -964,8 +988,8 @@ and fill_nothing (expr : expr_a) (exprtyp : perktype) (typ : perktype) :
 (* Add more type checking logic as needed: pepperepeppe     peppè! culo*)
 
 (** Checks if two types are the same or not. *)
-and match_types ?(coalesce : bool = false) (expected : perktype)
-    (actual : perktype) : perktype =
+and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
+    (expected : perktype) (actual : perktype) : perktype =
   let expected = resolve_type expected in
   let actual = resolve_type actual in
   let rec match_types_aux expected actual =
@@ -987,9 +1011,13 @@ and match_types ?(coalesce : bool = false) (expected : perktype)
           let param_types = List.map2 match_types_aux params1 params2 in
           let ret_type = match_types_aux ret1 ret2 in
           ([], Funtype (param_types, ret_type), [])
-      | Arraytype (t1, n1), Arraytype (t2, n2) when n1 = n2 ->
+      | Arraytype (t1, n1), Arraytype (t2, n2) when n1 = n2 || Option.is_none n1
+        ->
           let t = match_types_aux t1 t2 in
-          ([], Arraytype (t, n1), [])
+          ([], Arraytype (t, n2), [])
+      | Arraytype (t1, Some n1), Arraytype (t2, Some n2)
+        when t1 = t2 && array_init && n1 >= n2 ->
+          ([], Arraytype (t1, Some n1), [])
       | Structtype t1, Structtype t2 when t1 = t2 -> actual
       | ArcheType (name1, decls1), ArcheType (name2, decls2)
         when name1 = name2 && List.length decls1 = List.length decls2 ->
