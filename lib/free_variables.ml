@@ -87,7 +87,10 @@ and free_variables_expr (e : expr_a) : perkident list * perkident list =
       | IfThenElseExpr (e1, e2, e3) ->
           fst (free_variables_expr e1)
           @ fst (free_variables_expr e2)
-          @ fst (free_variables_expr e3)),
+          @ fst (free_variables_expr e3)
+      | Make (_, inits) ->
+          List.flatten
+            (List.map (fun (_, x) -> free_variables_expr x |> fst) inits)),
       [] )
   in
   let out_free, out_bound = free_variables_expr e in

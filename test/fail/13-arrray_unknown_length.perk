@@ -1,0 +1,5 @@
+import "stdio.h"
+
+fun f(a: [int]): void {
+    printf("Array length: %d\n", a.length);
+}

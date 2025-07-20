@@ -113,7 +113,7 @@ let resolve_type (typ : perktype) : perktype =
                     resolve_type_aux ~unfold:(unfold - 1) t lst
                   in
                   ((a, Arraytype (ret_t, n), q), ret_l)
-              | Structtype _t -> (typ, lst)
+              | Structtype _ -> (typ, lst)
               | ArcheType (name, decls) ->
                   let lst = typ :: lst in
                   let decls_t, decls_l =
@@ -198,7 +198,7 @@ let rec type_descriptor_of_perktype ?(erase_env = true) (t : perktype) : string
   let _, t, _ = t in
   match t with
   | Basetype s -> s
-  | Structtype _ -> failwith "structn't!" (* TODO: structize *)
+  | Structtype (id, _) -> id
   | Funtype (args, ret) ->
       let args_str =
         String.concat "__" (List.map type_descriptor_of_perktype args)
@@ -356,7 +356,19 @@ let dependencies_of_type (typ : perktype) : perkident list =
                   ret_l @ underlying_l )
             | Arraytype (t, _) ->
                 dependencies_of_type_aux ~voidize t (typ :: lst)
-            | Structtype _t -> ([], lst)
+            | Structtype (_, fields) ->
+                let field_types =
+                  List.map (fun ((typ, _id), _) -> typ) fields
+                in
+                let lst = typ :: lst in
+                List.fold_left
+                  (fun (acc, lst) field ->
+                    let res_t, res_l =
+                      dependencies_of_type_aux ~voidize field lst
+                    in
+                    (res_t @ acc, res_l))
+                  ([ type_descriptor_of_perktype typ ], lst)
+                  field_types
             | ArcheType (name, decls) ->
                 let lst = typ :: lst in
                 let decls_t, decls_l =
@@ -478,7 +490,9 @@ let rec bind_type_if_needed (typ : perktype) =
           | _, Arraytype (t, _), _ ->
               bind_type typ';
               bind_type_if_needed t
-          | _, Structtype _, _ -> ()
+          | _, Structtype (_id, fields), _ ->
+              bind_type typ;
+              List.iter (fun ((typ, _id), _) -> bind_type_if_needed typ) fields
           | _, ArcheType (_name, _decls), _ ->
               bind_type typ';
               List.iter (fun (typ, _id) -> bind_type_if_needed typ) _decls

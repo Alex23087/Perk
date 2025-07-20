@@ -1,0 +1,6 @@
+import "stdio.h"
+
+fun main(): void {
+    let arr: [int] = [1, 2, 3, 4, 5]; // Initialize an array with values
+    printf("Array elements: %d, %d, %d, %d, %d\n", arr[0], arr[1], arr[2], arr[3], arr[4]);
+}

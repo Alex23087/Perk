@@ -284,7 +284,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
         l;
       add_code_to_type_binding
         ([], ArcheType (i, l), [])
-        (Printf.sprintf "\n%sstruct %s {\n%s\n};\ntypedef struct %s %s;"
+        (Printf.sprintf "\n%sstruct %s {\n%s\n};\ntypedef struct %s %s;\n"
            indent_string i
            (if List.length l = 0 then ""
             else
@@ -431,12 +431,25 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                        let lambda = annot_copy def (lambda_of_func func) in
                        Printf.sprintf "self->%s = (%s) %s" id (codegen_type typ)
                          (codegen_functional ~is_lambda:false lambda)
-                   | DefVar (_, ((typ, id), expr)) ->
+                   | DefVar (_, ((typ, id), expr)) -> (
                        let expr_str, letindefs =
                          codegen_expr_and_letindefs expr
                        in
-                       Printf.sprintf "%s\nself->%s = (%s) %s" letindefs id
-                         (codegen_type typ) expr_str)
+                       match ( $ ) expr with
+                       | Array _ ->
+                           (* Workaround for array initialization in models: Create a fresh array and copy it to the model *)
+                           let fv = fresh_var "array_init" in
+                           let cdg_type = codegen_type typ in
+                           Printf.sprintf
+                             "%s\n\
+                              %s    %s %s = %s;\n\
+                              %s    memcpy(&self->%s, &%s, sizeof(%s))"
+                             letindefs indent_string cdg_type fv expr_str
+                             indent_string id fv fv
+                       | _ ->
+                           Printf.sprintf "%s\n%s    self->%s = (%s) %s"
+                             letindefs indent_string id (codegen_type typ)
+                             expr_str))
                  defs)
           ^ ";"
       in
@@ -479,6 +492,20 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
         indent_string name name params_str_with_types indent_string name name
         initializers_str archetypes_substruct_str constructor_call_str
         indent_string
+  | Struct (id, fields) ->
+      let fields_decl = List.map fst fields in
+      add_code_to_type_binding
+        ([], Structtype (id, fields), [])
+        (Printf.sprintf "\n%stypedef struct %s {\n%s\n} %s;\n" indent_string id
+           (if List.length fields_decl = 0 then ""
+            else
+              (indent_string ^ "    "
+              ^ String.concat
+                  (";\n" ^ indent_string ^ "    ")
+                  (List.map codegen_decl fields_decl))
+              ^ ";")
+           id);
+      ""
   | InlineC s -> s
   | Fundef (t, id, args, body) -> indent_string ^ codegen_fundef t id args body
   | Extern _ -> ""
@@ -650,7 +677,7 @@ and codegen_type ?(expand : bool = false) (t : perktype) : string =
   let type_str =
     match t' with
     | Basetype s -> s
-    | Structtype s -> "struct " ^ s
+    | Structtype (id, _) -> id
     | Funtype _ -> type_descriptor_of_perktype t
     | Lambdatype _ -> type_descriptor_of_perktype t
     | Pointertype ([], Structtype _, _) when expand -> "void*"
@@ -793,6 +820,9 @@ and codegen_expr (e : expr_a) : string =
       match Option.map resolve_type acctype with
       | Some (_, Modeltype _, _) ->
           Printf.sprintf "%s->%s" (codegen_expr e1) ide
+      | Some (_, Arraytype (_t, Some n), _) -> string_of_int n
+      | Some (_, Structtype (_id, _), _) ->
+          Printf.sprintf "%s.%s" (codegen_expr e1) ide
       | Some t -> (
           match Option.map discard_type_aq rightype with
           | Some (Lambdatype _) | Some (Funtype _) ->
@@ -898,6 +928,25 @@ and codegen_expr (e : expr_a) : string =
   | IfThenElseExpr (guard, then_e, else_e) ->
       Printf.sprintf "(%s ? %s : %s)" (codegen_expr guard) (codegen_expr then_e)
         (codegen_expr else_e)
+  | Make (id, inits) ->
+      let fields =
+        match lookup_type id with
+        | Some (_, Structtype (_, fields), _) -> fields
+        | _ ->
+            raise_type_error e
+              (Printf.sprintf "There is no struct with name %s" id)
+      in
+      Printf.sprintf "{%s}"
+        (String.concat ", "
+           (List.map
+              (fun ((_typ, field), expr) ->
+                let initialiser =
+                  List.find_opt (fun (f, _) -> f = field) inits
+                in
+                match initialiser with
+                | Some (_, e) -> codegen_expr e
+                | None -> codegen_expr expr)
+              fields))
 
 (* struct {int is_empty; int value;} palle = {0,1}; *)
 

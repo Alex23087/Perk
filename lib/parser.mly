@@ -22,6 +22,7 @@
 %token <string> InlineC
 %token Import ImportLocal Open
 %token Archetype Model Summon Banish Cast
+%token Struct Make
 %token Nothing Something Of
 
 /* Precedence and associativity specification */
@@ -83,6 +84,7 @@ topleveldef:
   | Archetype i = Ident LBrace l = perkdeclorfun_list RBrace                                               { annotate_2_code !fnm $loc (Ast.Archetype (i, l)) }
   | Model i = Ident Colon il = ident_list LBrace l = perkdeforfun_list RBrace                              { annotate_2_code !fnm $loc (Ast.Model (i, il, l)) }
   | Model i = Ident LBrace l = perkdeforfun_list RBrace                                                    { annotate_2_code !fnm $loc (Ast.Model (i, [], l)) }
+  | Struct i = Ident LBrace l = separated_list(Comma, perkdef) RBrace                                      { annotate_2_code !fnm $loc (Ast.Struct (i, l)) }
   | Fun pf = perkfun                                                                                       { annotate_2_code !fnm $loc (Ast.Fundef (pf)) }
   | error                                                                                                  { raise (ParseError(!fnm, "top-level definition expected")) }
 
@@ -134,6 +136,8 @@ perkdef:
 perkfun:
   | i = Ident LParen id_list = perkvardesc_list RParen Colon rt = perktype LBrace c = command RBrace       { (rt, i, id_list, c) }
   | i = Ident LParen RParen Colon rt = perktype LBrace c = command RBrace                                  { (rt, i, [], c) }
+  | Ident LParen perkvardesc_list RParen error                                                             { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
+  | Ident LParen RParen error                                                                              { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
   
 
 perkvardesc:
@@ -166,6 +170,8 @@ expr:
   | e1 = expr LBracket e2 = expr RBracket                                                                  { annotate_2_code !fnm $loc (Ast.Subscript (e1, e2)) }
   | Summon i = Ident LParen l = expr_list RParen                                                           { annotate_2_code !fnm $loc (Summon (i, l)) }
   | Summon i = Ident LParen RParen                                                                         { annotate_2_code !fnm $loc (Summon (i, [])) }
+  | Make i = Ident LParen RParen                                                                           { annotate_2_code !fnm $loc (Ast.Make (i, [])) }
+  | Make i = Ident LParen l = initializer_list RParen                                                      { annotate_2_code !fnm $loc (Ast.Make (i, l)) }
   | e1 = expr Dot i = Ident                                                                                { annotate_2_code !fnm $loc (Ast.Access (e1, i, None, None)) }
   | Nothing                                                                                                { annotate_2_code !fnm $loc (Ast.Nothing ([], Ast.Infer, [])) }
   | Nothing Of t=perktype                                                                                  { annotate_2_code !fnm $loc (Ast.Nothing (t)) }
@@ -296,6 +302,10 @@ perkdeclorfun_list:
   | tl = declorfun Comma t = perkdeclorfun_list { tl :: t }
   | error { raise (ParseError(!fnm, "variable descriptor expected")) }
   | declorfun error { raise (ParseError(!fnm, "unexpected variable descriptor")) }
+
+initializer_list:
+  | i = Ident Assign e = expr { [(i, e)] }
+  | i = Ident Assign e = expr Comma il = initializer_list { (i, e) :: il }
 
 spanish_inquisition:
   | error { raise (ParseError(!fnm, "Nobody expects the Spanish Inquisition!")) }
