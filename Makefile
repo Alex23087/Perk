@@ -89,8 +89,10 @@ extensions:
 		exit 1; \
 	fi
 	cd tools/vscode-extensions/perk-syntax && \
+	npm install && \
 	vsce package --allow-missing-repository
 	cd tools/vscode-extensions/perk-vscode-lsp && \
+	npm install && \
 	npx tsc && \
 	vsce package --allow-missing-repository
 

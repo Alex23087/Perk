@@ -14,15 +14,16 @@ type parse_result =
 (** Generates the [tags] file, by first expanding the libraries and merging
     them, and then calling [ctags].*)
 let generate_tags lib_paths =
+  let libs_expanded = Filename.concat (Filename.get_temp_dir_name()) "libs_expanded.h" in
   let status =
     Sys.command
-      (Printf.sprintf "gcc -E -P -dD %s > libs_expanded.h "
-         (String.concat " " lib_paths))
+      (Printf.sprintf "gcc -E -P -dD %s > %s "
+         (String.concat " " lib_paths) libs_expanded)
   in
   if status = 0 then
     let status =
       Sys.command
-        (Printf.sprintf "ctags --kinds-C=+p --fields=+Snt libs_expanded.h")
+        (Printf.sprintf "ctags --kinds-C=+p --fields=+Snt %s" libs_expanded)
     in
     if status = 0 then () else failwith "lib expansion failed"
   else failwith "lib expansion failed"
@@ -189,7 +190,8 @@ let remove_tags () =
   ()
 
 let remove_libs_expanded () =
-  let _ = Sys.command "rm libs_expanded.h" in
+  let libs_expanded = Filename.concat (Filename.get_temp_dir_name()) "libs_expanded.h" in
+  let _ = Sys.command (Printf.sprintf "rm %s" libs_expanded) in
   ()
 
 (** Given a basic C sort, returns the corresponding base type *)

@@ -2,12 +2,6 @@ import "stdio.h"
 import "stdlib.h"
 import "string.h"
 
-extern printf : (char*, ...) -> int
-extern sprintf : (char*, char*, ...) -> char*
-extern itoa : (int, char*, int) -> char*
-extern strcat: (char*, char*) -> char*
-extern malloc: int -> char*
-
 /*
 def leibniz_pi():
     """generator for digits of pi"""
