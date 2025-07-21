@@ -24,6 +24,9 @@ let get_lib_path s =
   (* TODO actual includepaths *)
   Printf.sprintf "/usr/include/%s" (remove_first_last s)
 
+(** Hash table of the defined ADT constructors*)
+let defined_constructors : (perkident, unit) Hashtbl.t = Hashtbl.create 10
+
 (* TODO handle type aliases *)
 
 (** check if type is numerical *)
@@ -393,6 +396,19 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
       in
       bind_type_if_needed ([], Structtype (ident, fields_res), []);
       annot_copy tldf (Struct (ident, fields_res))
+  | ADT (ident, constructors) ->
+      (* TODO: check existence of types *)
+      List.iter
+        (fun (ide, t) ->
+          if Hashtbl.mem defined_constructors ide then
+            raise_type_error tldf
+              (Printf.sprintf "Constructor %s is already defined" ide);
+          Hashtbl.add defined_constructors ide ();
+          bind_var ide
+            ([], Funtype (t, ([], AlgebraicType (ident, constructors), [])), []))
+        constructors;
+      bind_type_if_needed ([], AlgebraicType (ident, constructors), []);
+      tldf
 
 (** Typechecks commands *)
 and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :

@@ -63,6 +63,7 @@ type perktype_partial =
       * perktype list
       * perkident list
     (* name, archetypes, fields (with access attributes), constructor_params, member functions*)
+  | AlgebraicType of perkident * (perkident * perktype list) list
   | Optiontype of perktype
   | Tupletype of perktype list
   | ArchetypeSum of perktype list
@@ -178,6 +179,7 @@ and topleveldef_t =
   | Archetype of perkident * declorfun_a list
   | Model of perkident * perkident list * deforfun_a list
   | Struct of perkident * perkdef list
+  | ADT of perkident * (perkident * perktype list) list
 
 and deforfun_t =
   | DefVar of perktype_attribute list * perkdef

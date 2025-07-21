@@ -9,11 +9,15 @@ let fnm = ref ""
 (** Internal flag to denote whether the current compilation mode is static *)
 let static_compilation : bool = false
 
+(** Internal flag to enable verbose compilation *)
+let verbose : bool ref = ref false
+
 (** Debug function that can be enabled to track function call numbers. *)
 let rec say_here (_msg : string) : unit =
-  (* Printf.printf "%s\n" _msg;
-     flush stdout *)
-  ()
+  if !verbose then (
+    Printf.printf "%s\n" _msg;
+    flush stdout)
+  else ()
 
 (** Utility function to add a parameter (i.e., self) to a type, iff it is a
     functional *)
@@ -54,6 +58,9 @@ and float_type : perktype = ([], Basetype "float", [])
 and char_type : perktype = ([], Basetype "char", [])
 and bool_type : perktype = ([], Basetype "bool", [])
 and void_pointer : perktype = ([], Pointertype ([], Basetype "void", []), [])
+and pointer_of_type (typ : perktype) : perktype = ([], Pointertype typ, [])
+
+(** Creates a self type for a given name. *)
 and self_type (name : perkident) : perktype = ([], Basetype name, [])
 
 (** Transorms a lambda to a function *)

@@ -65,7 +65,7 @@ debug_run: build
 		exit 1; \
 	fi
 	opam exec -- dune build --profile=dev
-	OCAMLRUNPARAM=b ./_build/default/bin/perkc.exe $(FILE)
+	OCAMLRUNPARAM=b ./_build/default/bin/perkc.exe --verbose $(FILE)
 	$(eval OUTFILE := $(basename $(FILE)).out)
 	$(eval SRCFILE := $(basename $(FILE)).c)
 	gcc -o $(OUTFILE) $(SRCFILE)

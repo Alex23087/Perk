@@ -23,6 +23,7 @@
 %token Import ImportLocal Open
 %token Archetype Model Summon Banish Cast
 %token Struct Make
+%token ADT Pipe Match Default
 %token Nothing Something Of
 
 /* Precedence and associativity specification */
@@ -61,6 +62,7 @@
 %type <Ast.perkident list> ident_list
 %type <Ast.perktype list> perktype_list
 %type <Ast.command_a> if_command
+%type <perkident * (Ast.perktype list)> constructor_type
 
 // %on_error_reduce command
 
@@ -74,6 +76,12 @@ program:
   | separated_list(Semicolon, topleveldef) error                                                           { raise (ParseError(!fnm, "unexpected token after program (Perhaps you forgot a ; ?)")) }
   | EOF                                                                                                    { raise (ParseError(!fnm, "empty program")) }
 
+constructor_type:
+  | i = Ident LParen l = separated_list(Comma, perktype) RParen                                            { (i, l) }
+  | i = Ident                                                                                              { (i, []) }
+  | i = Ident error                                                                                        { raise (ParseError(!fnm, ("invalid type for constructor" ^ i))) }
+  | error                                                                                                  { raise (ParseError(!fnm, "constructor type expected")) }
+
 topleveldef:
   | Import i = String                                                                                      { annotate_2_code !fnm $loc (Ast.Import ("<" ^ i ^ ">")) }
   | ImportLocal i = String                                                                                 { annotate_2_code !fnm $loc (Ast.Import ("\"" ^ i ^ "\"")) }
@@ -85,6 +93,8 @@ topleveldef:
   | Model i = Ident Colon il = ident_list LBrace l = perkdeforfun_list RBrace                              { annotate_2_code !fnm $loc (Ast.Model (i, il, l)) }
   | Model i = Ident LBrace l = perkdeforfun_list RBrace                                                    { annotate_2_code !fnm $loc (Ast.Model (i, [], l)) }
   | Struct i = Ident LBrace l = separated_list(Comma, perkdef) RBrace                                      { annotate_2_code !fnm $loc (Ast.Struct (i, l)) }
+  | ADT i = Ident Assign option(Pipe) l = separated_nonempty_list(Pipe, constructor_type)                  { annotate_2_code !fnm $loc (Ast.ADT (i, l)) }   
+  | ADT Ident error                                                                                        { raise (ParseError(!fnm, "expected a list of constructors after ADT definition")) }           
   | Fun pf = perkfun                                                                                       { annotate_2_code !fnm $loc (Ast.Fundef (pf)) }
   | error                                                                                                  { raise (ParseError(!fnm, "top-level definition expected")) }
 

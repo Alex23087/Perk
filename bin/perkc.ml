@@ -27,7 +27,9 @@ let dir =
 
 (* Main command implementation *)
 let perkc_cmd check_only verbose output_file input_file (dir : string option) =
-  if verbose then Printf.printf "Processing file: %s\n" input_file;
+  if verbose then (
+    Printf.printf "Processing file: %s\n" input_file;
+    Perk.Utils.verbose := true);
 
   if check_only then (
     if verbose then Printf.printf "Running syntax and type check only\n";

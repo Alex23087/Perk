@@ -202,44 +202,7 @@ and codegen_program (tldfs : topleveldef_a list) : string =
        ((t)(__lambdummy->func))())\n\
        #define CALL_LAMBDA(l, t, ...) (__lambdummy = (__lambdummy_type \
        *)l,       ((t)(__lambdummy->func))(__VA_ARGS__))" ^ "\n\n"
-    (* ^ "#define CAST_LAMBDA(name, from_type, to_type, func_type) \
-          ((__perk_capture_dummy_##from_type = name, (to_type) \
-          {__perk_capture_dummy_##from_type.env, \
-          (func_type)__perk_capture_dummy_##from_type.func}))\n"
-       ^ "#define CALL_LAMBDA0(l, t) (__perk_capture_dummy_##t = l, \
-          __perk_capture_dummy_##t.func(&(__perk_capture_dummy_##t.env)))\n"
-       ^ "#define CALL_LAMBDA(l, t, ...) (__perk_capture_dummy_##t = l, \
-          __perk_capture_dummy_##t.func(&(__perk_capture_dummy_##t.env), \
-          __VA_ARGS__))\n" ^ "\n\n" *)
-    (* Write typedefs for functions*)
-    (* ^ Hashtbl.fold
-           (fun _ v acc -> Printf.sprintf "%s%s;\n" acc (snd_3 v))
-           function_type_hashmap ""
-       ^ "\n" *)
-    (* Write typedefs for tuples *)
-    (* ^ Hashtbl.fold
-       (fun _ v acc -> Printf.sprintf "%s%s;\n" acc v)
-       tuple_hashmap "" *)
-    (* Write struct definitions *)
-    (* ^ String.concat "\n" (List.rev !struct_def_list)
-       ^ "\n\n" *)
-    ^ generate_types ()
-    ^ "\n"
-    (* Write environment typedefs *)
-    (* ^ (if List.length !lambda_environments = 0 then ""
-          else
-            "\n"
-            ^ String.concat ";\n"
-                (List.map (fun (_name, typ) -> typ) !lambda_environments)
-            ^ ";\n\n")
-       (* Write lambda capture dummies *)
-       ^ (if List.length !lambda_capture_dummies = 0 then ""
-          else
-            "\n"
-            ^ String.concat ";\n"
-                (List.map (fun (_name, typ) -> typ) !lambda_capture_dummies)
-            ^ ";\n\n") *)
-    (* Write hoisted function signatures *)
+    ^ generate_types () ^ "\n"
     ^ Hashtbl.fold
         (fun id typ acc ->
           Printf.sprintf "%s%s;\n" acc (codegen_fundecl id typ))
@@ -506,6 +469,83 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
               ^ ";")
            id);
       ""
+  | ADT (id, constructors) ->
+      let adt_type = ([], AlgebraicType (id, constructors), []) in
+      let adt_desc = type_descriptor_of_perktype adt_type in
+      add_code_to_type_binding adt_type
+        (Printf.sprintf
+           "\n\
+            %stypedef enum __perk_%s_Tag {\n\
+            %s\n\
+            %s} __perk_%s_Tag;\n\n\
+            %stypedef struct %s {\n\
+           \    %s\n\
+            %s} %s;\n"
+           indent_string id
+           (String.concat ",\n"
+              (List.map
+                 (fun (c, _) ->
+                   Printf.sprintf "%s    __perk_%s_Tag" indent_string c)
+                 constructors))
+           indent_string id indent_string id
+           (Printf.sprintf "__perk_%s_Tag tag;\n    union {\n%s\n    } data;" id
+              (String.concat "\n"
+                 (List.map
+                    (fun (c, t) ->
+                      Printf.sprintf
+                        "%s        struct {\n            %s;\n        } %s;"
+                        indent_string
+                        (String.concat ";\n            "
+                           (List.mapi
+                              (fun i t -> Printf.sprintf "%s* _%d" t i)
+                              t))
+                        c)
+                    (List.filter_map
+                       (fun (_c, t) ->
+                         match t with
+                         | [] -> None
+                         | _ -> Some (_c, List.map codegen_type t))
+                       constructors))))
+           indent_string id);
+      List.iter
+        (fun (c, (t : perktype list)) ->
+          bind_function_type c ([], Funtype (t, adt_type), []);
+
+          Hashtbl.add lambdas_hashmap (annotate_dummy (Int 1))
+            ( c,
+              (match t with
+              | [] ->
+                  Printf.sprintf "%s %s() {\n    %s\n}" adt_desc c
+                    (Printf.sprintf
+                       "%s out;\n    out.tag = __perk_%s_Tag;\n    return out;"
+                       adt_desc c)
+              | _ ->
+                  Printf.sprintf "%s %s(%s) {\n    %s\n}" adt_desc c
+                    (String.concat ", "
+                       (List.mapi
+                          (fun i t ->
+                            Printf.sprintf "%s arg_%d" (codegen_type t) i)
+                          t))
+                    (Printf.sprintf
+                       "%s out;\n\
+                       \    out.tag = __perk_%s_Tag;\n\
+                       \    %s\n\
+                       \    return out;"
+                       adt_desc c
+                       (String.concat "\n    "
+                          (List.mapi
+                             (fun i t ->
+                               Printf.sprintf
+                                 "out.data.%s._%d = malloc(sizeof(%s));\n\
+                                 \    *out.data.%s._%d = arg_%d;"
+                                 c i (codegen_type t) c i i)
+                             t)))),
+              [],
+              type_descriptor_of_perktype
+                ([], Funtype (List.map pointer_of_type t, adt_type), []) )
+          |> ignore)
+        constructors;
+      ""
   | InlineC s -> s
   | Fundef (t, id, args, body) -> indent_string ^ codegen_fundef t id args body
   | Extern _ -> ""
@@ -678,6 +718,7 @@ and codegen_type ?(expand : bool = false) (t : perktype) : string =
     match t' with
     | Basetype s -> s
     | Structtype (id, _) -> id
+    | AlgebraicType (id, _constructors) -> id
     | Funtype _ -> type_descriptor_of_perktype t
     | Lambdatype _ -> type_descriptor_of_perktype t
     | Pointertype ([], Structtype _, _) when expand -> "void*"
@@ -1005,7 +1046,9 @@ and generate_types () =
       (Hashtbl.fold
          (fun k (typ, code) acc ->
            if is_builtin_type k (typ, code) then acc
-           else (k, (typ, code, dependencies_of_type typ)) :: acc)
+           else (
+             out := !out ^ generate_forward_declaration typ;
+             (k, (typ, code, dependencies_of_type typ)) :: acc))
          type_symbol_table [])
   in
 
@@ -1013,11 +1056,12 @@ and generate_types () =
     compare (List.length d_a) (List.length d_b)
   in
   ft_list := List.sort sort_based_on_deps_count !ft_list;
-  (* List.iter
+  List.iter
     (fun (id, (_, _, deps)) ->
-      Printf.printf "Type: %s, Dependencies: [%s]\n" id
-        (String.concat ", " deps))
-    !ft_list; *)
+      say_here
+        (Printf.sprintf "Type: %s, Dependencies: [%s]\n" id
+           (String.concat ", " deps)))
+    !ft_list;
   while List.length !ft_list > 0 do
     (* say_here "generate_types"; *)
     let _id, (_typ, _code, _deps) = List.hd !ft_list in
@@ -1055,7 +1099,7 @@ and codegen_type_definition (t : perktype) : string =
       | _, Tupletype ts, _ ->
           let type_str = type_descriptor_of_perktype t in
           let compiled =
-            Printf.sprintf "typedef struct {%s} %s;"
+            Printf.sprintf "typedef struct %s {%s} %s;" type_str
               (if List.length ts = 0 then ""
                else
                  String.concat "; "
@@ -1213,3 +1257,13 @@ and codegen_lambda_capture (lamtype : perktype) : string =
         "Impossible: codegen_lambda_capture: not a lambda expression. If you \
          see this error please file an issue at \
          https://github.com/Alex23087/Perk/issues"
+
+and generate_forward_declaration (t : perktype) : string =
+  match discard_type_aq t with
+  | Tupletype _ ->
+      let type_str = type_descriptor_of_perktype t in
+      Printf.sprintf "typedef struct %s %s;\n" type_str type_str
+  | AlgebraicType (id, _constructors) ->
+      let type_str = type_descriptor_of_perktype t in
+      Printf.sprintf "typedef struct %s %s;\n" type_str id
+  | _ -> ""

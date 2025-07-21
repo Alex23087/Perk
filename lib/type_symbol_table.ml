@@ -113,7 +113,8 @@ let resolve_type (typ : perktype) : perktype =
                     resolve_type_aux ~unfold:(unfold - 1) t lst
                   in
                   ((a, Arraytype (ret_t, n), q), ret_l)
-              | Structtype _ -> (typ, lst)
+              | Structtype _ -> (typ, lst) (* TODO: Fix type resolution *)
+              | AlgebraicType _ -> (typ, lst) (* TODO: Fix type resolution *)
               | ArcheType (name, decls) ->
                   let lst = typ :: lst in
                   let decls_t, decls_l =
@@ -199,6 +200,7 @@ let rec type_descriptor_of_perktype ?(erase_env = true) (t : perktype) : string
   match t with
   | Basetype s -> s
   | Structtype (id, _) -> id
+  | AlgebraicType (id, _) -> id
   | Funtype (args, ret) ->
       let args_str =
         String.concat "__" (List.map type_descriptor_of_perktype args)
@@ -369,6 +371,8 @@ let dependencies_of_type (typ : perktype) : perkident list =
                     (res_t @ acc, res_l))
                   ([ type_descriptor_of_perktype typ ], lst)
                   field_types
+            | AlgebraicType (_, _constructors) ->
+                ([ type_descriptor_of_perktype typ ], typ :: lst)
             | ArcheType (name, decls) ->
                 let lst = typ :: lst in
                 let decls_t, decls_l =
@@ -493,6 +497,11 @@ let rec bind_type_if_needed (typ : perktype) =
           | _, Structtype (_id, fields), _ ->
               bind_type typ;
               List.iter (fun ((typ, _id), _) -> bind_type_if_needed typ) fields
+          | _, AlgebraicType (_id, constructors), _ ->
+              bind_type typ;
+              List.iter
+                (fun (_id, typs) -> List.iter bind_type_if_needed typs)
+                constructors
           | _, ArcheType (_name, _decls), _ ->
               bind_type typ';
               List.iter (fun (typ, _id) -> bind_type_if_needed typ) _decls
