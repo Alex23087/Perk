@@ -67,6 +67,8 @@
             ocamlPkgs.menhirLib
             ocamlPkgs.ppx_deriving
             ocamlPkgs.sedlex
+            ocamlPkgs.fpath
+            ocamlPkgs.cmdliner
           ];
 
           buildPhase = ''
