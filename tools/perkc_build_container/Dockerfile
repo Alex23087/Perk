@@ -7,4 +7,5 @@ RUN opam update && opam install -y \
     sedlex \
     menhir \
     odoc \
-    cmdliner
+    cmdliner \
+    fpath

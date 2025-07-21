@@ -23,9 +23,11 @@
             ocamlPkgs.menhirLib
             ocamlPkgs.ppx_deriving
             ocamlPkgs.sedlex
+            ocamlPkgs.fpath
+            ocamlPkgs.cmdliner
             pkgs.opam
             pkgs.gcc
-            pkgs.SDL2
+            pkgs.ctags
             pkgs.vsce
             pkgs.nodePackages.typescript
             pkgs.nodejs
