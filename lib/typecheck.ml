@@ -300,9 +300,9 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
           | false ->
               raise_type_error tldf
                 (Printf.sprintf
-                   "Model %s is missing required field %s of type %s, declared \
-                    in archetype %s"
-                   ident id arch (show_perktype typ)))
+                   "Model %s is missing required field '%s' of type %s, \
+                    declared in archetype %s"
+                   ident id (show_perktype typ) arch))
         required_fields;
 
       (* Gather member functions *)
