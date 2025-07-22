@@ -10,4 +10,4 @@ COPY server.py /app/server.py
 WORKDIR /app
 
 EXPOSE 8080
-CMD ["sudo", "python3", "server.py"]
+CMD ["sudo", "-E", "python3", "server.py"]

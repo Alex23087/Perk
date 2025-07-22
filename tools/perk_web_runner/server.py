@@ -4,6 +4,7 @@ import subprocess
 import tempfile
 import os
 import json
+import ssl
 
 app = Flask(__name__)
 CORS(app)
@@ -66,4 +67,27 @@ def pulse():
     return jsonify({"status": "ok"})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    # Get certificate paths from environment variables
+    cert_file = os.environ.get('SSL_CERT_PATH', '/certs/server.crt')
+    key_file = os.environ.get('SSL_KEY_PATH', '/certs/server.key')
+    port = int(os.environ.get('PORT', '8443'))
+    
+    # Create SSL context
+    ssl_context = None
+    
+    if os.path.exists(cert_file) and os.path.exists(key_file):
+        try:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+            context.load_cert_chain(cert_file, key_file)
+            ssl_context = context
+            print(f"Using SSL certificates: {cert_file}, {key_file}")
+        except Exception as e:
+            print(f"Failed to load certificates {cert_file}, {key_file}: {e}")
+    
+    if ssl_context:
+        print(f"Starting HTTPS server on port {port}")
+        app.run(host="0.0.0.0", port=port, ssl_context=ssl_context)
+    else:
+        fallback_port = int(os.environ.get('HTTP_PORT', '8080'))
+        print(f"No SSL certificates found, starting HTTP server on port {fallback_port}")
+        app.run(host="0.0.0.0", port=fallback_port)
