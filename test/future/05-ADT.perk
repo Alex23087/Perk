@@ -7,15 +7,15 @@ type List = | Empty | Cons(int, List) | Leaf (int)
 //     Cons(T, List<T>)
 // }
 
-fun length(l: List): int {
-    match (l) {
-        Empty { return 0 },
-        Cons(_, (Cons(_, tail))) { return 2 + length(tail) },
-        Cons(_, tail) { return 1 + length(tail) }
-        Leaf(12) { return 1 },
-        Leaf(_) { return 1 }
-    }
-}
+// fun length(l: List): int {
+//     match (l) {
+//         Empty { return 0 },
+//         Cons(_, (Cons(_, tail))) { return 2 + length(tail) },
+//         Cons(_, tail) { return 1 + length(tail) }
+//         Leaf(12) { return 1 },
+//         Leaf(_) { return 1 }
+//     }
+// }
 
 // int length(List l)
 // {
@@ -48,17 +48,18 @@ fun length(l: List): int {
 
 fun main(): void {
     let l :List = Cons (10, Empty());
-    skip
+    let l2 : List = Empty;
+    skip;
 
-//     match (l) {
-//         Empty {
-
-//         }
-//         Cons(x, _) {
-
-//         }
-//         default {
-
-//         }
-//     }
+    match (l) {
+        Empty {
+            skip
+        }
+        Cons(x, _) {
+          skip
+        }
+        default {
+          skip
+        }
+    }
 }

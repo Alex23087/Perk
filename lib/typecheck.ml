@@ -662,10 +662,23 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
   | String _ -> (expr, ([], Pointertype ([], Basetype "char", []), []))
   | Var id -> (
       match lookup_var id with
+      | Some (([], Funtype (params, ret), []) as t) -> (
+          match Option.map discard_type_aq expected_return with
+          | Some (Funtype _) -> (expr, t)
+          | _ ->
+              (* Constructors are automatically applied *)
+              if Hashtbl.mem defined_constructors id && List.length params = 0
+              then (annot_copy expr (Apply (expr, [], None)), ret)
+              else (expr, t))
       | Some t -> (expr, t)
       | None -> raise_type_error expr ("Unknown identifier: " ^ id))
   | Apply (func, params, _) ->
-      let fun_expr, fun_type = typecheck_expr func in
+      let fun_expr, fun_type =
+        typecheck_expr
+          ~expected_return:(Some ([], Funtype ([], void_type), []))
+            (* TODO: Put correct type here *)
+          func
+      in
       (* Check that the function is a function 👍 *)
       let fun_param_types, fun_ret_type, apptype =
         match fun_type with
