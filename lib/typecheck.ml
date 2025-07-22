@@ -143,20 +143,39 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
         let deftype =
           if equal_perktype typ'' typ''_nocoal then None else Some typ''
         in
+        (match discard_type_aq typ'' with
+        | Lambdatype (params, _, _) ->
+            if
+              List.exists
+                (fun typ ->
+                  match discard_type_aq typ with
+                  | Basetype "void" -> true
+                  | _ -> false)
+                params
+            then raise_type_error tldf "Cannot have void parameters in a lambda"
+        | _ -> ());
         bind_type_if_needed typ';
         bind_type_if_needed typ'';
         bind_var id typ'';
         annot_copy tldf (Def (((typ'', id), expr_res), deftype))
   | Fundef (ret_type, id, params, body) ->
       if id = "self" then raise_type_error tldf "Identifier self is reserved"
-      else
+      else (
+        if
+          List.exists
+            (fun (typ, _) ->
+              match discard_type_aq typ with
+              | Basetype "void" -> true
+              | _ -> false)
+            params
+        then raise_type_error tldf "Cannot have void parameters in a function";
         let funtype =
           ([], Funtype (List.map (fun (typ, _) -> typ) params, ret_type), [])
         in
         bind_var id funtype;
         bind_type_if_needed funtype;
         annot_copy tldf (Fundef (ret_type, id, params, body))
-        (* |> ignore; typecheck_deferred_function tldf *)
+        (* |> ignore; typecheck_deferred_function tldf *))
   | Extern (id, typ) ->
       (if id = "self" then raise_type_error tldf "Identifier self is reserved"
        else
@@ -183,6 +202,31 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
                  (fun d ->
                    d |> decl_of_declorfun
                    |> (fun (typ, id) ->
+                   (match discard_type_aq typ with
+                   | Funtype (params, _ret) ->
+                       if
+                         List.exists
+                           (fun typ ->
+                             match discard_type_aq typ with
+                             | Basetype "void" -> true
+                             | _ -> false)
+                           params
+                       then
+                         raise_type_error tldf
+                           "Cannot have void parameters in a function"
+                   | Lambdatype (params, _, _) ->
+                       if
+                         List.exists
+                           (fun typ ->
+                             match discard_type_aq typ with
+                             | Basetype "void" -> true
+                             | _ -> false)
+                           params
+                       then
+                         raise_type_error tldf
+                           "Cannot have void parameters in a lambda"
+                   | _ -> ());
+
                    (add_parameter_to_func_only void_pointer typ, id))
                    |> fst)
                  decls);
@@ -325,6 +369,16 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
             match ( $ ) def with
             | DefFun (attrs, (ret, id, params, body)) ->
                 push_symbol_table ();
+                if
+                  List.exists
+                    (fun (typ, _) ->
+                      match discard_type_aq typ with
+                      | Basetype "void" -> true
+                      | _ -> false)
+                    params
+                then
+                  raise_type_error tldf
+                    "Cannot have void parameters in a function";
                 List.iter
                   (fun (typ, id) ->
                     try bind_var id typ
@@ -352,6 +406,19 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
                   try match_types ~array_init typ expr_type
                   with Type_match_error msg -> raise_type_error expr msg
                 in
+                (match discard_type_aq typ' with
+                | Lambdatype (params, _, _) ->
+                    if
+                      List.exists
+                        (fun typ ->
+                          match discard_type_aq typ with
+                          | Basetype "void" -> true
+                          | _ -> false)
+                        params
+                    then
+                      raise_type_error tldf
+                        "Cannot have void parameters in a lambda"
+                | _ -> ());
                 (try bind_var_local local_symbol_table id typ'
                  with Double_declaration msg -> raise_type_error def msg);
                 annot_copy def (DefVar (attrs, ((typ', id), expr_res))))
@@ -448,6 +515,17 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
         let deftype =
           if equal_perktype typ'' typ''_nocoal then None else Some typ''
         in
+        (match discard_type_aq typ'' with
+        | Lambdatype (params, _, _) ->
+            if
+              List.exists
+                (fun typ ->
+                  match discard_type_aq typ with
+                  | Basetype "void" -> true
+                  | _ -> false)
+                params
+            then raise_type_error cmd "Cannot have void parameters in a lambda"
+        | _ -> ());
         bind_type_if_needed typ';
         bind_type_if_needed typ'';
         bind_var id typ'';

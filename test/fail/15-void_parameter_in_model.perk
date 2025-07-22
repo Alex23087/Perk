@@ -1,0 +1,5 @@
+model Test {
+    fun f(a: void): void {
+        skip
+    }
+}

@@ -1,0 +1,3 @@
+let f := (a: void): void{
+    skip
+}

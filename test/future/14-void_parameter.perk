@@ -1,3 +1,0 @@
-fun f(a: void): void{ // This compiles with perkc but then is not valid C
-    skip
-}

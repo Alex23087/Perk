@@ -1,0 +1,3 @@
+archetype Test {
+    fun f: void -> void
+}
