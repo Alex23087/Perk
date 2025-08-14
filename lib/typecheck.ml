@@ -1138,6 +1138,7 @@ and typecheck_expr_list (exprs : expr_a list) (types : perktype list) :
 
 and fill_nothing (expr : expr_a) (exprtyp : perktype) (typ : perktype) :
     expr_a * perktype =
+  let expr = autoas expr exprtyp typ in
   match (( $ ) expr, typ) with
   | Nothing _, ([], Optiontype _, []) -> (annot_copy expr (Nothing typ), typ)
   | Nothing _, _ ->
@@ -1231,12 +1232,39 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
       | Optiontype t, Optiontype s -> ([], Optiontype (match_types_aux t s), [])
       | Tupletype t1, Tupletype t2 ->
           ([], Tupletype (List.map2 match_types_aux t1 t2), [])
-      | ArchetypeSum t1, ArchetypeSum t2 ->
-          ( [],
-            ArchetypeSum
-              (match_type_list t1
-                 (List.map (fun t -> (annotate_dummy (Int (-1)), t)) t2)),
-            [] )
+      | ArchetypeSum t1, ArchetypeSum t2 -> (
+          try
+            let _ =
+              match_type_list (t1 @ [ vararg ])
+                (* A shorter archetype list can be matched with a longer one.
+                   To implement this reusing existing code, we use the code for varargs *)
+                (List.map (fun t -> (annotate_dummy (Int (-1)), t)) t2)
+            in
+            ([], ArchetypeSum t1, [])
+          with Type_match_error _ | Type_error _ ->
+            raise
+              (Type_match_error
+                 (Printf.sprintf "Type mismatch: expected %s,\ngot %s instead"
+                    (Codegen.codegen_type ~expand:true expected)
+                    (Codegen.codegen_type ~expand:true actual))))
+      | ArchetypeSum t1, Modeltype (_, archetypes, _, _, _) -> (
+          let t2 =
+            List.map (fun id -> resolve_type ([], Basetype id, [])) archetypes
+          in
+          try
+            let _ =
+              match_type_list (t1 @ [ vararg ])
+                (* A shorter archetype list can be matched with a longer one.
+                   To implement this reusing existing code, we use the code for varargs *)
+                (List.map (fun t -> (annotate_dummy (Int (-1)), t)) t2)
+            in
+            ([], ArchetypeSum t1, [])
+          with Type_match_error _ | Type_error _ ->
+            raise
+              (Type_match_error
+                 (Printf.sprintf "Type mismatch: expected %s,\ngot %s instead"
+                    (Codegen.codegen_type ~expand:true expected)
+                    (Codegen.codegen_type ~expand:true actual))))
       | Lambdatype (params1, ret1, _), Funtype (params2, ret2) ->
           let param_types = List.map2 match_types_aux params1 params2 in
           let ret_type = match_types_aux ret1 ret2 in
@@ -1267,6 +1295,10 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
 and match_type_list (expected : perktype list)
     (actual : (expr_a * perktype) list) : perktype list =
   let rec match_type_list_aux expected' actual' =
+    say_here
+      (Printf.sprintf "match_type_list_aux: expected: %s, actual: %s"
+         (String.concat ", " (List.map show_perktype expected'))
+         (String.concat ", " (List.map (fun (_, t) -> show_perktype t) actual')));
     match (expected', actual') with
     | ([], Vararg, []) :: _ :: _, _ ->
         raise_type_error
@@ -1300,3 +1332,9 @@ and autocast (expr : expr_a) (typ : perktype) (expected : perktype option) :
   match expected with
   | None -> (expr, typ)
   | Some t -> (annot_copy expr (Cast ((typ, t), expr)), t)
+
+and autoas (expr : expr_a) (actual : perktype) (expected : perktype) : expr_a =
+  match (discard_type_aq expected, discard_type_aq actual) with
+  | ArchetypeSum a1, ArchetypeSum _ | ArchetypeSum a1, Modeltype _ ->
+      annot_copy expr (As (expr, a1, Some actual))
+  | _ -> expr

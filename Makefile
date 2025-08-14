@@ -22,7 +22,7 @@ clean:
 # Install dependencies
 .PHONY: deps
 deps:
-	opam install -y ppx_deriving sedlex menhir odoc cmdliner fpath
+	opam install -y dune ppx_deriving sedlex menhir odoc cmdliner fpath
 	@if ! command -v gcc >/dev/null 2>&1; then \
 		echo "Warning: gcc is not installed or not in PATH." >&2; \
 	fi

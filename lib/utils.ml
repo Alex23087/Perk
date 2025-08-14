@@ -52,6 +52,7 @@ and add_parameter_to_func_2 (param_type : perktype) (func_type : perktype) :
       (a, Lambdatype (new_params, ret, free_vars), d)
   | _ -> func_type
 
+and vararg : perktype = ([], Vararg, [])
 and void_type : perktype = ([], Basetype "void", [])
 and int_type : perktype = ([], Basetype "int", [])
 and float_type : perktype = ([], Basetype "float", [])

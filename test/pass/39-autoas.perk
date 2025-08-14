@@ -22,4 +22,10 @@ fun main(): int {
     m.x = 42;
     printf("%d\n", f(m as TestArch+TestArch2));
     printf("%d\n", f(m));
+
+    let m2: <TestArch+TestArch2> = m;
+    printf("%d\n", f(m2));
+
+    let m3: <TestArch> = m2;
+    printf("%d\n", f(m3));
 }
