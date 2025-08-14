@@ -901,7 +901,7 @@ and codegen_expr (e : expr_a) : string =
         (String.concat ", "
            (List.map (fun e -> Printf.sprintf "%s" (codegen_expr e)) es))
   | TupleSubscript (e, i) -> Printf.sprintf "%s._%d" (codegen_expr e) i
-  | As (id, typlist, typ) ->
+  | As (expr, typlist, typ) ->
       if Option.is_none typ then
         raise_compilation_error e
           "The type for 'as' expression has not been tagged during typecheck. \
@@ -909,6 +909,12 @@ and codegen_expr (e : expr_a) : string =
            https://github.com/Alex23087/Perk/issues";
       let typ = Option.get typ in
       let sum_type_descr = codegen_type ([], ArchetypeSum typlist, []) in
+      let code = codegen_expr expr in
+      let new_id = fresh_var "as_expr" in
+      let new_decl =
+        Printf.sprintf "%s %s = %s;\n" (codegen_type typ) new_id code
+      in
+      generated_freevars := !generated_freevars ^ new_decl;
       Printf.sprintf "((%s) {%s%s})" sum_type_descr
         (if List.length typlist = 0 then ""
          else
@@ -919,9 +925,11 @@ and codegen_expr (e : expr_a) : string =
                   whether the variable is a model or an archetype sum *)
                   match typ with
                   | _, Modeltype _, _ ->
-                      Printf.sprintf "%s->%s" id (codegen_type t ~expand:true)
+                      Printf.sprintf "%s->%s" new_id
+                        (codegen_type t ~expand:true)
                   | _, ArchetypeSum _, _ ->
-                      Printf.sprintf "%s.%s" id (codegen_type t ~expand:true)
+                      Printf.sprintf "%s.%s" new_id
+                        (codegen_type t ~expand:true)
                   | _ ->
                       raise_compilation_error e
                         "as expression can only be used with models or \
@@ -930,8 +938,8 @@ and codegen_expr (e : expr_a) : string =
            ^ ", ")
         (* If the variable is an archetype sum, the internal self pointer is passed *)
         (match typ with
-        | _, Modeltype _, _ -> id
-        | _, ArchetypeSum _, _ -> Printf.sprintf "%s.self" id
+        | _, Modeltype _, _ -> new_id
+        | _, ArchetypeSum _, _ -> Printf.sprintf "%s.self" new_id
         | _ ->
             raise_compilation_error e
               "as expression can only be used with models or archetypes")

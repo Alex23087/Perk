@@ -1,0 +1,24 @@
+import "stdio.h"
+
+archetype TestArch {
+    x: int
+}
+
+archetype TestArch2 {
+    y: int
+}
+
+model TestModel: TestArch, TestArch2 {
+    let x : int = 0,
+    let y : int = 0
+}
+
+fun f(a: <TestArch>) : int {
+    return a.x;
+}
+
+fun main(): int {
+    let m: TestModel = summon TestModel();
+    m.x = 42;
+    printf("%d\n", f(m as TestArch+TestArch2 as TestArch));
+}
