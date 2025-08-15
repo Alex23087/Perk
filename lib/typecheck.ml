@@ -84,7 +84,11 @@ and typecheck_deferred_function (tldf : topleveldef_a) : topleveldef_a =
           try bind_var id typ
           with Double_declaration msg -> raise_type_error tldf msg)
         params;
-      let body_res = typecheck_command ~retype:(Some ret_type) body in
+      let body_res, _body_type, body_returns =
+        typecheck_command ~retype:(Some ret_type) body
+      in
+      if (not body_returns) && not (is_unit_type ret_type) then
+        raise_type_error tldf "Not all code paths return a value";
       pop_symbol_table ();
       let funtype =
         ([], Funtype (List.map (fun (typ, _) -> typ) params, ret_type), [])
@@ -384,7 +388,11 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
                     try bind_var id typ
                     with Double_declaration msg -> raise_type_error def msg)
                   params;
-                let body_res = typecheck_command ~retype:(Some ret) body in
+                let body_res, _body_type, body_returns =
+                  typecheck_command ~retype:(Some ret) body
+                in
+                if (not body_returns) && not (is_unit_type ret) then
+                  raise_type_error tldf "Not all code paths return a value";
                 pop_symbol_table ();
                 (try
                    bind_var_local local_symbol_table id
@@ -477,16 +485,20 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
       bind_type_if_needed ([], AlgebraicType (ident, constructors), []);
       tldf
 
-(** Typechecks commands *)
+(** Typechecks commands
+    @param retype the expected return type
+    @return
+      the typechecked command (can be modified by the check), the return type
+      (if any), and whether all code paths return a value *)
 and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
-    command_a =
+    command_a * perktype option * bool =
   match ( $ ) cmd with
-  | InlineCCmd _ -> cmd
+  | InlineCCmd _ -> (cmd, None, true)
   | Block c ->
       push_symbol_table ();
-      let c_res = typecheck_command ~retype c in
+      let c_res, return_type, does_return = typecheck_command ~retype c in
       pop_symbol_table ();
-      annot_copy cmd (Block c_res)
+      (annot_copy cmd (Block c_res), return_type, does_return)
   | DefCmd (((typ, id), expr), _) ->
       if id = "self" then raise_type_error cmd "Identifier self is reserved"
       else
@@ -533,7 +545,7 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
            (match deftype with
            | Some deftype -> show_perktype deftype
            | None -> "None"); *)
-        annot_copy cmd (DefCmd (((typ'', id), expr_res), deftype))
+        (annot_copy cmd (DefCmd (((typ'', id), expr_res), deftype)), None, false)
   | Assign (lhs, rhs, _, _) ->
       let lhs_res, lhs_type = typecheck_expr lhs in
       let rhs_res, rhs_type = typecheck_expr rhs in
@@ -556,11 +568,14 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
          (show_perktype lhs_type) (show_perktype rhs_type)
          (match acctype with Some t -> show_perktype t | None -> "None")
          (match rasstype with Some t -> show_perktype t | None -> "None"); *)
-      annot_copy cmd (Assign (lhs_res, rhs_res, acctype, rasstype))
+      ( annot_copy cmd (Assign (lhs_res, rhs_res, acctype, rasstype)),
+        Some exprval,
+        true )
   | Seq (c1, c2) ->
-      let c1_res = typecheck_command ~retype c1 in
-      let c2_res = typecheck_command ~retype c2 in
-      annot_copy cmd (Seq (c1_res, c2_res))
+      let c1_res, _c1_type, c1_returns = typecheck_command ~retype c1 in
+      (* TODO: If c1_returns is true, c2 is dead code. Warn *)
+      let c2_res, _c2_type, c2_returns = typecheck_command ~retype c2 in
+      (annot_copy cmd (Seq (c1_res, c2_res)), retype, c1_returns || c2_returns)
   | IfThenElse (guard, then_branch, else_branch) ->
       let guard_res, guard_type = typecheck_expr guard in
       (match guard_type with
@@ -571,12 +586,18 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
             (Printf.sprintf "If guard must be a boolean or an int, got %s"
                (show_perktype guard_type)));
       push_symbol_table ();
-      let then_branch_res = typecheck_command ~retype then_branch in
+      let then_branch_res, _then_branch_type, then_branch_returns =
+        typecheck_command ~retype then_branch
+      in
       pop_symbol_table ();
       push_symbol_table ();
-      let else_branch_res = typecheck_command ~retype else_branch in
+      let else_branch_res, _else_branch_type, else_branch_returns =
+        typecheck_command ~retype else_branch
+      in
       pop_symbol_table ();
-      annot_copy cmd (IfThenElse (guard_res, then_branch_res, else_branch_res))
+      ( annot_copy cmd (IfThenElse (guard_res, then_branch_res, else_branch_res)),
+        retype,
+        then_branch_returns && else_branch_returns )
   | Whiledo (guard, body) ->
       let guard_res, guard_type = typecheck_expr guard in
       (match guard_type with
@@ -584,12 +605,12 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       | g when is_numerical g -> ()
       | _ ->
           raise_type_error cmd
-            (Printf.sprintf "If guard must be a boolean or an int, got %s"
+            (Printf.sprintf "While guard must be a boolean or an int, got %s"
                (show_perktype guard_type)));
       push_symbol_table ();
-      let body_res = typecheck_command ~retype body in
+      let body_res, body_type, body_returns = typecheck_command ~retype body in
       pop_symbol_table ();
-      annot_copy cmd (Whiledo (guard_res, body_res))
+      (annot_copy cmd (Whiledo (guard_res, body_res)), body_type, body_returns)
   | Dowhile (guard, body) ->
       let guard_res, guard_type = typecheck_expr guard in
       (match guard_type with
@@ -600,11 +621,13 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
             (Printf.sprintf "While guard must be a boolean or an int, got %s"
                (show_perktype guard_type)));
       push_symbol_table ();
-      let body_res = typecheck_command ~retype body in
+      let body_res, body_type, body_returns = typecheck_command ~retype body in
       pop_symbol_table ();
-      annot_copy cmd (Dowhile (guard_res, body_res))
+      (annot_copy cmd (Dowhile (guard_res, body_res)), body_type, body_returns)
   | For (initcmd, guard, incrcmd, body) ->
-      let initcmd_res = typecheck_command ~retype initcmd in
+      let initcmd_res, _initcmd_type, initcmd_returns =
+        typecheck_command ~retype initcmd
+      in
       let guard_res, guard_type = typecheck_expr guard in
       (match guard_type with
       | _, Basetype "bool", _ -> ()
@@ -613,14 +636,19 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
           raise_type_error cmd
             (Printf.sprintf "For guard must be a boolean or an int, got %s"
                (show_perktype guard_type)));
-      let incrcmd_res = typecheck_command ~retype incrcmd in
+      let incrcmd_res, _incrcmd_type, incrcmd_returns =
+        typecheck_command ~retype incrcmd
+      in
       push_symbol_table ();
-      let body_res = typecheck_command ~retype body in
+      let body_res, body_type, body_returns = typecheck_command ~retype body in
       pop_symbol_table ();
-      annot_copy cmd (For (initcmd_res, guard_res, incrcmd_res, body_res))
-  | Expr e -> annot_copy cmd (Expr (fst (typecheck_expr e)))
-  | Switch _ -> cmd
-  | Skip -> cmd
+      ( annot_copy cmd (For (initcmd_res, guard_res, incrcmd_res, body_res)),
+        body_type,
+        (* TODO: Check agreement between body_type and other types *)
+        body_returns || initcmd_returns || incrcmd_returns )
+  | Expr e -> (annot_copy cmd (Expr (fst (typecheck_expr e))), None, false)
+  | Switch _ -> (cmd, None, false)
+  | Skip -> (cmd, None, false)
   | Banish id ->
       (* TODO: Let banish unbind the future (unbind banished things after they're banished) *)
       (match Option.map resolve_type (lookup_var id) with
@@ -629,10 +657,10 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       | Some _ ->
           raise_syntax_error cmd
             (Printf.sprintf "Variable %s is not a model" id));
-      cmd
+      (cmd, None, false)
   | Return None -> (
       match retype with
-      | Some (_, Basetype "void", _) | None -> cmd
+      | Some (_, Basetype "void", _) | None -> (cmd, None, true)
       | Some t ->
           raise_type_error cmd
             (Printf.sprintf
@@ -645,11 +673,16 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       | Some t ->
           ignore
             (try match_types t e_type
-             with Type_match_error msg -> raise_type_error cmd msg)
+             with Type_match_error _msg ->
+               raise_type_error cmd
+                 (Printf.sprintf
+                    "This return is supposed to return a value of type %s, got \
+                     %s instead"
+                    (show_perktype t) (show_perktype e_type)))
       | None ->
           raise_type_error cmd "This return is not supposed to return any value");
-      annot_copy cmd (Return (Some e_res))
-  | Continue | Break -> cmd
+      (annot_copy cmd (Return (Some e_res)), Some e_type, true)
+  | Continue | Break -> (cmd, None, false)
 
 (** Typechecks expressions *)
 and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
@@ -762,7 +795,11 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           try bind_var id typ
           with Double_declaration msg -> raise_type_error expr msg)
         params;
-      let body_res = typecheck_command ~retype:(Some retype) body in
+      let body_res, _body_type, body_returns =
+        typecheck_command ~retype:(Some retype) body
+      in
+      if (not body_returns) && not (is_unit_type retype) then
+        raise_type_error expr "Not all code paths return a value";
       let free_vars = fst (free_variables_expr expr) in
       let free_vars =
         List.map

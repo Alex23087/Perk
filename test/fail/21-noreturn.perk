@@ -1,0 +1,5 @@
+fun f(): int {
+    if (true) {
+        return 42;
+    }
+}

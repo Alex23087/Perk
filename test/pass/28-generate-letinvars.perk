@@ -7,7 +7,7 @@ model M {
     }
 }
 
-fun main() : int {
+fun main() : void {
     let wanana := summon M();
     if (wanana.banana() == 5) {
         while (wanana.banana() == 5) {

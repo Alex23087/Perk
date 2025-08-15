@@ -1,5 +1,5 @@
 import "stdio.h"
 
-fun main () : int {
+fun main () : void {
     skip
 }

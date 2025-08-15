@@ -64,6 +64,9 @@ and pointer_of_type (typ : perktype) : perktype = ([], Pointertype typ, [])
 (** Creates a self type for a given name. *)
 and self_type (name : perkident) : perktype = ([], Basetype name, [])
 
+and is_unit_type (typ : perktype) : bool =
+  match discard_type_aq typ with Basetype "void" -> true | _ -> false
+
 (** Transorms a lambda to a function *)
 and func_of_lambda_void (t : perktype) : perktype =
   match t with
