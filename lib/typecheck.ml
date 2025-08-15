@@ -670,6 +670,8 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
   | Return (Some e) ->
       let e_res, e_type = typecheck_expr e in
       (match retype with
+      | Some (_, Basetype "void", _) | None ->
+          raise_type_error cmd "This return is not supposed to return any value"
       | Some t ->
           ignore
             (try match_types t e_type
@@ -678,9 +680,7 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
                  (Printf.sprintf
                     "This return is supposed to return a value of type %s, got \
                      %s instead"
-                    (show_perktype t) (show_perktype e_type)))
-      | None ->
-          raise_type_error cmd "This return is not supposed to return any value");
+                    (show_perktype t) (show_perktype e_type))));
       (annot_copy cmd (Return (Some e_res)), Some e_type, true)
   | Continue | Break -> (cmd, None, false)
 

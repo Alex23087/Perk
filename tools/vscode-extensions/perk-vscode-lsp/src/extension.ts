@@ -23,7 +23,11 @@ export function activate(context: vscode.ExtensionContext) {
                     new vscode.Position(startLine, error.characterStart),
                     new vscode.Position(endLine, error.characterEnd)
                 );
-                diagnostics.push(new vscode.Diagnostic(range, `${error.errorType}: ${error.message}`, vscode.DiagnosticSeverity.Error));
+                diagnostics.push(new vscode.Diagnostic(
+                    range,
+                    `${(error.errorType.charAt(0).toUpperCase() + error.errorType.slice(1) + " Error")}: ${error.message}`,
+                    vscode.DiagnosticSeverity.Error
+                ));
             });
 
             // Set diagnostics or clear them if no errors
@@ -50,7 +54,7 @@ function runCompiler(sourceCode: string, dir: string | undefined): { errorType: 
     fs.writeFileSync(tmpFile, sourceCode, 'utf8');
 
     // Run the perkc compiler. Use the --check option to get errors and the --dir option to specify the directory if provided
-    const command = `perkc --check ${tmpFile}${dir ? ` --dir ${path.dirname(dir)}` : ''}`;
+    const command = `perkc --check --json ${tmpFile}${dir ? ` --dir ${path.dirname(dir)}` : ''}`;
 
     // Wait for the command to finish
     try {

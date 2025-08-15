@@ -73,7 +73,7 @@ type perktype_partial =
 
 and perktype =
   perktype_attribute list * perktype_partial * perktype_qualifier list
-[@@deriving show, eq]
+[@@deriving eq]
 
 (* and perktype_annotated = perktype annotated [@@deriving show, eq] *)
 and perkvardesc = perktype * perkident [@@deriving show, eq]
@@ -201,3 +201,35 @@ let filter_var_table () =
     List.fold_left
       (fun l (id, typ) -> if List.mem (id, typ) l then l else (id, typ) :: l)
       [] !all_vars
+
+(** Discards attributes and qualifiers of a type. *)
+and discard_type_aq (typ : perktype) : perktype_partial =
+  let _a, t, _q = typ in
+  t
+
+let rec show_perktype (typ : perktype) : string =
+  match discard_type_aq typ with
+  | Basetype s -> s
+  | Funtype (args, ret) ->
+      Printf.sprintf "(%s) -> %s"
+        (String.concat ", " (List.map show_perktype args))
+        (show_perktype ret)
+  | Vararg -> "..."
+  | Tupletype ts ->
+      Printf.sprintf "(%s)" (String.concat ", " (List.map show_perktype ts))
+  | Arraytype (t, n) ->
+      Printf.sprintf "[%s]"
+        (show_perktype t ^ match n with Some n -> string_of_int n | None -> "")
+  | Lambdatype (params, ret, _free_vars) ->
+      Printf.sprintf "(%s) => %s"
+        (String.concat ", " (List.map show_perktype params))
+        (show_perktype ret)
+  | Pointertype t -> Printf.sprintf "%s*" (show_perktype t)
+  | Infer -> "?"
+  | Modeltype (name, _, _, _, _) -> name
+  | ArcheType (name, _) -> name
+  | Structtype (name, _) -> name
+  | AlgebraicType (name, _) -> name
+  | Optiontype t -> Printf.sprintf "%s?" (show_perktype t)
+  | ArchetypeSum ts ->
+      Printf.sprintf "<%s>" (String.concat " + " (List.map show_perktype ts))

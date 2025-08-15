@@ -1186,7 +1186,7 @@ and codegen_type_definition (t : perktype) : string =
             (Printf.sprintf
                "Unexpected type generation request: got %s. If you see this \
                 error, please file an issue at https://github.com/"
-               (type_descriptor_of_perktype t)))
+               (show_perktype t)))
 
 and codegen_lambda_environment (free_vars : perkvardesc list) :
     bool * string * string =

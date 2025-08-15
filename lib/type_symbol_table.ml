@@ -253,8 +253,7 @@ and type_descriptor_of_environment ?(erase_env = false)
 let print_type_symbol_table () =
   Printf.printf "Type Symbol Table:\n";
   Hashtbl.iter
-    (fun id (typ, _code) ->
-      Printf.printf "%s: %s,\n\n" id (type_descriptor_of_perktype typ))
+    (fun id (typ, _code) -> Printf.printf "%s: %s,\n\n" id (show_perktype typ))
     type_symbol_table
 
 (* Binds a type in the symble table. NOT Throws an exception if the name has already been defined *)

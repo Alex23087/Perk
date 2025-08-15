@@ -140,11 +140,6 @@ and lambda_def_of_func_def_ (def : perkdef) : perkdef =
       let new_expr = lambda_expr_of_func_expr expr typ in
       ((new_typ, id), new_expr)
 
-(** Discards attributes and qualifiers of a type. *)
-and discard_type_aq (typ : perktype) : perktype_partial =
-  let _a, t, _q = typ in
-  t
-
 (** Tranforms a function definition to a lambda definition *)
 and lambda_of_func (func : perkfundef) : expr_t =
   let typ, _id, args, body = func in
