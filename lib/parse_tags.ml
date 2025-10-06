@@ -16,7 +16,12 @@ type parse_result =
 let generate_tags lib_paths =
   let status =
     Sys.command
-      (Printf.sprintf "gcc -E -P -dD %s > libs_expanded.h "
+      (Printf.sprintf
+         "/usr/local/i386elfgcc/bin/i386-elf-gcc -ffreestanding -m32 \
+          -fno-builtin -fno-stack-protector -fno-pic -Wno-error -DVGA_VESA \
+          -DHRES=600 -DVRES=400 -DBPP=4 -DWINDOW_DRAG_NORMAL -E -P -dD %s > \
+          libs_expanded.h "
+         (* "gcc -E -P -dD %s > libs_expanded.h " *)
          (String.concat " " lib_paths))
   in
   if status = 0 then
@@ -24,8 +29,8 @@ let generate_tags lib_paths =
       Sys.command
         (Printf.sprintf "ctags --kinds-C=+p --fields=+Snt libs_expanded.h")
     in
-    if status = 0 then () else failwith "lib expansion failed"
-  else failwith "lib expansion failed"
+    if status = 0 then () else failwith "lib expansion failed 1"
+  else failwith "lib expansion failed 2"
 
 (** Debug function to print parsed [tags] file*)
 let string_of_parse_result pr =
@@ -143,8 +148,10 @@ let to_ctypes (p : parse_result) : (string * ctype * typed_var list) option =
         let ctype_sig = parse_signature signature in
         let ctype_ret = parse_ret_type ret in
         Some (name, ctype_ret, ctype_sig)
-      with _ -> None)
-  | _ -> failwith ""
+      with _ ->
+        Printf.eprintf "Warning: could not parse prototype for %s\n" name;
+        None)
+  | _ -> failwith "Trying to convert non-prototype to ctype"
 
 (** Debug function to print C prototype types. *)
 let string_of_ctypes ((name, ret, signature) : string * ctype * typed_var list)
@@ -184,13 +191,10 @@ let get_type_from_spec_list sl =
   else if len = 0 then solve_specifiers sl
   else failwith "Illegal type - more than one base type"
 
-let remove_tags () =
-  let _ = Sys.command "rm tags" in
-  ()
+let remove_tags () = if not !Utils.verbose then Sys.command "rm tags" |> ignore
 
 let remove_libs_expanded () =
-  let _ = Sys.command "rm libs_expanded.h" in
-  ()
+  if not !Utils.verbose then Sys.command "rm libs_expanded.h" |> ignore
 
 (** Given a basic C sort, returns the corresponding base type *)
 let perktype_of_sort s : perktype_partial =

@@ -22,7 +22,10 @@ let get_lib_path s =
     if len <= 2 then "" else String.sub s 1 (len - 2)
   in
   (* TODO actual includepaths *)
-  Printf.sprintf "/usr/include/%s" (remove_first_last s)
+  Printf.sprintf "%s/%s"
+    (if String.starts_with ~prefix:"<" s then "/usr/include"
+     else Fpath.(to_string (normalize (v (Filename.dirname !Utils.fnm)))))
+    (remove_first_last s)
 
 (* TODO handle type aliases *)
 
@@ -32,6 +35,7 @@ let is_numerical (_, typ, _) =
     [
       Basetype "int";
       Basetype "float";
+      Basetype "double";
       Basetype "size_t";
       Basetype "int64_t";
       Basetype "int32_t";
@@ -103,7 +107,11 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
       (* TODO hoist these*)
       List.iter
         (fun (id, t) ->
-          if Option.is_none (lookup_var id) then bind_var id t else ())
+          say_here
+            (Printf.sprintf "Adding library function %s of type %s" id
+               (type_descriptor_of_perktype t));
+          if Option.is_none (lookup_var id) then bind_var id t
+          else say_here "Skipping")
         !library_functions;
       remove_tags ();
       remove_libs_expanded ();
@@ -168,6 +176,9 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
       (* annotate_dummy Skip *)
       (* Externs are only useful for type checking. No need to keep it for codegen step *)
   | Archetype (name, decls) -> (
+      if !Utils.static_compilation then
+        raise_compilation_error tldf
+          "Archetypes cannot be used in static compilation mode";
       if name = "self" then raise_type_error tldf "Identifier self is reserved"
       else
         match lookup_type name with
@@ -180,14 +191,17 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
                  (fun d ->
                    d |> decl_of_declorfun
                    |> (fun (typ, id) ->
-                   (add_parameter_to_func_only void_pointer typ, id))
+                        (add_parameter_to_func_only void_pointer typ, id))
                    |> fst)
                  decls);
             bind_type_if_needed
               ([], ArcheType (name, List.map decl_of_declorfun decls), []);
             tldf)
   | Model (ident, archetypes, fields) ->
-      (if ident = "self" then
+      (if !Utils.static_compilation then
+         raise_compilation_error tldf
+           "Models cannot be used in static compilation mode";
+       if ident = "self" then
          raise_type_error tldf "Identifier self is reserved"
        else
          (* Check that the model is not already defined *)
@@ -338,8 +352,8 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
                 let expr_res, expr_type = typecheck_expr expr in
                 let expr_res, expr_type = fill_nothing expr_res expr_type typ in
                 (* TODO: usual array initialization doesn't work for models, as
-                the fields are defined first and then assigned, and C doesn't allow
-                this for array expressions. Figure out a way to deal with this *)
+                   the fields are defined first and then assigned, and C doesn't allow
+                   this for array expressions. Figure out a way to deal with this *)
                 let array_init =
                   match (typ, ( $ ) expr_res) with
                   | (_, Arraytype (_, Some _n), _), Array _ -> true
@@ -634,7 +648,17 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           let lhs_res, _ = typecheck_expr lhs in
           let rhs_res, _ = typecheck_expr rhs in
           ( annot_copy expr (Binop (op, lhs_res, rhs_res)),
-            ([], Basetype "bool", []) ))
+            ([], Basetype "bool", []) )
+      | ShL | ShR -> (
+          let lhs_res, lhs_type = typecheck_expr lhs in
+          let rhs_res, rhs_type = typecheck_expr rhs in
+          (* TODO: These should be integral rather than numerical *)
+          match (is_numerical lhs_type, is_numerical rhs_type) with
+          | true, true ->
+              (annot_copy expr (Binop (op, lhs_res, rhs_res)), lhs_type)
+          | _ ->
+              raise_type_error expr
+                "Bitwise shift operators require integral types"))
   | PreUnop (op, e) ->
       let expr_res, expr_type = typecheck_expr e in
       let res_type =
@@ -649,6 +673,9 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       in
       (annot_copy expr (PreUnop (op, expr_res)), res_type)
   | Lambda (retype, params, body, _) ->
+      if !Utils.static_compilation then
+        raise_compilation_error expr
+          "Lambdas cannot be used in static compilation mode";
       push_symbol_table ();
       List.iter
         (fun (typ, id) ->
@@ -670,7 +697,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       let lamtype =
         match free_vars with
         | [] ->
-            if static_compilation then
+            if !static_compilation then
               ([], Funtype (List.map (fun (typ, _) -> typ) params, retype), [])
             else
               ( [],
@@ -847,7 +874,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
         | _, Structtype (name, fields), _ -> (
             let field = List.find_opt (fun ((_, id), _) -> id = ide) fields in
             match field with
-            | Some ((typ, _), _) -> (typ, Some expr_type, Some typ)
+            | Some ((typ, _), _) -> (typ, Some expr_type', Some typ)
             | None ->
                 raise_type_error expr
                   (Printf.sprintf "Field %s not found in struct %s" ide name))
@@ -872,8 +899,8 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
   | As (id, archs, _) -> (
       let typ = lookup_var id in
       (* This function is used by both the model and archetype sum cases.
-      It checks the presence of all archetypes needed, and tags the As expression with
-      the type of the variable, since the expression has to be compiled according to its type *)
+         It checks the presence of all archetypes needed, and tags the As expression with
+         the type of the variable, since the expression has to be compiled according to its type *)
       let check_archetypes (archetypes : perkident list) =
         let archs_idents =
           List.map
@@ -989,27 +1016,30 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       match structype with
       | _, Structtype (_name, fields), _ ->
           let local_symbol_table = ref [ Hashtbl.create 10 ] in
-          List.iter
-            (fun (id, expr) ->
-              (try bind_var_local local_symbol_table id ([], Infer, [])
-               with Double_declaration _msg ->
-                 raise_type_error expr
-                   (Printf.sprintf "Trying to initialize field %s twice" id));
-              let field =
-                List.assoc_opt id
-                  (List.map (fun ((typ, id), _) -> (id, typ)) fields)
-              in
-              match field with
-              | Some typ -> (
-                  let _expr_res, expr_type = typecheck_expr expr in
-                  try match_types typ expr_type |> ignore
-                  with Type_match_error msg -> raise_type_error expr msg)
-              | _ ->
-                  raise_type_error expr
-                    (Printf.sprintf "Field %s not found in struct %s" id _name))
-            inits;
-          List.map (fun ((typ, _), _) -> typ) fields |> ignore;
-          (expr, structype)
+          let inits =
+            List.map
+              (fun (id, expr) ->
+                (try bind_var_local local_symbol_table id ([], Infer, [])
+                 with Double_declaration _msg ->
+                   raise_type_error expr
+                     (Printf.sprintf "Trying to initialize field %s twice" id));
+                let field =
+                  List.assoc_opt id
+                    (List.map (fun ((typ, id), _) -> (id, typ)) fields)
+                in
+                match field with
+                | Some typ -> (
+                    let expr_res, expr_type = typecheck_expr expr in
+                    try
+                      match_types typ expr_type |> ignore;
+                      (id, expr_res)
+                    with Type_match_error msg -> raise_type_error expr msg)
+                | _ ->
+                    raise_type_error expr
+                      (Printf.sprintf "Field %s not found in struct %s" id _name))
+              inits
+          in
+          (annot_copy expr (Make (id, inits)), structype)
       | _ ->
           raise_type_error expr
             (Printf.sprintf "Cannot make struct %s, as it is not defined" id))

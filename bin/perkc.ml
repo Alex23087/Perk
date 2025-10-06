@@ -10,6 +10,10 @@ let check_only =
   let doc = "Only check the file for syntax and type errors, don't compile" in
   Arg.(value & flag & info [ "c"; "check" ] ~doc)
 
+let static_compilation =
+  let doc = "Compile in static mode" in
+  Arg.(value & flag & info [ "s"; "static" ] ~doc)
+
 let verbose =
   let doc = "Enable verbose output" in
   Arg.(value & flag & info [ "v"; "verbose" ] ~doc)
@@ -26,16 +30,17 @@ let dir =
   Arg.(value & opt (some string) None & info [ "d"; "dir" ] ~docv:"DIR" ~doc)
 
 (* Main command implementation *)
-let perkc_cmd check_only verbose output_file input_file (dir : string option) =
+let perkc_cmd check_only static_compilation verbose output_file input_file
+    (dir : string option) =
   if verbose then Printf.printf "Processing file: %s\n" input_file;
 
   if check_only then (
     if verbose then Printf.printf "Running syntax and type check only\n";
-    ignore (check_file ?dir input_file);
+    ignore (check_file ?dir static_compilation verbose input_file);
     `Ok ())
   else (
     if verbose then Printf.printf "Compiling to C\n";
-    compile_program ?dir input_file output_file;
+    compile_program ?dir static_compilation verbose input_file output_file;
     `Ok ())
 
 (* Command definition *)
@@ -61,6 +66,7 @@ let cmd =
   Cmd.v info
     Term.(
       ret
-        (const perkc_cmd $ check_only $ verbose $ output_file $ input_file $ dir))
+        (const perkc_cmd $ check_only $ static_compilation $ verbose
+       $ output_file $ input_file $ dir))
 
 let () = exit (Cmd.eval cmd)

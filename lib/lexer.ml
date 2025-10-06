@@ -66,6 +66,8 @@ let rec token lexbuf =
   | "<=" | 0x2264 -> Leq (* ≤ *)
   | "<" -> Lt
   | ">=" | 0x2265 -> Geq (* ≥ *)
+  | ">>" -> ShR
+  | "<<" -> ShL
   | ">" -> Gt
   | "-" -> Minus
   | "!" | 0x00AC -> Bang (* ¬ *)

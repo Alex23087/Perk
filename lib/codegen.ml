@@ -84,7 +84,7 @@ let rec codegen_functional ~(is_lambda : bool) (e : expr_a) : string =
                  args)
           in
           match free_variables with
-          | [] when static_compilation ->
+          | [] when !static_compilation ->
               let body_str = codegen_command body 1 in
               let lambdatype =
                 ( [ Static ],
@@ -137,7 +137,7 @@ let rec codegen_functional ~(is_lambda : bool) (e : expr_a) : string =
     Hashtbl.add lambdas_hashmap e
       (id, compiled, List.map snd free_variables, type_descriptor);
     match free_variables with
-    | [] when static_compilation || not is_lambda -> id
+    | [] when !static_compilation || not is_lambda -> id
     | _ ->
         let env_descriptor = type_descriptor_of_environment free_variables in
         let capture_list_str =
@@ -177,31 +177,33 @@ and codegen_program (tldfs : topleveldef_a list) : string =
       |> String.trim
     in
     (* Write includes *)
-    "#include <malloc.h>\n#include <string.h>\n#include <stdbool.h>\n"
+    (if !Utils.static_compilation then ""
+     else "#include <malloc.h>\n#include <string.h>\n#include <stdbool.h>\n")
     ^ String.concat "\n"
         (List.rev
            (List.map (fun lib -> Printf.sprintf "#include %s" lib) !import_list))
     ^ "\n\n"
     (* Write macros *)
     (* ^ "typedef struct env_ {} env_;\n" *)
-    ^ "typedef struct _lambdummy_type {\n\
-      \    void *env;\n\
-      \    void *func;\n\
-       } __lambdummy_type;\n\
-       static __lambdummy_type *__lambdummy;\n\n\
-      \ __lambdummy_type *alloclabmd(int size, void *labmda, void *env)\n\
-       {\n\
-      \    __lambdummy_type *ptr = malloc(sizeof(__lambdummy_type));\n\
-      \    ptr->env = malloc(size);\n\
-      \    memcpy(ptr->env, env, size);\n\
-      \    ptr->func = labmda;\n\
-      \    return ptr;\n\
-       }"
-    ^ "\n\n"
-    ^ "#define CALL_LAMBDA0(l, t) (__lambdummy = (__lambdummy_type *)l, \
-       ((t)(__lambdummy->func))())\n\
-       #define CALL_LAMBDA(l, t, ...) (__lambdummy = (__lambdummy_type \
-       *)l,       ((t)(__lambdummy->func))(__VA_ARGS__))" ^ "\n\n"
+    ^ (if !Utils.static_compilation then ""
+       else
+         "typedef struct _lambdummy_type {\n\
+         \    void *env;\n\
+         \    void *func;\n\
+          } __lambdummy_type;\n\
+          static __lambdummy_type *__lambdummy;\n\n\
+         \ __lambdummy_type *alloclabmd(int size, void *labmda, void *env)\n\
+          {\n\
+         \    __lambdummy_type *ptr = malloc(sizeof(__lambdummy_type));\n\
+         \    ptr->env = malloc(size);\n\
+         \    memcpy(ptr->env, env, size);\n\
+         \    ptr->func = labmda;\n\
+         \    return ptr;\n\
+          }" ^ "\n\n"
+         ^ "#define CALL_LAMBDA0(l, t) (__lambdummy = (__lambdummy_type *)l, \
+            ((t)(__lambdummy->func))())\n\
+            #define CALL_LAMBDA(l, t, ...) (__lambdummy = (__lambdummy_type \
+            *)l,       ((t)(__lambdummy->func))(__VA_ARGS__))" ^ "\n\n")
     (* ^ "#define CAST_LAMBDA(name, from_type, to_type, func_type) \
           ((__perk_capture_dummy_##from_type = name, (to_type) \
           {__perk_capture_dummy_##from_type.env, \
@@ -759,7 +761,8 @@ and codegen_expr (e : expr_a) : string =
                   Printf.sprintf "%s(%s.self%s)" expr_str e1_str
                     args_str (* this is for archetype sums *)
               | None ->
-                  raise_compilation_error e "Impossible: no acctype for access"
+                  raise_compilation_error e
+                    "Impossible: no acctype for access 1"
               (* this is for models *))
           | _ -> Printf.sprintf "%s(%s)" expr_str args_str)
       | Some lamtype -> (
@@ -833,7 +836,7 @@ and codegen_expr (e : expr_a) : string =
               Printf.sprintf "(*(%s.%s.%s))" (codegen_expr e1)
                 (type_descriptor_of_perktype t)
                 ide)
-      | None -> failwith "Impossible: no acctype for access")
+      | None -> failwith "Impossible: no acctype for access 2")
   | Binop (op, e1, e2) ->
       Printf.sprintf "%s %s %s" (codegen_expr e1) (codegen_binop op)
         (codegen_expr e2)
@@ -875,7 +878,7 @@ and codegen_expr (e : expr_a) : string =
              (List.map
                 (fun t ->
                   (* Structs representing archetypes are accessed differently depending on
-                  whether the variable is a model or an archetype sum *)
+                     whether the variable is a model or an archetype sum *)
                   match typ with
                   | _, Modeltype _, _ ->
                       Printf.sprintf "%s->%s" id (codegen_type t ~expand:true)
@@ -936,7 +939,7 @@ and codegen_expr (e : expr_a) : string =
             raise_type_error e
               (Printf.sprintf "There is no struct with name %s" id)
       in
-      Printf.sprintf "{%s}"
+      Printf.sprintf "((%s){%s})" id
         (String.concat ", "
            (List.map
               (fun ((_typ, field), expr) ->
@@ -965,6 +968,8 @@ and codegen_binop (op : binop) : string =
   | Land -> "&&"
   | Lor -> "||"
   | Neq -> "!="
+  | ShL -> "<<"
+  | ShR -> ">>"
 
 (** generates code for prefix unary operators *)
 and codegen_preunop (op : preunop) : string =
@@ -1014,10 +1019,10 @@ and generate_types () =
   in
   ft_list := List.sort sort_based_on_deps_count !ft_list;
   (* List.iter
-    (fun (id, (_, _, deps)) ->
-      Printf.printf "Type: %s, Dependencies: [%s]\n" id
-        (String.concat ", " deps))
-    !ft_list; *)
+     (fun (id, (_, _, deps)) ->
+       Printf.printf "Type: %s, Dependencies: [%s]\n" id
+         (String.concat ", " deps))
+     !ft_list; *)
   while List.length !ft_list > 0 do
     (* say_here "generate_types"; *)
     let _id, (_typ, _code, _deps) = List.hd !ft_list in
@@ -1192,9 +1197,8 @@ and codegen_lambda_capture (lamtype : perktype) : string =
               \    void* env;\n\
               \    %s func;\n\
                };\n\
-               typedef struct %s* %s"
-              capture_type_desc lambda_type_desc capture_type_desc
-              capture_type_desc
+               typedef struct %s* %s" capture_type_desc lambda_type_desc
+              capture_type_desc capture_type_desc
           in
           let alltogether =
             Printf.sprintf "%s%s"
@@ -1206,7 +1210,7 @@ and codegen_lambda_capture (lamtype : perktype) : string =
           in
           (* Printf.printf "%s\n\n\n\n\n\n" alltogether; *)
           (* lambda_capture_dummies :=
-            (capture_type_desc, alltogether) :: !lambda_capture_dummies; *)
+             (capture_type_desc, alltogether) :: !lambda_capture_dummies; *)
           alltogether)
   | _ ->
       failwith

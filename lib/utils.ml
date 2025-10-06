@@ -7,13 +7,15 @@ open Errors
 let fnm = ref ""
 
 (** Internal flag to denote whether the current compilation mode is static *)
-let static_compilation : bool = false
+let static_compilation : bool ref = ref false
+
+let verbose : bool ref = ref false
 
 (** Debug function that can be enabled to track function call numbers. *)
 let rec say_here (_msg : string) : unit =
-  (* Printf.printf "%s\n" _msg;
-     flush stdout *)
-  ()
+  if !verbose then (
+    Printf.printf "%s\n" _msg;
+    flush stdout)
 
 (** Utility function to add a parameter (i.e., self) to a type, iff it is a
     functional *)
@@ -149,10 +151,10 @@ and decl_of_deforfun (def : deforfun_a) : perktype_attribute list * perkdecl =
   (* If this def is a lambda, make its type a lambda type *)
   | DefVar (attr, ((typ, id), _)) ->
       (* let new_typ =
-        match typ with
-        | a, Funtype (params, ret), d -> (a, Lambdatype (params, ret, []), d)
-        | _ -> typ
-      in *)
+           match typ with
+           | a, Funtype (params, ret), d -> (a, Lambdatype (params, ret, []), d)
+           | _ -> typ
+         in *)
       (attr, (typ, id))
 
 (** Transform a variable or function declaration to a declaration. *)
@@ -172,10 +174,10 @@ and decl_of_declorfun (def : declorfun_a) : perkdecl =
   (* If this def is a lambda, make its type a lambda type *)
   | DeclVar (typ, id) ->
       (* let new_typ =
-        match typ with
-        | a, Funtype (params, ret), d -> (a, Lambdatype (params, ret, []), d)
-        | _ -> typ
-      in *)
+           match typ with
+           | a, Funtype (params, ret), d -> (a, Lambdatype (params, ret, []), d)
+           | _ -> typ
+         in *)
       (typ, id)
 
 (** Given a function definition, returns its function type. *)
