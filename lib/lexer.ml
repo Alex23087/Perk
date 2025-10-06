@@ -122,7 +122,7 @@ let rec token lexbuf =
   | "constr" -> Constr
   | "var" -> Var
   | "match" -> Match
-  | "default" -> Default
+  | "when" -> When
   | "~>" | "as" | 0x2933 | 0x21DD -> As (* ⤳ ⇝ *)
   | "->" | 0x2192 -> Arrow (* → *)
   | "=>" | 0x21D2 -> Bigarrow (* ⇒ *)

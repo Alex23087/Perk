@@ -4,6 +4,8 @@ import "stdio.h"
 
 type List = | Empty | Cons(int, List) | Leaf (int)
 
+type ListPair = Pair (List, List)
+
 // type ArseList = | Empty | Cons(ArseList, ArseList) | Leaf
 
 // enum List<T> {
@@ -59,17 +61,62 @@ fun sum (l : List) : int {
       },
       constr Cons(var x : int, var l1 : List) {
         res = sum(l1) + x
+      },
+      constr Leaf(var x : int) {
+        res = x
       }
     };
   return res
 }
 
+fun add_all (l1 : List, l2 : List) : List {
+  match (Pair(l1, l2)) {
+      constr Pair (constr Empty, constr Empty) {
+          printf("adding two empties\n");
+          return Empty
+      },
+      constr Pair (constr Cons (var n1 : int,  var l1 : List),
+                   constr Cons (var n2 : int,  var l2 : List)) {
+          printf("adding two cons %d, %d\n", n1, n2);
+          return Cons (n1 + n2, add_all (l1, l2))
+      },
+      _ {
+        printf ("banana");
+        return Empty
+      }
+    };
+
+    printf("should not reach here");
+    return Empty
+}
+
+fun iter (l: List, f: (int) => void): void {
+    match (l) {
+        constr Empty {
+            skip
+        },
+        constr Cons (var n : int, var l1 : List) {
+            f(n);
+            iter(l1, f)
+        },
+        constr Leaf (var n : int) {
+            f(n)
+        }
+    }
+}
+
 fun main(): void {
     let l : List = Cons (10,Cons (15, Empty()));
-    let l2 : List = Empty;
+    let l2 : List = Cons (1,Cons (2, Cons(3, Empty())));
+
+    iter(l, (x: int): void {printf("value: %d\n", x);});
 
     printf ("the sum is: %d\n", sum(l));
 
+    let l12 := add_all(l, l2);
+    iter(l12, (x: int): void {printf("value from add_all: %d\n", x);});
+
+    printf("cculopoli");
   // let l : ArseList = Cons (Empty, Empty);
   //   let l2 : ArseList = Empty;
   //   skip;

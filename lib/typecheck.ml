@@ -572,10 +572,20 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
         Some exprval,
         true )
   | Seq (c1, c2) ->
-      let c1_res, _c1_type, c1_returns = typecheck_command ~retype c1 in
+      let c1_res, c1_type, c1_returns = typecheck_command ~retype c1 in
       (* TODO: If c1_returns is true, c2 is dead code. Warn *)
-      let c2_res, _c2_type, c2_returns = typecheck_command ~retype c2 in
-      (annot_copy cmd (Seq (c1_res, c2_res)), retype, c1_returns || c2_returns)
+      let c2_res, c2_type, c2_returns = typecheck_command ~retype c2 in
+      let return_type =
+        match (c1_type, c2_type) with
+        | Some t, Some t' -> (
+            try Some (match_types t t')
+            with Type_match_error msg -> raise_type_error cmd msg)
+        | Some t, None | None, Some t -> Some t
+        | None, None -> None
+      in
+      ( annot_copy cmd (Seq (c1_res, c2_res)),
+        return_type,
+        c1_returns || c2_returns )
   | IfThenElse (guard, then_branch, else_branch) ->
       let guard_res, guard_type = typecheck_expr guard in
       (match guard_type with
@@ -625,6 +635,7 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       pop_symbol_table ();
       (annot_copy cmd (Dowhile (guard_res, body_res)), body_type, body_returns)
   | For (initcmd, guard, incrcmd, body) ->
+      push_symbol_table ();
       let initcmd_res, _initcmd_type, initcmd_returns =
         typecheck_command ~retype initcmd
       in
@@ -639,7 +650,6 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       let incrcmd_res, _incrcmd_type, incrcmd_returns =
         typecheck_command ~retype incrcmd
       in
-      push_symbol_table ();
       let body_res, body_type, body_returns = typecheck_command ~retype body in
       pop_symbol_table ();
       ( annot_copy cmd (For (initcmd_res, guard_res, incrcmd_res, body_res)),
@@ -686,12 +696,13 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
   | Match (e, match_entry_list, _) ->
       let expr, _t = typecheck_expr e in
       let entry_list, rettype, does_return =
-        typecheck_match_entry_list match_entry_list
+        typecheck_match_entry_list ~retype match_entry_list
       in
       (annot_copy cmd (Match (expr, entry_list, Some _t)), rettype, does_return)
 
-and typecheck_match_entry_list (mel : match_entry_a list) =
-  let check_all = List.map typecheck_match_entry mel in
+and typecheck_match_entry_list ?(retype : perktype option = None)
+    (mel : match_entry_a list) =
+  let check_all = List.map (typecheck_match_entry ~retype) mel in
   let firsts = List.map (fun (a, _, _) -> a) check_all in
   let seconds = List.map (fun (_, b, _) -> b) check_all in
   let thirds = List.map (fun (_, _, c) -> c) check_all in
@@ -700,26 +711,47 @@ and typecheck_match_entry_list (mel : match_entry_a list) =
     match seconds with
     | [] -> None
     | hd :: tl ->
-        if List.for_all (fun x -> x = hd) tl then hd
-        else
-          raise_type_error (List.hd firsts)
-            "Entries of match have different return types"
+        (let hd = Option.map resolve_type hd in
+         List.iter (fun x ->
+             match (Option.map resolve_type x, Option.map resolve_type hd) with
+             | Some x, Some hd -> (
+                 try match_types x hd |> ignore
+                 with Type_match_error _ ->
+                   raise_type_error (List.hd firsts)
+                     (Printf.sprintf
+                        "Entries of match have different return types: %s and \
+                         %s"
+                        (show_perktype x) (show_perktype hd)))
+             | None, None -> ()
+             | Some x, None | None, Some x ->
+                 raise_type_error (List.hd firsts)
+                   (Printf.sprintf
+                      "Entries of match have different return types: %s and \
+                       None"
+                      (show_perktype x))))
+          tl;
+        hd
   in
   let all_return = List.for_all (fun x -> x) thirds in
 
   (firsts, all_same, all_return)
 
-and typecheck_match_entry (entry : match_entry_a) =
+and typecheck_match_entry ?(retype : perktype option = None)
+    (entry : match_entry_a) =
   match ( $ ) entry with
-  | Default c ->
+  (* | Default c ->
       let body_res, body_type, body_returns = typecheck_command c in
-      (annot_copy entry (Default body_res), body_type, body_returns)
-  | MatchCase (_case, c) ->
+      (annot_copy entry (Default body_res), body_type, body_returns) *)
+  | MatchCase (_case, _when_expr, c) ->
       (* TODO also check case!! *)
+      push_symbol_table ();
       let vars_in_case = get_vars_in_case _case in
       List.iter (fun (x, t) -> bind_var x t) vars_in_case;
-      let body_res, body_type, body_returns = typecheck_command c in
-      (annot_copy entry (MatchCase (_case, body_res)), body_type, body_returns)
+      let body_res, body_type, body_returns = typecheck_command ~retype c in
+      pop_symbol_table ();
+      ( annot_copy entry (MatchCase (_case, _when_expr, body_res)),
+        body_type,
+        body_returns )
 
 and get_vars_in_case (case : match_case_a) =
   match ( $ ) case with

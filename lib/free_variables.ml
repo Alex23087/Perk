@@ -65,8 +65,14 @@ let rec free_variables_command (cmd : command_a) :
 
 and free_variables_match_entry (entry : match_entry_a) =
   match ( $ ) entry with
-  | Default c -> free_variables_command c
-  | MatchCase (_, c) -> free_variables_command c
+  | MatchCase (_, when_expr, c) ->
+      let wfree, _wbound =
+        if Option.is_some when_expr then
+          free_variables_expr (Option.get when_expr)
+        else ([], [])
+      in
+      let cfree, cbound = free_variables_command c in
+      (wfree @ cfree, cbound)
 
 (** Returns pair of lists: FIRST LIST IS FREE VARS, SECOND LIST IS BOUND *)
 and free_variables_expr (e : expr_a) : perkident list * perkident list =

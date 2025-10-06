@@ -169,9 +169,7 @@ and command_t =
   | Match of expr_a * match_entry_a list * perktype option
 [@@deriving show, eq]
 
-and match_entry_t =
-  | Default of command_a
-  | MatchCase of match_case_a * command_a
+and match_entry_t = MatchCase of match_case_a * expr_a option * command_a
 [@@deriving show, eq]
 
 and match_case_t =

@@ -23,7 +23,7 @@
 %token Import ImportLocal Open
 %token Archetype Model Summon Banish Cast
 %token Struct Make
-%token ADT Pipe Match Default Matchall Constr Var
+%token ADT Pipe Match When Matchall Constr Var
 %token Nothing Something Of
 
 /* Precedence and associativity specification */
@@ -133,8 +133,8 @@ command:
   | Do error                                                                                               { raise (ParseError(!fnm, "missing braces after do"))}
 
 match_entry:
-  | Default LBrace c=command RBrace {annotate_2_code !fnm $loc (Ast.Default(c))}
-  | m=match_case LBrace c=command RBrace {annotate_2_code !fnm $loc (Ast.MatchCase(m, c))}
+  | m = match_case LBrace c = command RBrace                                                               {annotate_2_code !fnm $loc (Ast.MatchCase(m, None, c))}
+  | m = match_case When e = expr LBrace c = command RBrace                                                 {annotate_2_code !fnm $loc (Ast.MatchCase(m, Some e, c))}
 
 match_case:
   | Matchall {annotate_2_code !fnm $loc Ast.Matchall}
