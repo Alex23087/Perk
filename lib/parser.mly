@@ -7,7 +7,7 @@
 
 /* Tokens declarations */
 %token EOF
-%token Plus Eq Neq Lt Leq Gt Geq Minus Star Div Ampersand PlusPlus MinusMinus Dot Ellipsis Question Land Lor
+%token Plus Eq Neq Lt Leq Gt Geq Minus Star Div Ampersand PlusPlus MinusMinus Dot Ellipsis Question Land Lor ShL ShR
 %token Fun Assign If Then Else While Do For
 %token <bool> Boolean
 %token <int> Integer
@@ -93,6 +93,7 @@ topleveldef:
   | Model i = Ident Colon il = ident_list LBrace l = perkdeforfun_list RBrace                              { annotate_2_code !fnm $loc (Ast.Model (i, il, l)) }
   | Model i = Ident LBrace l = perkdeforfun_list RBrace                                                    { annotate_2_code !fnm $loc (Ast.Model (i, [], l)) }
   | Struct i = Ident LBrace l = separated_list(Comma, perkdef) RBrace                                      { annotate_2_code !fnm $loc (Ast.Struct (i, l)) }
+  | Struct Ident LBrace error                                                                              { raise (ParseError(!fnm, "unexpected token in struct definition")) }
   | ADT i = Ident Assign option(Pipe) l = separated_nonempty_list(Pipe, constructor_type)                  { annotate_2_code !fnm $loc (Ast.ADT (i, l)) }   
   | ADT Ident error                                                                                        { raise (ParseError(!fnm, "expected a list of constructors after ADT definition")) }           
   | Fun pf = perkfun                                                                                       { annotate_2_code !fnm $loc (Ast.Fundef (pf)) }
@@ -197,6 +198,7 @@ expr:
   | Summon i = Ident LParen RParen                                                                         { annotate_2_code !fnm $loc (Summon (i, [])) }
   | Make i = Ident LParen RParen                                                                           { annotate_2_code !fnm $loc (Ast.Make (i, [])) }
   | Make i = Ident LParen l = initializer_list RParen                                                      { annotate_2_code !fnm $loc (Ast.Make (i, l)) }
+  | Make Ident LParen error                                                                                { raise (ParseError(!fnm, "invalid make expression (perhaps you forgot a closing parenthesis?)")) }
   | e1 = expr Dot i = Ident                                                                                { annotate_2_code !fnm $loc (Ast.Access (e1, i, None, None)) }
   | Nothing                                                                                                { annotate_2_code !fnm $loc (Ast.Nothing ([], Ast.Infer, [])) }
   | Nothing Of t=perktype                                                                                  { annotate_2_code !fnm $loc (Ast.Nothing (t)) }
@@ -273,6 +275,8 @@ perktype_partial:
   | Neq                                                                                                    { Ast.Neq }
   | Land                                                                                                   { Ast.Land }
   | Lor                                                                                                    { Ast.Lor }
+  | ShL                                                                                                    { Ast.ShL }
+  | ShR                                                                                                    { Ast.ShR }
 
 %inline preunop:
   | Minus                                                                                                  { Ast.Neg }
@@ -331,6 +335,8 @@ perkdeclorfun_list:
 initializer_list:
   | i = Ident Assign e = expr { [(i, e)] }
   | i = Ident Assign e = expr Comma il = initializer_list { (i, e) :: il }
+  | Ident error { raise (ParseError(!fnm, "initializer expected (e.g. field = value)")) }
+  | error { raise (ParseError(!fnm, "initializer expected (e.g. field = value)")) }
 
 spanish_inquisition:
   | error { raise (ParseError(!fnm, "Nobody expects the Spanish Inquisition!")) }

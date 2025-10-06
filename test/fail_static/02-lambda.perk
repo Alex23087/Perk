@@ -1,0 +1,14 @@
+import "stdio.h"
+
+fun main (): int {
+    let x: int = 0;
+
+    let printx := (): void {
+        printf("x = %d\n", x);
+    };
+
+    x = 2;
+    printx();
+
+    return 0;
+}

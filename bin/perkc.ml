@@ -14,6 +14,14 @@ let json_format =
   let doc = "Output errors and warnings in JSON format" in
   Arg.(value & flag & info [ "j"; "json" ] ~doc)
 
+let static_compilation =
+  let doc = "Compile in static mode" in
+  Arg.(value & flag & info [ "s"; "static" ] ~doc)
+
+let static_compilation =
+  let doc = "Compile in static mode" in
+  Arg.(value & flag & info [ "s"; "static" ] ~doc)
+
 let verbose =
   let doc = "Enable verbose output" in
   Arg.(value & flag & info [ "v"; "verbose" ] ~doc)
@@ -30,8 +38,8 @@ let dir =
   Arg.(value & opt (some string) None & info [ "d"; "dir" ] ~docv:"DIR" ~doc)
 
 (* Main command implementation *)
-let perkc_cmd check_only json_format verbose output_file input_file
-    (dir : string option) =
+let perkc_cmd check_only json_format static_compilation verbose output_file
+    input_file (dir : string option) =
   if verbose then (
     Printf.printf "Processing file: %s\n" input_file;
     Perk.Utils.verbose := true);
@@ -40,11 +48,13 @@ let perkc_cmd check_only json_format verbose output_file input_file
     if verbose then Printf.printf "Running syntax and type check only\n";
     ignore
       (compile_program ?dir ?dry_run:(Some check_only)
-         ?json_format:(Some json_format) input_file None);
+         ?json_format:(Some json_format) static_compilation verbose input_file
+         None);
     `Ok ())
   else (
     if verbose then Printf.printf "Compiling to C\n";
-    compile_program ?dir ?json_format:(Some json_format) input_file output_file;
+    compile_program ?dir ?json_format:(Some json_format) static_compilation
+      verbose input_file output_file;
     `Ok ())
 
 (* Command definition *)
@@ -70,7 +80,7 @@ let cmd =
   Cmd.v info
     Term.(
       ret
-        (const perkc_cmd $ check_only $ json_format $ verbose $ output_file
-       $ input_file $ dir))
+        (const perkc_cmd $ check_only $ json_format $ static_compilation
+       $ verbose $ output_file $ input_file $ dir))
 
 let () = exit (Cmd.eval cmd)
