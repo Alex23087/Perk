@@ -683,6 +683,49 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
                     (show_perktype t) (show_perktype e_type))));
       (annot_copy cmd (Return (Some e_res)), Some e_type, true)
   | Continue | Break -> (cmd, None, false)
+  | Match (e, match_entry_list, _) ->
+      let expr, _t = typecheck_expr e in
+      let entry_list, rettype, does_return =
+        typecheck_match_entry_list match_entry_list
+      in
+      (annot_copy cmd (Match (expr, entry_list, Some _t)), rettype, does_return)
+
+and typecheck_match_entry_list (mel : match_entry_a list) =
+  let check_all = List.map typecheck_match_entry mel in
+  let firsts = List.map (fun (a, _, _) -> a) check_all in
+  let seconds = List.map (fun (_, b, _) -> b) check_all in
+  let thirds = List.map (fun (_, _, c) -> c) check_all in
+
+  let all_same =
+    match seconds with
+    | [] -> None
+    | hd :: tl ->
+        if List.for_all (fun x -> x = hd) tl then hd
+        else
+          raise_type_error (List.hd firsts)
+            "Entries of match have different return types"
+  in
+  let all_return = List.for_all (fun x -> x) thirds in
+
+  (firsts, all_same, all_return)
+
+and typecheck_match_entry (entry : match_entry_a) =
+  match ( $ ) entry with
+  | Default c ->
+      let body_res, body_type, body_returns = typecheck_command c in
+      (annot_copy entry (Default body_res), body_type, body_returns)
+  | MatchCase (_case, c) ->
+      (* TODO also check case!! *)
+      let vars_in_case = get_vars_in_case _case in
+      List.iter (fun (x, t) -> bind_var x t) vars_in_case;
+      let body_res, body_type, body_returns = typecheck_command c in
+      (annot_copy entry (MatchCase (_case, body_res)), body_type, body_returns)
+
+and get_vars_in_case (case : match_case_a) =
+  match ( $ ) case with
+  | MatchVar (v, t) -> [ (v, t) ]
+  | CompoundCase (_, cl) -> List.map get_vars_in_case cl |> List.flatten
+  | _ -> []
 
 (** Typechecks expressions *)
 and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :

@@ -166,6 +166,19 @@ and command_t =
   | Return of expr_a option
   | Break
   | Continue
+  | Match of expr_a * match_entry_a list * perktype option
+[@@deriving show, eq]
+
+and match_entry_t =
+  | Default of command_a
+  | MatchCase of match_case_a * command_a
+[@@deriving show, eq]
+
+and match_case_t =
+  | Matchall
+  | MatchVar of perkident * perktype
+  | MatchExpr of expr_a
+  | CompoundCase of perkident * match_case_a list
 [@@deriving show, eq]
 
 and topleveldef_t =
@@ -193,6 +206,8 @@ and command_a = command_t annotated [@@deriving show, eq]
 and topleveldef_a = topleveldef_t annotated [@@deriving show, eq]
 and deforfun_a = deforfun_t annotated [@@deriving show, eq]
 and declorfun_a = declorfun_t annotated [@@deriving show, eq]
+and match_entry_a = match_entry_t annotated [@@deriving show, eq]
+and match_case_a = match_case_t annotated [@@deriving show, eq]
 
 let all_vars : (perkident * perktype) list ref = ref []
 

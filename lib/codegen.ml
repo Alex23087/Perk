@@ -670,6 +670,145 @@ and codegen_command (cmd : command_a) (indentation : int) : string =
         indent_string expr_str
   | Continue -> indent_string ^ Printf.sprintf "continue;"
   | Break -> indent_string ^ Printf.sprintf "break;"
+  | Match (e, l, opt_type) ->
+      let t =
+        try Option.get opt_type
+        with _ -> failwith "should not happen - was set in the codegen"
+      in
+      let x = fresh_var "switch_var" in
+      let gc, lid = codegen_match_entries l x (indentation + 1) in
+      let def = codegen_def (t, x) e None indent_string in
+      Printf.sprintf "%s%s\n%s\nswitch (%s.tag){\n%s%s}\n" def indent_string lid
+        x gc indent_string
+
+and codegen_match_entries (mel : match_entry_a list) (match_var : string)
+    indentation : perkident * string =
+  let indent_string = String.make (4 * indentation) ' ' in
+  let codegen_match_entry (entry : match_entry_a) (add_break : bool) :
+      perkident * string =
+    match ( $ ) entry with
+    | Default c ->
+        ( Printf.sprintf "%sdefault: %s\n%sbreak;\n" indent_string
+            (codegen_command c indentation)
+            indent_string,
+          "" )
+    | MatchCase (case, c) ->
+        let gc, lid = codegen_match_case case c match_var indentation in
+        (Printf.sprintf "%s%s" gc (if add_break then "break;\n" else ""), lid)
+  in
+
+  let case_names =
+    List.map
+      (fun entry ->
+        match ( $ ) entry with
+        | MatchCase (case, _) -> (
+            match ( $ ) case with CompoundCase (id, _) -> Some id | _ -> None)
+        | _ -> None)
+      mel
+  in
+
+  let rec case_name_bools names =
+    match names with
+    | [] -> []
+    | [ _ ] -> [ true ]
+    | x :: (y :: _ as tl) ->
+        let this =
+          match (x, y) with
+          | None, _ -> true
+          | Some a, Some b -> a <> b
+          | Some _, None -> true
+        in
+        this :: case_name_bools tl
+  in
+  let case_bools = case_name_bools case_names in
+
+  let gend_entries, lid =
+    List.mapi (fun i el -> codegen_match_entry el (List.nth case_bools i)) mel
+    |> List.split
+  in
+  (gend_entries |> String.concat "", lid |> String.concat "\n")
+
+and codegen_match_case (case : match_case_a) (c : command_a)
+    (match_var : string) indentation : perkident * string =
+  let indent_string = String.make (4 * indentation) ' ' in
+  match ( $ ) case with
+  | MatchExpr e ->
+      let expr_cg, lid = codegen_expr_and_letindefs e in
+      ( Printf.sprintf "%scase %s: {%s}\n" indent_string expr_cg
+          (codegen_command c indentation),
+        lid )
+  | MatchVar (v, t) ->
+      let def = Printf.sprintf "%s %s = %s;" (codegen_type t) v match_var in
+      ( Printf.sprintf "%sdefault: %s\n%s\n%s\n" def indent_string indent_string
+          (codegen_command c indentation),
+        "" )
+  | Matchall ->
+      ( Printf.sprintf "%sdefault: %s\n" indent_string
+          (codegen_command c indentation),
+        "" )
+  | CompoundCase (id, inner_cases) ->
+      let rec generate_condition id inner_cases match_var =
+        let res =
+          List.mapi
+            (fun i case ->
+              match ( $ ) case with
+              | Matchall -> ("1", "")
+              | MatchVar _ -> ("1", "")
+              | MatchExpr e ->
+                  let expr_cg, lid = codegen_expr_and_letindefs e in
+                  ( Printf.sprintf "*%s.data.%s._%d == %s" match_var id i expr_cg,
+                    lid )
+              | CompoundCase (id1, []) ->
+                  ( Printf.sprintf "%s.data.%s._%d -> tag == __perk_%s_Tag"
+                      match_var id i id1,
+                    "" )
+              | CompoundCase (id1, doubly_inner_cases) ->
+                  let cond_1 =
+                    Printf.sprintf "%s.data.%s._%d -> tag == __perk_%s_Tag"
+                      match_var id i id1
+                  in
+                  let rest =
+                    generate_condition id1 doubly_inner_cases
+                      (Printf.sprintf "%s.data.%s._%d" match_var id i)
+                  in
+                  let rest, lid = rest in
+                  (Printf.sprintf "(%s) && (%s)" cond_1 rest, lid))
+            inner_cases
+        in
+        let res, lid = List.split res in
+        ( (if List.is_empty res then "1" else String.concat " && " res),
+          String.concat "\n" lid )
+      in
+
+      let rec generate_constraint id inner_cases match_var =
+        let res =
+          List.mapi
+            (fun i case ->
+              match ( $ ) case with
+              | MatchVar (v, t) ->
+                  let def =
+                    Printf.sprintf "%s %s = *%s.data.%s._%d;" (codegen_type t) v
+                      match_var id i
+                  in
+                  def
+              | CompoundCase (id1, doubly_inner_cases) ->
+                  generate_constraint id1 doubly_inner_cases
+                    (Printf.sprintf "%s.data.%s._%d" match_var id i)
+              | _ -> "")
+            inner_cases
+        in
+        "\n" ^ String.concat "\n" (List.map (fun x -> indent_string ^ x) res)
+      in
+
+      let inner_condition, lid = generate_condition id inner_cases match_var in
+
+      let constraints = generate_constraint id inner_cases match_var in
+
+      ( Printf.sprintf "%scase __perk_%s_Tag:%s\n%sif (%s) {\n%s\n%sbreak;}\n"
+          indent_string id constraints indent_string inner_condition
+          (codegen_command c (indentation + 1))
+          indent_string,
+        lid )
 
 (** Generates code for perk definitions. *)
 and codegen_def (t : perkvardesc) (e : expr_a) (deftype : perktype option)

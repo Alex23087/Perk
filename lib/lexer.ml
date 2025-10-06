@@ -118,6 +118,9 @@ let rec token lexbuf =
   | "make" -> Make
   | "type" -> ADT
   | "|" -> Pipe
+  | "_" -> Matchall
+  | "constr" -> Constr
+  | "var" -> Var
   | "match" -> Match
   | "default" -> Default
   | "~>" | "as" | 0x2933 | 0x21DD -> As (* ⤳ ⇝ *)

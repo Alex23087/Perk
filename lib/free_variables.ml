@@ -53,10 +53,20 @@ let rec free_variables_command (cmd : command_a) :
         let free, _ = free_variables_expr def in
         (free, [ id ])
     | Continue | Break -> ([], [])
+    | Match (e, l, _) ->
+        let expr_free, expr_bound = free_variables_expr e in
+        let fvl = List.map free_variables_match_entry l in
+        let fvl1, fvl2 = List.split fvl in
+        (expr_free @ List.flatten fvl1, expr_bound @ List.flatten fvl2)
   in
   let out_free, out_bound = free_variables_command_aux cmd in
   ( List.sort_uniq String.compare out_free,
     List.sort_uniq String.compare out_bound )
+
+and free_variables_match_entry (entry : match_entry_a) =
+  match ( $ ) entry with
+  | Default c -> free_variables_command c
+  | MatchCase (_, c) -> free_variables_command c
 
 (** Returns pair of lists: FIRST LIST IS FREE VARS, SECOND LIST IS BOUND *)
 and free_variables_expr (e : expr_a) : perkident list * perkident list =

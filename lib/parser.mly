@@ -23,7 +23,7 @@
 %token Import ImportLocal Open
 %token Archetype Model Summon Banish Cast
 %token Struct Make
-%token ADT Pipe Match Default
+%token ADT Pipe Match Default Matchall Constr Var
 %token Nothing Something Of
 
 /* Precedence and associativity specification */
@@ -122,8 +122,7 @@ command:
   | Banish i = Ident                                                                                       { annotate_2_code !fnm $loc (Banish i) }
   | Continue                                                                                               { annotate_2_code !fnm $loc (Ast.Continue) }
   | Break                                                                                                  { annotate_2_code !fnm $loc (Ast.Break) }
-
-
+  | Match LParen e = expr RParen LBrace l = separated_nonempty_list (Comma, match_entry) RBrace            {annotate_2_code !fnm $loc (Ast.Match(e, l, None))}
   | error                                                                                                  { raise (ParseError(!fnm, "command expected")) }
   | command error                                                                                          { raise (ParseError(!fnm, "unexpected command (perhaps you are missing a ';'?)")) }
   | expr Assign error                                                                                      { raise (ParseError(!fnm, "expression expected on the right hand side of =")) }
@@ -132,7 +131,17 @@ command:
   | If LParen expr RParen error                                                                            { raise (ParseError(!fnm, "missing braces after if guard"))}
   | While LParen expr RParen error                                                                         { raise (ParseError(!fnm, "missing braces after while guard"))}
   | Do error                                                                                               { raise (ParseError(!fnm, "missing braces after do"))}
-  
+
+match_entry:
+  | Default LBrace c=command RBrace {annotate_2_code !fnm $loc (Ast.Default(c))}
+  | m=match_case LBrace c=command RBrace {annotate_2_code !fnm $loc (Ast.MatchCase(m, c))}
+
+match_case:
+  | Matchall {annotate_2_code !fnm $loc Ast.Matchall}
+  | Var i=Ident Colon t=perktype {annotate_2_code !fnm $loc (Ast.MatchVar(i, t))}
+  | Constr i=Ident { annotate_2_code !fnm $loc (Ast.CompoundCase(i, []))}
+  | Constr i=Ident LParen l = separated_nonempty_list(Comma, match_case) RParen { annotate_2_code !fnm $loc (Ast.CompoundCase(i, l))}
+  | e = expr {annotate_2_code !fnm $loc (Ast.MatchExpr(e))}
 
 deforfun:
   | d = perkdef                                                                                            {annotate_2_code !fnm $loc (Ast.DefVar([], d))}

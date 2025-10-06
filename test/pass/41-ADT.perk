@@ -1,6 +1,10 @@
+import "stdio.h"
+
 // type Point = Point(int, int)
 
 type List = | Empty | Cons(int, List) | Leaf (int)
+
+// type ArseList = | Empty | Cons(ArseList, ArseList) | Leaf
 
 // enum List<T> {
 //     Empty,
@@ -46,20 +50,39 @@ type List = | Empty | Cons(int, List) | Leaf (int)
 //     }
 // }
 
-fun main(): void {
-    let l :List = Cons (10, Empty());
-    let l2 : List = Empty;
-    skip;
+fun sum (l : List) : int {
+  let res := 0;
+  
+  match (l) {
+      constr Empty {
+          res = 0
+      },
+      constr Cons(var x : int, var l1 : List) {
+        res = sum(l1) + x
+      }
+    };
+  return res
+}
 
-    match (l) {
-        Empty {
-            skip
-        }
-        Cons(x, _) {
-          skip
-        }
-        default {
-          skip
-        }
-    }
+fun main(): void {
+    let l : List = Cons (10,Cons (15, Empty()));
+    let l2 : List = Empty;
+
+    printf ("the sum is: %d\n", sum(l));
+
+  // let l : ArseList = Cons (Empty, Empty);
+  //   let l2 : ArseList = Empty;
+  //   skip;
+
+  //   match (l) {
+  //       constr Empty {
+  //           skip
+  //       },
+  //       constr Cons(constr Empty, constr Empty) {
+  //         skip
+  //       },
+  //       default {
+  //         skip
+  //       }
+  //   }
 }
