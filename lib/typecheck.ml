@@ -29,6 +29,24 @@ let defined_constructors : (perkident, unit) Hashtbl.t = Hashtbl.create 10
 
 (* TODO handle type aliases *)
 
+(** check if type is integral *)
+let is_integral (_, typ, _) =
+  let nums =
+    [
+      Basetype "int";
+      Basetype "size_t";
+      Basetype "int64_t";
+      Basetype "int32_t";
+      Basetype "int16_t";
+      Basetype "int8_t";
+      Basetype "uint64_t";
+      Basetype "uint32_t";
+      Basetype "uint16_t";
+      Basetype "uint8_t";
+    ]
+  in
+  List.mem typ nums
+
 (** check if type is numerical *)
 let is_numerical (_, typ, _) =
   let nums =
@@ -926,13 +944,12 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
   | Subscript (container, accessor) -> (
       let container_res, container_type = typecheck_expr container in
       let accessor_res, accessor_type = typecheck_expr accessor in
-      (match accessor_type with
-      | _, Basetype "int", _ ->
-          () (* TODO this should be any integral numeric type *)
-      | _ ->
-          raise_type_error expr
-            (Printf.sprintf "Subscript operator requires int, got %s"
-               (show_perktype accessor_type)));
+      if is_integral accessor_type then
+        ()
+      else
+        raise_type_error expr
+          (Printf.sprintf "Subscript operator requires integer type, got %s"
+            (show_perktype accessor_type))
       match container_type with
       | _, Arraytype (t, _n), _ ->
           (annot_copy expr (Subscript (container_res, accessor_res)), t)
