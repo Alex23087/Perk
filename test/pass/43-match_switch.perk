@@ -1,0 +1,20 @@
+import "stdio.h"
+
+fun main(): void {
+    let x: int = 42;
+
+    match (true) {
+        `{x < 10} {
+            printf("x is less than 10\n");
+        },
+        `{11 < x && x < 20} {
+            printf("x is between 11 and 20\n");
+        },
+        `{x == 42} {
+            printf("x is the answer to life, the universe, and everything\n");
+        },
+        _ {
+            printf("x is something else\n");
+        }
+    }
+}

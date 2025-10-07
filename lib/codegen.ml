@@ -677,7 +677,7 @@ and codegen_command (cmd : command_a) (indentation : int) : string =
       in
       let x = fresh_var "switch_var" in
       let label = fresh_var "label" in
-      let gc, lid = codegen_match_entries l x label (indentation + 1) in
+      let gc, lid = codegen_match_entries l x label indentation in
       let def = codegen_def (t, x) e None indent_string in
       (* Printf.sprintf "%s%s\n%s\nswitch (%s.tag){\n%s%s}\n" def indent_string lid
         x gc indent_string *)
@@ -686,7 +686,7 @@ and codegen_command (cmd : command_a) (indentation : int) : string =
 
 and codegen_match_entries (mel : match_entry_a list) (match_var : string)
     (goto_label : string) indentation : perkident * string =
-  let indent_string = String.make (4 * indentation) ' ' in
+  (* let indent_string = String.make (4 * indentation) ' ' in *)
   let codegen_match_entry (entry : match_entry_a) (add_break : bool) :
       perkident * string =
     match ( $ ) entry with
@@ -694,7 +694,7 @@ and codegen_match_entries (mel : match_entry_a list) (match_var : string)
         let gc, lid =
           codegen_match_case case c match_var add_break goto_label indentation
         in
-        (Printf.sprintf "%s%s" indent_string gc, lid)
+        (Printf.sprintf "%s" gc, lid)
   in
 
   let case_names =
@@ -734,25 +734,23 @@ and codegen_match_case (case : match_case_a) (c : command_a)
     perkident * string =
   (* il filo interdentale *)
   let indent_string = String.make (4 * indentation) ' ' in
-  let add_break = false in
   match ( $ ) case with
   | MatchExpr e ->
       let expr_cg, lid = codegen_expr_and_letindefs e in
-      ( Printf.sprintf "%sif (%s == %s) {%s %s}\n" indent_string match_var
-          expr_cg
-          (codegen_command c indentation)
-          (if add_break then "goto " ^ goto_label ^ ";" else ""),
+      ( Printf.sprintf "%sif ((%s) == (%s)) {\n%s\n%s    goto %s;\n%s}\n"
+          indent_string match_var expr_cg
+          (codegen_command c (indentation + 1))
+          indent_string goto_label indent_string,
         lid )
   | MatchVar (v, t) ->
       let def = Printf.sprintf "%s %s = %s;" (codegen_type t) v match_var in
-      ( Printf.sprintf "%s{%s\n%s\n%s %s}\n" indent_string def indent_string
-          (codegen_command c indentation)
-          (if add_break then "goto " ^ goto_label ^ ";" else ""),
+      ( Printf.sprintf "%s{%s\n%s\n%s}\n" indent_string def indent_string
+          (codegen_command c indentation),
         "" )
   | Matchall ->
-      ( Printf.sprintf "%s{%s%s}\n" indent_string
-          (codegen_command c indentation)
-          (if add_break then "goto " ^ goto_label ^ ";" else ""),
+      ( Printf.sprintf "%s{\n%s\n%s}\n" indent_string
+          (codegen_command c (indentation + 1))
+          indent_string,
         "" )
   | CompoundCase (id, inner_cases) ->
       let rec generate_condition id inner_cases match_var =
@@ -764,7 +762,7 @@ and codegen_match_case (case : match_case_a) (c : command_a)
               | MatchVar _ -> ("1", "")
               | MatchExpr e ->
                   let expr_cg, lid = codegen_expr_and_letindefs e in
-                  ( Printf.sprintf "(*(*%s).data.%s._%d) == %s" match_var id i
+                  ( Printf.sprintf "(*(*%s).data.%s._%d) == (%s)" match_var id i
                       expr_cg,
                     lid )
               | CompoundCase (id1, []) ->
@@ -818,12 +816,11 @@ and codegen_match_case (case : match_case_a) (c : command_a)
            %s%s\n\
            %s%s\n\
            %sgoto %s;}\n\
-           %s%s}\n"
+           %s}\n"
           indent_string match_var id indent_string inner_condition indent_string
           constraints indent_string
           (codegen_command c (indentation + 1))
-          indent_string goto_label indent_string
-          (if add_break then "goto " ^ goto_label ^ ";" else ""),
+          indent_string goto_label indent_string,
         lid )
 
 (** Generates code for perk definitions. *)
