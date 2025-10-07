@@ -1,0 +1,141 @@
+import "stdio.h"
+import "malloc.h"
+import "string.h"
+
+type Expression = Var (char*) | Appl (Expression, Expression) | Lambda (char*, Expression)
+
+fun print_expr(e: Expression): void {
+    match (e) {
+        Var(var name) {
+            printf("Var(%s)", name)
+        },
+        Appl(var e1, var e2) {
+            printf("Appl(");
+            print_expr(e1);
+            printf(", ");
+            print_expr(e2);
+            printf(")");
+        },
+        Lambda(var param, var body)  {
+            printf("Lambda(%s, ", param);
+            print_expr(body);
+            printf(")");
+        }
+    }
+}
+
+let counter := 0
+
+fun fresco () : char* {
+    let new_str: char* = cast(char*, malloc(cast(size_t, 20)));
+    sprintf(new_str, "var_%d", counter);
+    counter = counter + 1;
+    return new_str;
+}
+
+fun subst (e: Expression, old: char*, new : Expression) : Expression {
+    match (e) {
+        Var (var name) {
+            if (!strcmp(name, old)) {
+                return new;
+            } else {
+                return e;
+            }
+        },
+        Appl (var e1, var e2) {
+            return Appl(subst(e1, old, new), subst(e2, old, new));
+        },
+        Lambda (var param, var body) {
+            if (!strcmp(param, old)) {
+                return e;
+            } else {
+                return Lambda(param, subst(body, old, new));
+            }
+        }
+    }
+}
+
+type StringList = Nil | Cons (char*, StringList)
+
+fun list_remove(lst: StringList, item: char*): StringList {
+    match (lst) {
+        Nil { return Nil; },
+        Cons (var head, var tail) {
+            if (!strcmp(head, item)) {
+                return list_remove(tail, item);
+            } else {
+                return Cons(head, list_remove(tail, item));
+            }
+        }
+    }
+}
+
+fun list_concatenate (lst1: StringList, lst2: StringList): StringList {
+    match (lst1) {
+        Nil { return lst2; },
+        Cons (var head, var tail) {
+            return Cons(head, list_concatenate(tail, lst2));
+        }
+    }
+}
+
+fun list_iter (lst: StringList, f: (char*) => void): void {
+    match (lst) {
+        Nil { return; },
+        Cons (var head, var tail) {
+            f(head);
+            list_iter(tail, f);
+        }
+    }
+}
+
+fun freevars (e : Expression) : StringList {
+    match (e) {
+        Var (var x) {return Cons (x, Nil)},
+        Appl (var e1, var e2) {
+            return list_concatenate(freevars(e1), freevars(e2))
+        },
+        Lambda (var x, var e1) {
+            return list_remove(freevars(e1), x)
+        }
+    }
+}
+
+fun eval (e : Expression) : Expression {
+    match (e) {
+        Var (var x) {return e},
+        Appl (var e1, var e2) {
+            let v1 := eval (e1);
+            let v1_ptr : void* = cast(void*, &v1);
+            print_expr (v1);
+            printf("\n");
+            list_iter (freevars (v1), 
+                (s: char*): void {
+                    cast(Expression, *v1_ptr) = subst (v1, s, Var(fresco()));
+                    print_expr (v1);
+                    printf("\n");
+                } 
+            );
+            print_expr (v1);
+            printf("\n");
+            let v2 := eval (e2);
+            match (v1) {
+                Lambda (var y, var body){return subst (body, y, v2)},
+                _ {
+                    printf("Error: trying to apply a non-functional value\n");
+                    return Var("error");
+                }
+            }
+        },
+        Lambda(_, _) {return e}
+    }
+}
+
+fun main(): void {
+    let expr := Lambda("x", Appl(Var("f"), Var("x")));
+
+    let res := eval (Appl (expr, Var("y")));
+
+    print_expr(res);
+    printf("\n");
+}

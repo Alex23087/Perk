@@ -123,6 +123,8 @@ command:
   | Continue                                                                                               { annotate_2_code !fnm $loc (Ast.Continue) }
   | Break                                                                                                  { annotate_2_code !fnm $loc (Ast.Break) }
   | Match LParen e = expr RParen LBrace l = separated_nonempty_list (Comma, match_entry) RBrace            {annotate_2_code !fnm $loc (Ast.Match(e, l, None))}
+  | Match LParen expr RParen LBrace separated_list (Comma, match_entry) error                              { raise (ParseError(!fnm, "invalid match statement (perhaps you are missing a ',' between cases?)")) }
+  | Match error                                                                                            { raise (ParseError(!fnm, "invalid match scrutinee (perhaps you are missing a '(' ?)")) }
   | error                                                                                                  { raise (ParseError(!fnm, "command expected")) }
   | command error                                                                                          { raise (ParseError(!fnm, "unexpected command (perhaps you are missing a ';'?)")) }
   | expr Assign error                                                                                      { raise (ParseError(!fnm, "expression expected on the right hand side of =")) }
@@ -135,6 +137,8 @@ command:
 match_entry:
   | m = match_case LBrace c = command RBrace                                                               {annotate_2_code !fnm $loc (Ast.MatchCase(m, None, c))}
   | m = match_case When e = expr LBrace c = command RBrace                                                 {annotate_2_code !fnm $loc (Ast.MatchCase(m, Some e, c))}
+  | match_case error                                                                                       { raise (ParseError(!fnm, "invalid match case, expected case body")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "match case expected")) }
 
 match_case:
   | BTICK LBrace e = expr RBrace {annotate_2_code !fnm $loc (Ast.MatchExpr(e))}
@@ -143,6 +147,7 @@ match_case:
   | Var i=Ident Colon t=perktype {annotate_2_code !fnm $loc (Ast.MatchVar(i, Some t))}
   | i=Ident { annotate_2_code !fnm $loc (Ast.CompoundCase(i, []))}
   | i=Ident LParen l = separated_nonempty_list(Comma, match_case) RParen { annotate_2_code !fnm $loc (Ast.CompoundCase(i, l))}
+  | error { raise (ParseError(!fnm, "expected match case")) }
 
 deforfun:
   | d = perkdef                                                                                            {annotate_2_code !fnm $loc (Ast.DefVar([], d))}
