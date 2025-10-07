@@ -29,12 +29,11 @@ let defined_constructors : (perkident, unit) Hashtbl.t = Hashtbl.create 10
 
 (* TODO handle type aliases *)
 
-(** check if type is numerical *)
-let is_numerical (_, typ, _) =
+(** check if type is integral *)
+let is_integral (_, typ, _) =
   let nums =
     [
       Basetype "int";
-      Basetype "float";
       Basetype "size_t";
       Basetype "int64_t";
       Basetype "int32_t";
@@ -44,13 +43,38 @@ let is_numerical (_, typ, _) =
       Basetype "uint32_t";
       Basetype "uint16_t";
       Basetype "uint8_t";
+      Basetype "char";
     ]
   in
   List.mem typ nums
 
-(** provides an integer ranking of numerical types: higher values are least
+(** check if type is numerical *)
+let is_numerical (_, typ, _) =
+  let nums =
+    [
+      Basetype "int";
+      Basetype "float";
+      Basetype "double";
+      Basetype "size_t";
+      Basetype "int64_t";
+      Basetype "int32_t";
+      Basetype "int16_t";
+      Basetype "int8_t";
+      Basetype "uint64_t";
+      Basetype "uint32_t";
+      Basetype "uint16_t";
+      Basetype "uint8_t";
+      Basetype "char";
+    ]
+  in
+  List.mem typ nums
+
+(* TODO: This ranking cannot be done with a total order, signed and unsigned are not comparable *)
+
+(** provides an integer ranking of numerical types: higher values are most
     general types *)
 let numerical_rank : perktype -> int = function
+  | _, Basetype "double", _ -> 12
   | _, Basetype "float", _ -> 11
   | _, Basetype "int64_t", _ -> 10
   | _, Basetype "size_t", _ -> 9
@@ -61,6 +85,8 @@ let numerical_rank : perktype -> int = function
   | _, Basetype "int16_t", _ -> 4
   | _, Basetype "uint16_t", _ -> 3
   | _, Basetype "int8_t", _ -> 2
+  | _, Basetype "char", _ ->
+      2 (* char's signedness is implementation dependent *)
   | _, Basetype "uint8_t", _ -> 1
   | _ -> 0 (* non‐numeric or unknown *)
 
@@ -926,13 +952,11 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
   | Subscript (container, accessor) -> (
       let container_res, container_type = typecheck_expr container in
       let accessor_res, accessor_type = typecheck_expr accessor in
-      (match accessor_type with
-      | _, Basetype "int", _ ->
-          () (* TODO this should be any integral numeric type *)
-      | _ ->
-          raise_type_error expr
-            (Printf.sprintf "Subscript operator requires int, got %s"
-               (show_perktype accessor_type)));
+      if is_integral accessor_type then ()
+      else
+        raise_type_error expr
+          (Printf.sprintf "Subscript operator requires integer type, got %s"
+             (show_perktype accessor_type));
       match container_type with
       | _, Arraytype (t, _n), _ ->
           (annot_copy expr (Subscript (container_res, accessor_res)), t)
