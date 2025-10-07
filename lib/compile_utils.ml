@@ -53,9 +53,12 @@ let ast_of_filename filename =
   ast
 
 let rec compile_program ?(dir : string option) (static_compilation : bool)
-    (verbose : bool) (input_file : string) (output_file : string option) =
+    (verbose : bool) (input_file : string) (output_file : string option)
+    (c_compiler : string) (c_flags : string) =
   Utils.static_compilation := static_compilation;
   Utils.verbose := verbose;
+  Utils.c_compiler := c_compiler;
+  Utils.c_flags := c_flags;
   let out_file =
     if Option.is_some output_file then Option.get output_file
     else Filename.chop_suffix input_file ".perk" ^ ".c"
@@ -170,9 +173,11 @@ and expand_opens (dir : string) (ast : topleveldef_a list) : topleveldef_a list
   | [] -> []
 
 and check_file ?dir (static_compilation : bool) (verbose : bool)
-    (filename : string) : unit =
+    (filename : string) (c_compiler : string) (c_flags : string) : unit =
   Utils.static_compilation := static_compilation;
   Utils.verbose := verbose;
+  Utils.c_compiler := c_compiler;
+  Utils.c_flags := c_flags;
   try process_file ?dir filename |> ignore with
   | Syntax_error ((start_line, start_col), (end_line, end_col), input_file, msg)
     ->
