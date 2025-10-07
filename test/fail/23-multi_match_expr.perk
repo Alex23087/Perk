@@ -1,0 +1,17 @@
+import "stdio.h"
+
+type List = EmptyList | Cons (int, List)
+type Tree = EmptyTree | Node (int, Tree, Tree)
+
+fun main(): void {
+    let l: List = EmptyList;
+
+    match (l) {
+        `{10} {
+            skip
+        },
+        Cons (var x : int, var l1 : List) {
+            printf("Canana");
+        }
+    }
+}

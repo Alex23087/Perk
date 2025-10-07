@@ -139,7 +139,8 @@ match_entry:
 match_case:
   | BTICK LBrace e = expr RBrace {annotate_2_code !fnm $loc (Ast.MatchExpr(e))}
   | Matchall {annotate_2_code !fnm $loc Ast.Matchall}
-  | Var i=Ident Colon t=perktype {annotate_2_code !fnm $loc (Ast.MatchVar(i, t))}
+  | Var i=Ident {annotate_2_code !fnm $loc (Ast.MatchVar(i, None))}
+  | Var i=Ident Colon t=perktype {annotate_2_code !fnm $loc (Ast.MatchVar(i, Some t))}
   | i=Ident { annotate_2_code !fnm $loc (Ast.CompoundCase(i, []))}
   | i=Ident LParen l = separated_nonempty_list(Comma, match_case) RParen { annotate_2_code !fnm $loc (Ast.CompoundCase(i, l))}
 

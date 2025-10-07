@@ -721,15 +721,17 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       (annot_copy cmd (Return (Some e_res)), Some e_type, true)
   | Continue | Break -> (cmd, None, false)
   | Match (e, match_entry_list, _) ->
-      let expr, _t = typecheck_expr e in
+      let expr, expr_type = typecheck_expr e in
       let entry_list, rettype, does_return =
-        typecheck_match_entry_list ~retype match_entry_list
+        typecheck_match_entry_list ~retype expr_type match_entry_list
       in
-      (annot_copy cmd (Match (expr, entry_list, Some _t)), rettype, does_return)
+      ( annot_copy cmd (Match (expr, entry_list, Some expr_type)),
+        rettype,
+        does_return )
 
 and typecheck_match_entry_list ?(retype : perktype option = None)
-    (mel : match_entry_a list) =
-  let check_all = List.map (typecheck_match_entry ~retype) mel in
+    (match_type : perktype) (mel : match_entry_a list) =
+  let check_all = List.map (typecheck_match_entry ~retype match_type) mel in
   let firsts = List.map (fun (a, _, _) -> a) check_all in
   let seconds = List.map (fun (_, b, _) -> b) check_all in
   let thirds = List.map (fun (_, _, c) -> c) check_all in
@@ -764,31 +766,76 @@ and typecheck_match_entry_list ?(retype : perktype option = None)
   (firsts, all_same, all_return)
 
 and typecheck_match_entry ?(retype : perktype option = None)
-    (entry : match_entry_a) =
+    (match_type : perktype) (entry : match_entry_a) =
   match ( $ ) entry with
   (* | Default c ->
       let body_res, body_type, body_returns = typecheck_command c in
       (annot_copy entry (Default body_res), body_type, body_returns) *)
-  | MatchCase (_case, _when_expr, c) ->
-      let _case = typecheck_match_case _case in
+  | MatchCase (case, _when_expr, c) ->
+      let case = typecheck_match_case match_type case in
       push_symbol_table ();
-      let vars_in_case = get_vars_in_case _case in
+      let vars_in_case = get_vars_in_case case in
       List.iter (fun (x, t) -> bind_var x t) vars_in_case;
       let body_res, body_type, body_returns = typecheck_command ~retype c in
       pop_symbol_table ();
-      ( annot_copy entry (MatchCase (_case, _when_expr, body_res)),
+      ( annot_copy entry (MatchCase (case, _when_expr, body_res)),
         body_type,
         body_returns )
 
-and typecheck_match_case case =
+and typecheck_match_case (match_type : perktype) case =
   match ( $ ) case with
   | Matchall -> case
-  | MatchVar _ -> case
-  | MatchExpr e ->
-      let e1, _t = typecheck_expr e in
-      annot_copy case (MatchExpr e1)
+  | MatchVar (x, Some typ) -> (
+      try
+        let _ = match_types typ match_type in
+        case
+      with Type_match_error _msg ->
+        raise_type_error case
+          (Printf.sprintf "Variable %s has type %s but it should have type %s" x
+             (show_perktype typ) (show_perktype match_type)))
+  | MatchVar (x, None) ->
+      (* matchvar type inference *)
+      annot_copy case (MatchVar (x, Some match_type))
+  | MatchExpr e -> (
+      let e1, t = typecheck_expr e in
+      Printf.printf "MatchExpr type: %s\n" (show_perktype t);
+      if not (is_equatable_type t) then
+        raise_type_error case
+          (Printf.sprintf "Expression in case has non-equatable type %s"
+             (show_perktype t));
+      try
+        let _ = match_types t match_type in
+        annot_copy case (MatchExpr e1)
+      with Type_match_error _msg ->
+        raise_type_error case
+          (Printf.sprintf
+             "Expression in case has type %s but it should have type %s"
+             (show_perktype t) (show_perktype match_type)))
   | CompoundCase (id, cases) ->
-      if is_constructor_name id then annot_copy case (CompoundCase (id, cases))
+      if is_constructor_name id then
+        if is_constructor_of id match_type then (
+          let parameters =
+            match resolve_type match_type with
+            | _, AlgebraicType (_, constructors), _ ->
+                List.find (fun (ide, _) -> ide = id) constructors |> snd
+            | _ -> failwith "Impossible, is_constructor_of returned true"
+          in
+          if List.length parameters <> List.length cases then
+            raise_type_error case
+              (Printf.sprintf
+                 "Constructor %s expects %d parameters, got %d instead" id
+                 (List.length parameters) (List.length cases));
+          (* Typecheck each case *)
+          annot_copy case
+            (CompoundCase
+               ( id,
+                 List.mapi
+                   (fun i c -> typecheck_match_case (List.nth parameters i) c)
+                   cases )))
+        else
+          raise_type_error case
+            (Printf.sprintf "Constructor %s does not construct type %s" id
+               (show_perktype match_type))
       else
         let smart_msg =
           let lvid = lookup_var id in
@@ -805,7 +852,9 @@ and typecheck_match_case case =
 
 and get_vars_in_case (case : match_case_a) =
   match ( $ ) case with
-  | MatchVar (v, t) -> [ (v, t) ]
+  | MatchVar (v, Some t) -> [ (v, t) ]
+  | MatchVar (_, None) ->
+      failwith "should not happen, match variable has not been inferred (3)"
   | CompoundCase (_, cl) -> List.map get_vars_in_case cl |> List.flatten
   | _ -> []
 

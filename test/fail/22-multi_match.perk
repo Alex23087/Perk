@@ -1,0 +1,23 @@
+import "stdio.h"
+
+type List = EmptyList | Cons (int, List)
+type Tree = EmptyTree | Node (int, Tree, Tree)
+
+fun main(): void {
+    let l: List = EmptyList;
+
+    match (l) {
+        EmptyList {
+            printf("Aanana");
+        },
+        EmptyTree {
+            printf("Banana");
+        },
+        Cons (var x : int, var l1 : List) {
+            printf("Canana");
+        },
+        Node (var x : int, var t1 : Tree, var t2 : Tree) {
+            printf("Danana");
+        }
+    }
+}

@@ -742,11 +742,14 @@ and codegen_match_case (case : match_case_a) (c : command_a)
           (codegen_command c (indentation + 1))
           indent_string goto_label indent_string,
         lid )
-  | MatchVar (v, t) ->
+  | MatchVar (v, Some t) ->
       let def = Printf.sprintf "%s %s = %s;" (codegen_type t) v match_var in
       ( Printf.sprintf "%s{%s\n%s\n%s}\n" indent_string def indent_string
           (codegen_command c indentation),
         "" )
+  | MatchVar (_, None) ->
+      failwith
+        "should not happen: type of match variable has not been inferred!"
   | Matchall ->
       ( Printf.sprintf "%s{\n%s\n%s}\n" indent_string
           (codegen_command c (indentation + 1))
@@ -792,12 +795,16 @@ and codegen_match_case (case : match_case_a) (c : command_a)
           List.mapi
             (fun i case ->
               match ( $ ) case with
-              | MatchVar (v, t) ->
+              | MatchVar (v, Some t) ->
                   let def =
                     Printf.sprintf "%s %s = (*(%s.data.%s._%d));"
                       (codegen_type t) v match_var id i
                   in
                   def
+              | MatchVar (_, None) ->
+                  failwith
+                    "should not happen: type of match variable has not been \
+                     inferred (2)"
               | CompoundCase (id1, doubly_inner_cases) ->
                   generate_constraint id1 doubly_inner_cases
                     (Printf.sprintf "(*(%s.data.%s._%d))" match_var id i)

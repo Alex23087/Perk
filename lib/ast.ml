@@ -174,7 +174,7 @@ and match_entry_t = MatchCase of match_case_a * expr_a option * command_a
 
 and match_case_t =
   | Matchall
-  | MatchVar of perkident * perktype
+  | MatchVar of perkident * perktype option
   | MatchExpr of expr_a
   | CompoundCase of perkident * match_case_a list
 [@@deriving show, eq]
