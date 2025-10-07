@@ -19,12 +19,8 @@ let generate_tags lib_paths =
   in
   let status =
     Sys.command
-      (Printf.sprintf
-         "/usr/local/i386elfgcc/bin/i386-elf-gcc -ffreestanding -m32 \
-          -fno-builtin -fno-stack-protector -fno-pic -Wno-error -DVGA_VESA \
-          -DHRES=600 -DVRES=400 -DBPP=4 -DWINDOW_DRAG_NORMAL -E -P -dD %s > \
-          libs_expanded.h "
-         (* "gcc -E -P -dD %s > %s " *)
+      (Printf.sprintf "%s %s -E -P -dD %s > %s " !Utils.c_compiler
+         !Utils.c_flags
          (String.concat " " lib_paths)
          libs_expanded)
   in
@@ -153,7 +149,8 @@ let to_ctypes (p : parse_result) : (string * ctype * typed_var list) option =
         let ctype_ret = parse_ret_type ret in
         Some (name, ctype_ret, ctype_sig)
       with _ ->
-        Printf.eprintf "Warning: could not parse prototype for %s\n" name;
+        Utils.say_here
+          (Printf.sprintf "Warning: could not parse prototype for %s\n" name);
         None)
   | _ -> failwith "Trying to convert non-prototype to ctype"
 

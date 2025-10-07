@@ -11,6 +11,8 @@ let static_compilation : bool ref = ref false
 
 (** Internal flag to enable verbose compilation *)
 let verbose : bool ref = ref false
+let c_compiler : string ref = ref "gcc"
+let c_flags : string ref = ref ""
 
 (** Debug function that can be enabled to track function call numbers. *)
 let rec say_here (_msg : string) : unit =
