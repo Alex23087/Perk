@@ -1,0 +1,8 @@
+type Example = Idk
+
+// This doesn't compile yet, even though the type is explicitly annotated
+let x: Example? = nothing
+// One would expect that at least this should compile, but alas not
+let y: Example? = cast(Example?, nothing)
+
+fun main(): void {skip}
