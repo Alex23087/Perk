@@ -17,7 +17,7 @@ fun f(a: <TestArch>) : int {
     return a.x;
 }
 
-fun main(): int {
+fun main(): void {
     let m: TestModel = summon TestModel();
     m.x = 42;
     printf("%d\n", f(m as TestArch+TestArch2 as TestArch));

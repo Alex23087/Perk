@@ -596,8 +596,8 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
          (match acctype with Some t -> show_perktype t | None -> "None")
          (match rasstype with Some t -> show_perktype t | None -> "None"); *)
       ( annot_copy cmd (Assign (lhs_res, rhs_res, acctype, rasstype)),
-        Some exprval,
-        true )
+        None,
+        false )
   | Seq (c1, c2) ->
       let c1_res, c1_type, c1_returns = typecheck_command ~retype c1 in
       (* TODO: If c1_returns is true, c2 is dead code. Warn *)

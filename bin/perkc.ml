@@ -66,7 +66,7 @@ let cmd =
       `P "Report bugs to https://github.com/Alex23087/Perk/issues";
     ]
   in
-  let info = Cmd.info "perkc" ~version:"1.0" ~doc ~man in
+  let info = Cmd.info "perkc" ~version:"0.89.0" ~doc ~man in
   Cmd.v info
     Term.(
       ret
