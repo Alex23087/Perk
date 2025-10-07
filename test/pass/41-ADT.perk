@@ -1,68 +1,20 @@
 import "stdio.h"
 
-// type Point = Point(int, int)
-
 type List = | Empty | Cons(int, List) | Leaf (int)
 
 type ListPair = Pair (List, List)
-
-// type ArseList = | Empty | Cons(ArseList, ArseList) | Leaf
-
-// enum List<T> {
-//     Empty,
-//     Cons(T, List<T>)
-// }
-
-// fun length(l: List): int {
-//     match (l) {
-//         Empty { return 0 },
-//         Cons(_, (Cons(_, tail))) { return 2 + length(tail) },
-//         Cons(_, tail) { return 1 + length(tail) }
-//         Leaf(12) { return 1 },
-//         Leaf(_) { return 1 }
-//     }
-// }
-
-// int length(List l)
-// {
-//     switch (l.tag)
-//     {
-//         case __perk_Empty_Tag:{
-//             return 0;
-//         }
-        
-//         case __perk_Cons_Tag:{
-//             switch (l.data.Cons._1->tag)
-//             {
-//                 case __perk_Cons_Tag: {
-//                     List tail = *l.data.Cons._1;
-//                     return 2 + length(tail);
-//                 }                
-//             }
-//             List tail = *l.data.Cons._1;
-//             return 1 + length(tail);
-//         }
-
-//         case __perk_Leaf_Tag:{
-//             if (l.data.Leaf._0 == 12) {
-//                 return 1;
-//             }
-//             return 1;
-//         }
-//     }
-// }
 
 fun sum (l : List) : int {
   let res := 0;
   
   match (l) {
-      constr Empty {
+      Empty {
           res = 0
       },
-      constr Cons(var x : int, var l1 : List) {
+      Cons(var x : int, var l1 : List) {
         res = sum(l1) + x
       },
-      constr Leaf(var x : int) {
+      Leaf(var x : int) {
         res = x
       }
     };
@@ -71,12 +23,12 @@ fun sum (l : List) : int {
 
 fun add_all (l1 : List, l2 : List) : List {
   match (Pair(l1, l2)) {
-      constr Pair (constr Empty, constr Empty) {
+       Pair ( Empty,  Empty) {
           printf("adding two empties\n");
           return Empty
       },
-      constr Pair (constr Cons (var n1 : int,  var l1 : List),
-                   constr Cons (var n2 : int,  var l2 : List)) {
+       Pair ( Cons (var n1 : int,  var l1 : List),
+                    Cons (var n2 : int,  var l2 : List)) {
           printf("adding two cons %d, %d\n", n1, n2);
           return Cons (n1 + n2, add_all (l1, l2))
       },
@@ -92,14 +44,14 @@ fun add_all (l1 : List, l2 : List) : List {
 
 fun iter (l: List, f: (int) => void): void {
     match (l) {
-        constr Empty {
+        Empty {
             skip
         },
-        constr Cons (var n : int, var l1 : List) {
+         Cons (var n : int, var l1 : List) {
             f(n);
             iter(l1, f)
         },
-        constr Leaf (var n : int) {
+         Leaf (var n : int) {
             f(n)
         }
     }
@@ -117,19 +69,5 @@ fun main(): void {
     iter(l12, (x: int): void {printf("value from add_all: %d\n", x);});
 
     printf("cculopoli");
-  // let l : ArseList = Cons (Empty, Empty);
-  //   let l2 : ArseList = Empty;
-  //   skip;
 
-  //   match (l) {
-  //       constr Empty {
-  //           skip
-  //       },
-  //       constr Cons(constr Empty, constr Empty) {
-  //         skip
-  //       },
-  //       default {
-  //         skip
-  //       }
-  //   }
 }

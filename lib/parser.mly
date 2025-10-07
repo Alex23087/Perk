@@ -2,6 +2,7 @@
   open Errors
   open Ast
   open Utils
+  open Parse_lexing_commons
 %}
 
 /* Tokens declarations */
@@ -23,7 +24,7 @@
 %token Import ImportLocal Open
 %token Archetype Model Summon Banish Cast
 %token Struct Make
-%token ADT Pipe Match When Matchall Constr Var
+%token ADT Pipe Match When Matchall Constr Var BTICK
 %token Nothing Something Of
 
 /* Precedence and associativity specification */
@@ -77,9 +78,8 @@ program:
   | EOF                                                                                                    { raise (ParseError(!fnm, "empty program")) }
 
 constructor_type:
-  | i = Ident LParen l = separated_list(Comma, perktype) RParen                                            { (i, l) }
-  | i = Ident                                                                                              { (i, []) }
-  | i = Ident error                                                                                        { raise (ParseError(!fnm, ("invalid type for constructor" ^ i))) }
+  | i = Ident LParen l = separated_list(Comma, perktype) RParen                                            {add_constructor_name i; (i, l) }
+  | i = Ident                                                                                              {add_constructor_name i ; (i, []) }  | i = Ident error                                                                                        { raise (ParseError(!fnm, ("invalid type for constructor" ^ i))) }
   | error                                                                                                  { raise (ParseError(!fnm, "constructor type expected")) }
 
 topleveldef:
@@ -137,11 +137,11 @@ match_entry:
   | m = match_case When e = expr LBrace c = command RBrace                                                 {annotate_2_code !fnm $loc (Ast.MatchCase(m, Some e, c))}
 
 match_case:
+  | BTICK LBrace e = expr RBrace {annotate_2_code !fnm $loc (Ast.MatchExpr(e))}
   | Matchall {annotate_2_code !fnm $loc Ast.Matchall}
   | Var i=Ident Colon t=perktype {annotate_2_code !fnm $loc (Ast.MatchVar(i, t))}
-  | Constr i=Ident { annotate_2_code !fnm $loc (Ast.CompoundCase(i, []))}
-  | Constr i=Ident LParen l = separated_nonempty_list(Comma, match_case) RParen { annotate_2_code !fnm $loc (Ast.CompoundCase(i, l))}
-  | e = expr {annotate_2_code !fnm $loc (Ast.MatchExpr(e))}
+  | i=Ident { annotate_2_code !fnm $loc (Ast.CompoundCase(i, []))}
+  | i=Ident LParen l = separated_nonempty_list(Comma, match_case) RParen { annotate_2_code !fnm $loc (Ast.CompoundCase(i, l))}
 
 deforfun:
   | d = perkdef                                                                                            {annotate_2_code !fnm $loc (Ast.DefVar([], d))}

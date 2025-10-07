@@ -7,6 +7,7 @@ open Type_symbol_table
 open Var_symbol_table
 open Free_variables
 open Parse_tags
+open Parse_lexing_commons
 
 (** List of library functions and their types :
     [(perkident * perktype) list ref]*)
@@ -769,7 +770,7 @@ and typecheck_match_entry ?(retype : perktype option = None)
       let body_res, body_type, body_returns = typecheck_command c in
       (annot_copy entry (Default body_res), body_type, body_returns) *)
   | MatchCase (_case, _when_expr, c) ->
-      (* TODO also check case!! *)
+      let _case = typecheck_match_case _case in
       push_symbol_table ();
       let vars_in_case = get_vars_in_case _case in
       List.iter (fun (x, t) -> bind_var x t) vars_in_case;
@@ -778,6 +779,29 @@ and typecheck_match_entry ?(retype : perktype option = None)
       ( annot_copy entry (MatchCase (_case, _when_expr, body_res)),
         body_type,
         body_returns )
+
+and typecheck_match_case case =
+  match ( $ ) case with
+  | Matchall -> case
+  | MatchVar _ -> case
+  | MatchExpr e ->
+      let e1, _t = typecheck_expr e in
+      annot_copy case (MatchExpr e1)
+  | CompoundCase (id, cases) ->
+      if is_constructor_name id then annot_copy case (CompoundCase (id, cases))
+      else
+        let smart_msg =
+          let lvid = lookup_var id in
+          if Option.is_some lvid then
+            let t = Option.get lvid in
+            Printf.sprintf
+              " To access the variable %s : %s use the syntax `{%s}" id
+              (show_perktype t) id
+          else ""
+        in
+
+        raise_compilation_error case
+          (Printf.sprintf "%s id not a valid constructor.%s" id smart_msg)
 
 and get_vars_in_case (case : match_case_a) =
   match ( $ ) case with
