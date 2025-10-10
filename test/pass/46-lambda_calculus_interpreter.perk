@@ -1,0 +1,273 @@
+import "stdio.h"
+import "malloc.h"
+import "string.h"
+import "stdlib.h"
+
+type Expression = Var (char*) | Appl (Expression, Expression) | Lambda (char*, Expression)
+
+fun print_expr(e: Expression): void {
+    match (e) {
+        Var(var name) {
+            printf("%s", name)
+        },
+        Appl(var e1, var e2) {
+            printf("(");
+            print_expr(e1);
+            printf(" ");
+            print_expr(e2);
+            printf(")");
+        },
+        Lambda(var param, var body)  {
+            printf("\\%s. ", param);
+            print_expr(body);
+            printf(")");
+        }
+    }
+}
+
+let counter := 0
+
+fun fresco () : char* {
+    let new_str: char* = cast(char*, malloc(cast(size_t, 20)));
+    sprintf(new_str, "var_%d", counter);
+    counter = counter + 1;
+    return new_str;
+}
+
+fun subst (e: Expression, old: char*, new : Expression) : Expression {
+    match (e) {
+        Var (var name) {
+            if (!strcmp(name, old)) {
+                return new;
+            } else {
+                return e;
+            }
+        },
+        Appl (var e1, var e2) {
+            return Appl(subst(e1, old, new), subst(e2, old, new));
+        },
+        Lambda (var param, var body) {
+            if (!strcmp(param, old)) {
+                return e;
+            } else {
+                // if param occurs free in 'new', rename param in body to avoid capture
+                let fv_new := freevars(new);
+                if (contains(fv_new, param) == 1) {
+                    let fresh := fresco();
+                    let body_renamed := subst(body, param, Var(fresh));
+                    return Lambda(fresh, subst(body_renamed, old, new));
+                } else {
+                    return Lambda(param, subst(body, old, new));
+                }
+            }
+        }
+    }
+}
+
+type StringList = Nil | Cons (char*, StringList)
+
+fun list_remove(lst: StringList, item: char*): StringList {
+    match (lst) {
+        Nil { return Nil; },
+        Cons (var head, var tail) {
+            if (!strcmp(head, item)) {
+                return list_remove(tail, item);
+            } else {
+                return Cons(head, list_remove(tail, item));
+            }
+        }
+    }
+}
+
+fun list_concatenate (lst1: StringList, lst2: StringList): StringList {
+    match (lst1) {
+        Nil { return lst2; },
+        Cons (var head, var tail) {
+            return Cons(head, list_concatenate(tail, lst2));
+        }
+    }
+}
+
+fun list_iter (lst: StringList, f: (char*) => void): void {
+    match (lst) {
+        Nil { return; },
+        Cons (var head, var tail) {
+            f(head);
+            list_iter(tail, f);
+        }
+    }
+}
+
+fun freevars (e : Expression) : StringList {
+    match (e) {
+        Var (var x) {return Cons (x, Nil)},
+        Appl (var e1, var e2) {
+            return list_concatenate(freevars(e1), freevars(e2))
+        },
+        Lambda (var x, var e1) {
+            return list_remove(freevars(e1), x)
+        }
+    }
+}
+
+let test: Expression* = cast(Expression*, 0)
+
+fun contains(lst: StringList, item: char*): int {
+    match (lst) {
+        Nil { return 0; },
+        Cons (var head, var tail) {
+            if (!strcmp(head, item)) { return 1; } else { return contains(tail, item); }
+        }
+    }
+}
+
+fun eval (e : Expression) : Expression {
+	// printf("e: ");
+	// print_expr(e);
+	// printf("\n");
+    match (e) {
+        Var (var x) { return e; },
+        Appl (var e1, var e2) {
+            // evaluate operator and argument (call-by-value)
+            let v1 := eval(e1);
+            let v2 := eval(e2);
+
+            // printf("v1: ");
+            // print_expr(v1);
+            // printf("\n");
+            // printf("v2: ");
+            // print_expr(v2);
+            // printf("\n");
+
+            match (v1) {
+                Lambda (var y, var body) {
+                    // avoid capture: if parameter y occurs free in v2, alpha-rename y in body
+                    let fv_v2 := freevars(v2);
+                    if (contains(fv_v2, y) == 1) {
+                        let fresh_name := fresco();
+                        let body_renamed := subst(body, y, Var(fresh_name));
+                        return eval(subst(body_renamed, fresh_name, v2));
+                    } else {
+                        return eval(subst(body, y, v2));
+                    }
+                },
+                _ {
+                    printf("Error: trying to apply a non-functional value\n");
+					exit(1);
+                    return Var("error");
+                }
+            }
+        },
+        Lambda(var x, var body) { return e }
+    }
+}
+
+fun normalize (e : Expression) : Expression {
+    match (e) {
+        Var (var x) { return e; },
+        Appl (var e1, var e2) {
+            let n1 := normalize(e1);
+            let n2 := normalize(e2);
+            match (n1) {
+                Lambda (var y, var body) {
+                    // avoid capture: rename y if it occurs free in n2
+                    let fv_n2 := freevars(n2);
+                    if (contains(fv_n2, y) == 1) {
+                        let fresh := fresco();
+                        let body_renamed := subst(body, y, Var(fresh));
+                        return normalize(subst(body_renamed, fresh, n2));
+                    } else {
+                        return normalize(subst(body, y, n2));
+                    }
+                },
+                _ {
+                    return Appl(n1, n2);
+                }
+            }
+        },
+        Lambda (var x, var body) {
+            return Lambda(x, normalize(body));
+        }
+    }
+}
+
+fun main(): void {
+    // let expr := Lambda("x", Appl(Var("f"), Var("x")));
+
+    // let res := eval (Appl (expr, Var("y")));
+
+	// let omega := Lambda("x", Appl(Var("x"), Var("x")));
+	// let Omega := Appl(omega, omega);
+    
+    // printf ("OMEGA: ");
+	// print_expr(Omega);
+	// printf("\n");
+	
+    // printf ("Omega applied to z: \n");
+    // print_expr(eval(Appl(Omega, Var("z"))));
+
+	let zero := (Lambda ("z", Lambda("s", Var("z"))));
+
+	let make_nat := (n: int): Expression {
+		if (n == 0) {
+			return zero;
+		} else {
+			return Lambda("z", Lambda("s", Appl(Var("s"), Appl(Appl(make_nat(n - 1), Var("z")), Var("s")))));
+		}
+	};
+
+    // lambda m . lambda n. lambda z . lambda s. m (n z s) s
+
+	let sum :=
+	Lambda("m",
+		Lambda("n",
+			Lambda("z",
+				Lambda("s",
+					Appl(
+						Appl(Var("m"),
+							Appl(
+								Appl(Var("n"), Var("z")),
+								Var("s")
+							)
+						),
+						Var("s")
+					)
+				)
+			)
+		)
+	);
+
+    // times = lambda m. lambda n. m (Zero) (Plus n)
+	let times :=
+	Lambda("m",
+		Lambda("n",
+			Appl(
+				Appl(Var("m"), make_nat(0)),
+				Appl(sum, Var("n"))
+			)
+		)
+	);
+
+	// print_expr(sum);
+	// printf("\n");
+	// print_expr(make_nat(0));
+	// printf("\n");
+	// print_expr(make_nat(1));
+	// printf("\n");
+	// print_expr(make_nat(2));
+	// printf("\n");
+	//
+    
+	// print_expr(make_nat(3));
+    let raw := Appl(Appl(times, make_nat(6)), make_nat(5));
+    let expr := normalize(eval(raw));
+    print_expr(expr);
+	// exit(0);
+	// let fst := Lambda("x", Lambda("y", Var("x")));
+	// let snd := Lambda("x", Lambda("y", Var("y")));
+	// let pair := Lambda("x", Lambda("y", Lambda("f", Appl(Appl(Var("f"), Var("x")), Var("y")))));
+	// let a := (Appl(Appl(pair, Var("x")), Var("y")));
+	// let x := eval (Appl(a, snd));
+	// print_expr(x);
+    printf("\n");
+}
