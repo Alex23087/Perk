@@ -87,7 +87,7 @@ and free_variables_expr (e : expr_a) : perkident list * perkident list =
       | Binop (_, e1, e2) ->
           fst (free_variables_expr e1) @ fst (free_variables_expr e2)
       | PreUnop (_, e1) | PostUnop (_, e1) -> fst (free_variables_expr e1)
-      | Lambda (_, params, body, _) ->
+      | Lambda (_, params, body, _, _) ->
           list_minus (fst (free_variables_command body)) (List.map snd params)
       | Parenthesised e1 -> fst (free_variables_expr e1)
       | Subscript (e1, e2) ->

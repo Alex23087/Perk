@@ -167,13 +167,11 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
           try match_types ~coalesce:true ~array_init typ' expr_type
           with Type_match_error msg -> raise_type_error tldf msg
         in
-        let typ''_nocoal =
+        let _typ''_nocoal =
           try match_types ~coalesce:false ~array_init typ' expr_type
           with Type_match_error _ -> ([], Infer, [])
         in
-        let deftype =
-          if equal_perktype typ'' typ''_nocoal then None else Some typ''
-        in
+        let deftype = Some typ'' in
         (match discard_type_aq typ'' with
         | Lambdatype (params, _, _) ->
             if
@@ -530,6 +528,7 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       if id = "self" then raise_type_error cmd "Identifier self is reserved"
       else
         let typ' = resolve_type typ in
+        let expr = add_lambda_name expr id in
         let expr_res, expr_type = typecheck_expr expr in
         let expr_res, expr_type = fill_nothing expr_res expr_type typ' in
         let expr_type =
@@ -547,13 +546,11 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
           try match_types ~coalesce:true ~array_init typ' expr_type
           with Type_match_error msg -> raise_type_error cmd msg
         in
-        let typ''_nocoal =
+        let _typ''_nocoal =
           try match_types ~coalesce:false ~array_init typ' expr_type
           with Type_match_error _ -> ([], Infer, [])
         in
-        let deftype =
-          if equal_perktype typ'' typ''_nocoal then None else Some typ''
-        in
+        let deftype = Some typ'' in
         (match discard_type_aq typ'' with
         | Lambdatype (params, _, _) ->
             if
@@ -962,8 +959,12 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
         | _, t -> t
       in
       (annot_copy expr (PreUnop (op, expr_res)), res_type)
-  | Lambda (retype, params, body, _) ->
+  | Lambda (retype, params, body, _, lambda_name) ->
       push_symbol_table ();
+      if Option.is_some lambda_name then
+        bind_var (Option.get lambda_name)
+          ([], Lambdatype (List.map fst params, retype, []), []);
+
       List.iter
         (fun (typ, id) ->
           try bind_var id typ
@@ -975,6 +976,12 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       if (not body_returns) && not (is_unit_type retype) then
         raise_type_error expr "Not all code paths return a value";
       let free_vars = fst (free_variables_expr expr) in
+      (* Remove lambda name from the list of free variables (recursion) *)
+      let free_vars =
+        List.filter
+          (fun v -> v <> Option.value lambda_name ~default:"")
+          free_vars
+      in
       let free_vars =
         List.map
           (fun v ->
@@ -1004,7 +1011,8 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       pop_symbol_table ();
       bind_type_if_needed lamtype;
       autocast
-        (annot_copy expr (Lambda (retype, params, body_res, free_vars)))
+        (annot_copy expr
+           (Lambda (retype, params, body_res, free_vars, lambda_name)))
         lamtype expected_return
   | PostUnop (op, e) ->
       let expr_res, expr_type = typecheck_expr e in

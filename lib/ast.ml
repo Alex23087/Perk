@@ -133,7 +133,12 @@ and expr_t =
   | Apply of expr_a * expr_a list * perktype option
   | Binop of binop * expr_a * expr_a
   | PreUnop of preunop * expr_a
-  | Lambda of perktype * perkvardesc list * command_a * perkvardesc list
+  | Lambda of
+      perktype
+      * perkvardesc list
+      * command_a
+      * perkvardesc list
+      * perkident option
   | PostUnop of postunop * expr_a
   | Parenthesised of expr_a
   | Subscript of expr_a * expr_a

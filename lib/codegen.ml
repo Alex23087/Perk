@@ -75,13 +75,19 @@ let rec codegen_functional ~(is_lambda : bool) (e : expr_a) : string =
     let id = fresh_var "lambda" in
     let compiled, (free_variables : perkvardesc list), type_descriptor =
       match ( $ ) e with
-      | Lambda (retype, args, body, free_variables) -> (
+      | Lambda (retype, args, body, free_variables, lambda_name) -> (
           let type_str = codegen_type retype in
           let args_str =
             String.concat ", "
               (List.map
                  (fun (t, id) -> Printf.sprintf "%s %s" (codegen_type t) id)
                  args)
+          in
+          let free_variables =
+            match lambda_name with
+            | None -> free_variables
+            | Some name ->
+                List.filter (fun (_t, id) -> id <> name) free_variables
           in
           match free_variables with
           | [] when static_compilation ->
@@ -98,6 +104,14 @@ let rec codegen_functional ~(is_lambda : bool) (e : expr_a) : string =
                 free_variables,
                 type_descriptor )
           | _ ->
+              (* Generate the self binding *)
+              let self_binding =
+                match lambda_name with
+                | None -> ""
+                | Some name ->
+                    Printf.sprintf "\n    %s* %s = (%s*) __lambdummy;\n"
+                      type_str name type_str
+              in
               (* Generate the string to "unpack" the environment (synthesized declarations of the form var = env.var) *)
               let env_bind_str =
                 if List.length free_variables = 0 then "\n"
@@ -127,8 +141,8 @@ let rec codegen_functional ~(is_lambda : bool) (e : expr_a) : string =
               bind_function_type id lambdatype;
               let type_descriptor = type_descriptor_of_perktype lambdatype in
               (* codegen_lambda_capture e lambdatype; *)
-              ( Printf.sprintf "static %s %s(%s) {%s%s\n}" type_str id args_str
-                  env_bind_str body_str,
+              ( Printf.sprintf "static %s %s(%s) {%s%s%s\n}" type_str id
+                  args_str self_binding env_bind_str body_str,
                 free_variables,
                 type_descriptor )
           (* with Not_inferred s -> raise_type_error e s *))
@@ -293,7 +307,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                          cmd ) ))
             | DefVar (attrs, ((typ, id), expr)) -> (
                 match (typ, ( $ ) expr) with
-                | (_, Funtype (_, _), _), Lambda (_, _, _, _) ->
+                | (_, Funtype (_, _), _), Lambda (_, _, _, _, _) ->
                     raise_type_error expr
                       "impossible: free vars should be empty in funtype"
                 | _ -> annot_copy def (DefVar (attrs, ((typ, id), expr)))))
@@ -836,12 +850,16 @@ and codegen_match_case (case : match_case_a) (c : command_a)
 and codegen_def (t : perkvardesc) (e : expr_a) (deftype : perktype option)
     (indent_string : string) : string =
   let indent_maybe s = if String.length s != 0 then indent_string else "" in
+  let _, id = t in
   let decl_str = codegen_decl t in
   let expr_str, letindefs = codegen_expr_and_letindefs e in
   match deftype with
   | Some (_, Optiontype _, _) ->
       Printf.sprintf "%s%s%s%s = {1, %s};" (indent_maybe letindefs) letindefs
         indent_string decl_str expr_str
+  | Some (_, Lambdatype _, _) ->
+      Printf.sprintf "%s%s%s%s;\n%s%s = %s;" (indent_maybe letindefs) letindefs
+        indent_string decl_str indent_string id expr_str
   | _ ->
       Printf.sprintf "%s%s%s%s = %s;" (indent_maybe letindefs) letindefs
         indent_string decl_str expr_str

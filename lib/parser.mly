@@ -183,8 +183,8 @@ expr:
   | e1 = expr b = binop e2 = expr                                                                          { annotate_2_code !fnm $loc (Ast.Binop (b, e1, e2)) }
   | u = preunop e = expr                                                                                   { annotate_2_code !fnm $loc (Ast.PreUnop (u, e)) }
   | e = expr u = postunop %prec POSTFIX                                                                    { annotate_2_code !fnm $loc (Ast.PostUnop (u, e)) }
-  | LParen id_list = perkvardesc_list RParen Colon ret = perktype LBrace c = command RBrace                { annotate_2_code !fnm $loc (Ast.Lambda (ret, id_list, c, [])) }
-  | LParen RParen Colon ret = perktype LBrace c = command RBrace                                           { annotate_2_code !fnm $loc (Ast.Lambda (ret, [], c, [])) }
+  | LParen id_list = perkvardesc_list RParen Colon ret = perktype LBrace c = command RBrace                { annotate_2_code !fnm $loc (Ast.Lambda (ret, id_list, c, [], None)) }
+  | LParen RParen Colon ret = perktype LBrace c = command RBrace                                           { annotate_2_code !fnm $loc (Ast.Lambda (ret, [], c, [], None)) }
   | b = Boolean                                                                                            { annotate_2_code !fnm $loc (Ast.Bool (b)) }
   | n = Integer                                                                                            { annotate_2_code !fnm $loc (Ast.Int (n)) }
   | f = Float                                                                                              { annotate_2_code !fnm $loc (Ast.Float (f)) }

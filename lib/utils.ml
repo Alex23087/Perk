@@ -143,7 +143,7 @@ and lambda_def_of_func_def_ (def : perkdef) : perkdef =
 (** Tranforms a function definition to a lambda definition *)
 and lambda_of_func (func : perkfundef) : expr_t =
   let typ, _id, args, body = func in
-  Lambda (typ, args, body, [])
+  Lambda (typ, args, body, [], None)
 
 (** Transform a variable or function definition to a declaration. *)
 and decl_of_deforfun (def : deforfun_a) : perktype_attribute list * perkdecl =
@@ -210,3 +210,9 @@ and add_attrs_to_deforfun (attrs : perktype_attribute list) (def : deforfun_a) :
       annot_copy def (DefFun (attrs @ old_attrs, (ret, id, params, body)))
   | DefVar (old_attrs, ((typ, id), expr)) ->
       annot_copy def (DefVar (attrs @ old_attrs, ((typ, id), expr)))
+
+and add_lambda_name (e : expr_a) (name : perkident) : expr_a =
+  match ( $ ) e with
+  | Lambda (typ, params, body, free_vars, _) ->
+      annot_copy e (Lambda (typ, params, body, free_vars, Some name))
+  | _ -> e
