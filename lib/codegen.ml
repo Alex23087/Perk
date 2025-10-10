@@ -691,6 +691,8 @@ and codegen_match_entries (mel : match_entry_a list) (match_var : string)
       perkident * string =
     match ( $ ) entry with
     | MatchCase (case, _when_expr, c) ->
+        (* TODO: Optimisation: cases after Matchall can be deleted *)
+        (* Alternatively, the compiler can issue a warning *)
         let gc, lid =
           codegen_match_case case c match_var add_break goto_label indentation
         in
@@ -751,9 +753,9 @@ and codegen_match_case (case : match_case_a) (c : command_a)
       failwith
         "should not happen: type of match variable has not been inferred!"
   | Matchall ->
-      ( Printf.sprintf "%s{\n%s\n%s}\n" indent_string
+      ( Printf.sprintf "%s{\n%s\n%s    goto %s;\n%s}\n" indent_string
           (codegen_command c (indentation + 1))
-          indent_string,
+          indent_string goto_label indent_string,
         "" )
   | CompoundCase (id, inner_cases) ->
       let rec generate_condition id inner_cases match_var =
