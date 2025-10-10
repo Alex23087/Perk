@@ -19,11 +19,12 @@ let rem_ptr s =
   if len < 4 then failwith "should not happen" else String.sub s 0 (len - 4)
 (* maybe should check the string is "_ptr" *)
 
-let rec is_builtin_type k (typ, code) =
+let is_builtin_type k (typ, code) =
   match typ with
-  | _, Pointertype typ1, _ ->
-      let k = rem_ptr k in
-      is_builtin_type k (typ1, code)
+  | _, Pointertype _typ1, _ ->
+      (* let k = rem_ptr k in
+      is_builtin_type k (typ1, code) *)
+      false
   | _ -> List.mem (k, (typ, code)) builtin_types
 
 let rec is_builtin_type_unlabeled typ =
@@ -296,6 +297,9 @@ let dependencies_of_type (typ : perktype) : perkident list =
 
   (* Auxiliary functions that takes a list as input to avoid circular dependencies *)
   (* The voidize parameters controls whether models have to be erased to void*. This is needed to avoid circular dependencies *)
+  (* Returns:
+  		- List of type descriptors of the dependencies
+		- List of visited types *)
   let rec dependencies_of_type_aux ?(voidize : bool = false) (typ : perktype)
       (lst : perktype list) : perkident list * perktype list =
     let typ = resolve_type typ in
@@ -317,7 +321,11 @@ let dependencies_of_type (typ : perktype) : perkident list =
             let _, typ', _ = typ in
             match typ' with
             | Basetype _ -> ([], typ :: lst)
-            | Pointertype t -> dependencies_of_type_aux ~voidize t (typ :: lst)
+            | Pointertype t ->
+                let deps, visited =
+                  dependencies_of_type_aux ~voidize t (typ :: lst)
+                in
+                (type_descriptor_of_perktype typ :: deps, typ :: visited)
             | Funtype (params, ret) ->
                 let lst = typ :: lst in
                 let params_t, params_l =
@@ -378,7 +386,9 @@ let dependencies_of_type (typ : perktype) : perkident list =
                   List.fold_right
                     (fun (param, _ide) (acc, lst) ->
                       let res_t, res_l =
-                        dependencies_of_type_aux ~voidize param lst
+                        dependencies_of_type_aux ~voidize
+                          (add_parameter_to_func_only void_pointer param)
+                          lst
                       in
                       (res_t @ acc, res_l))
                     decls ([], lst)
@@ -503,7 +513,11 @@ let rec bind_type_if_needed (typ : perktype) =
                 constructors
           | _, ArcheType (_name, _decls), _ ->
               bind_type typ';
-              List.iter (fun (typ, _id) -> bind_type_if_needed typ) _decls
+              List.iter
+                (fun (typ, _id) ->
+                  bind_type_if_needed
+                    (add_parameter_to_func_only void_pointer typ))
+                _decls
           | _, ArchetypeSum _ts, _ ->
               bind_type typ';
               List.iter bind_type_if_needed _ts

@@ -1228,18 +1228,18 @@ and generate_types () =
   List.iter
     (fun (id, (_, _, deps)) ->
       say_here
-        (Printf.sprintf "Type: %s, Dependencies: [%s]\n" id
+        (Printf.sprintf "Type: %s, Dependencies: [%s]" id
            (String.concat ", " deps)))
     !ft_list;
   while List.length !ft_list > 0 do
     (* say_here "generate_types"; *)
     let _id, (_typ, _code, _deps) = List.hd !ft_list in
-    (* if List.length _deps > 0 then *)
-    (* Printf.printf "%s\n"
-       (Printf.sprintf "Warning: Type %s depends on %s, not yet generated\n"
-          (List.hd (List.map fst !ft_list))
-          (List.hd
-             (List.map (fun (_, (_, _, d)) -> String.concat ", " d) !ft_list))); *)
+    if List.length _deps > 0 then
+      say_here
+        (Printf.sprintf "Warning: Type %s depends on %s, not yet generated"
+           (List.hd (List.map fst !ft_list))
+           (List.hd
+              (List.map (fun (_, (_, _, d)) -> String.concat ", " d) !ft_list)));
     let _code = Some (codegen_type_definition _typ) in
     ft_list := List.tl !ft_list;
     (* Remove dzpendency from other elements *)
@@ -1263,7 +1263,7 @@ and codegen_type_definition (t : perktype) : string =
   (* Some types (e.g., Models, Archetypes) will have code already generated *)
   | Some c -> c
   | None -> (
-      say_here (Printf.sprintf "codegen_type_definition: %s\n" key);
+      say_here (Printf.sprintf "codegen_type_definition: %s" key);
       match t with
       | _, Tupletype ts, _ ->
           let type_str = type_descriptor_of_perktype t in
