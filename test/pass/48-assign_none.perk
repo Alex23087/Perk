@@ -1,0 +1,8 @@
+import "stdio.h"
+
+fun main (): void {
+	let x: int? = none;
+	if (!x?) {
+		printf("everything ok\n");
+	}
+}

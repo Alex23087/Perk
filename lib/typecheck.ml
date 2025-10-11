@@ -174,11 +174,13 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
           try match_types ~coalesce:true ~array_init typ' expr_type
           with Type_match_error msg -> raise_type_error tldf msg
         in
-        let _typ''_nocoal =
+        let typ''_nocoal =
           try match_types ~coalesce:false ~array_init typ' expr_type
           with Type_match_error _ -> ([], Infer, [])
         in
-        let deftype = Some typ'' in
+        let deftype =
+          if equal_perktype typ'' typ''_nocoal then None else Some typ''
+        in
         (match discard_type_aq typ'' with
         | Lambdatype (params, _, _) ->
             if
@@ -559,11 +561,13 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
           try match_types ~coalesce:true ~array_init typ' expr_type
           with Type_match_error msg -> raise_type_error cmd msg
         in
-        let _typ''_nocoal =
+        let typ''_nocoal =
           try match_types ~coalesce:false ~array_init typ' expr_type
           with Type_match_error _ -> ([], Infer, [])
         in
-        let deftype = Some typ'' in
+        let deftype =
+          if equal_perktype typ'' typ''_nocoal then None else Some typ''
+        in
         (match discard_type_aq typ'' with
         | Lambdatype (params, _, _) ->
             if
