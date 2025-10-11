@@ -276,7 +276,7 @@ test_fail: build
 		echo "Testing single file: $$FILE"; \
 		BASENAME="$${FILE%.*}"; \
 		CFILE="$${BASENAME}.c"; \
-		RES=$$(_build/default/bin/perkc.exe --static "$$FILE" 2>&1); \
+		RES=$$(_build/default/bin/perkc.exe "$$FILE" 2>&1); \
 		EXIT_CODE=$$?; \
 		rm -f "$$(dirname $$FILE)/a.out" "$$CFILE"; \
 		if [ $$EXIT_CODE -ne 0 ]; then \

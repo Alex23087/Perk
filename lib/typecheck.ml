@@ -59,7 +59,6 @@ let is_numerical (_, typ, _) =
       Basetype "int";
       Basetype "float";
       Basetype "double";
-      Basetype "double";
       Basetype "size_t";
       Basetype "int64_t";
       Basetype "int32_t";
