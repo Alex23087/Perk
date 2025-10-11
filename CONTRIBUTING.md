@@ -24,7 +24,7 @@ We don't have a strict pull request process, but here are some guidelines to fol
 ---
 
 ## Tests
-:warning: All references to the static tests only currently apply to the [`sperkaster-patches`](https://github.com/Alex23087/Perk/tree/sperkaster-patches) branch, and will be merged to `main` in the (near) future. :warning:
+:warning: All references to the static tests only currently apply to the [`devel`](https://github.com/Alex23087/Perk/tree/devel) branch, and will be merged to `main` in the (near) future. :warning:
 
 ### Directory structure
 Our current test setup consists in a number of Perk programs that should test small parts of the language. These programs are located in the `tests/` directory. The structure of this directory is as follows:
