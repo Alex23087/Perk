@@ -14,19 +14,23 @@ type parse_result =
 (** Generates the [tags] file, by first expanding the libraries and merging
     them, and then calling [ctags].*)
 let generate_tags lib_paths =
-  let libs_expanded = Filename.concat (Filename.get_temp_dir_name()) "libs_expanded.h" in
+  let libs_expanded =
+    Filename.concat (Filename.get_temp_dir_name ()) "libs_expanded.h"
+  in
   let status =
     Sys.command
-      (Printf.sprintf "gcc -E -P -dD %s > %s "
-         (String.concat " " lib_paths) libs_expanded)
+      (Printf.sprintf "%s %s -E -P -dD %s > %s " !Utils.c_compiler
+         !Utils.c_flags
+         (String.concat " " lib_paths)
+         libs_expanded)
   in
   if status = 0 then
     let status =
       Sys.command
         (Printf.sprintf "ctags --kinds-C=+p --fields=+Snt %s" libs_expanded)
     in
-    if status = 0 then () else failwith "lib expansion failed"
-  else failwith "lib expansion failed"
+    if status = 0 then () else failwith "lib expansion failed 1"
+  else failwith "lib expansion failed 2"
 
 (** Debug function to print parsed [tags] file*)
 let string_of_parse_result pr =
@@ -144,8 +148,11 @@ let to_ctypes (p : parse_result) : (string * ctype * typed_var list) option =
         let ctype_sig = parse_signature signature in
         let ctype_ret = parse_ret_type ret in
         Some (name, ctype_ret, ctype_sig)
-      with _ -> None)
-  | _ -> failwith ""
+      with _ ->
+        Utils.say_here
+          (Printf.sprintf "Warning: could not parse prototype for %s\n" name);
+        None)
+  | _ -> failwith "Trying to convert non-prototype to ctype"
 
 (** Debug function to print C prototype types. *)
 let string_of_ctypes ((name, ret, signature) : string * ctype * typed_var list)
@@ -185,14 +192,14 @@ let get_type_from_spec_list sl =
   else if len = 0 then solve_specifiers sl
   else failwith "Illegal type - more than one base type"
 
-let remove_tags () =
-  let _ = Sys.command "rm tags" in
-  ()
+let remove_tags () = if not !Utils.verbose then Sys.command "rm tags" |> ignore
 
 let remove_libs_expanded () =
-  let libs_expanded = Filename.concat (Filename.get_temp_dir_name()) "libs_expanded.h" in
-  let _ = Sys.command (Printf.sprintf "rm %s" libs_expanded) in
-  ()
+  let libs_expanded =
+    Filename.concat (Filename.get_temp_dir_name ()) "libs_expanded.h"
+  in
+  if not !Utils.verbose then
+    Sys.command (Printf.sprintf "rm %s" libs_expanded) |> ignore
 
 (** Given a basic C sort, returns the corresponding base type *)
 let perktype_of_sort s : perktype_partial =

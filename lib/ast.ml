@@ -92,6 +92,8 @@ and binop =
   | Neq
   | Land
   | Lor
+  | ShL
+  | ShR
 (*  ... boolean and bitwise ops and all that  *)
 [@@deriving show, eq]
 

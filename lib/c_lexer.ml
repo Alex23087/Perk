@@ -53,7 +53,7 @@ let unescape ch lexbuf =
       in
       raise (Lexing_error (start_pos, end_pos, "Invalid escape character"))
 
-let type_names = ref [ "int"; "char"; "float"; "void" ]
+let type_names = ref [ "int"; "char"; "float"; "void"; "bool" ]
 
 let rec token lexbuf =
   match%sedlex lexbuf with

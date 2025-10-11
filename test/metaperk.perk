@@ -422,6 +422,8 @@ fun execute_computation (stack_vp : void*) : (void* * int){
 fun main () : int {
     let fib : char* = "; ; store 1 0 store 2 1 while < load 3 100 ; ; ; store 3 + load 1 load 2 print load 3 store 1 load 2 store 2 load 3";
 
+    let str : char* = "; store 0 3 while != load 0 0 ; print load 0 store 0 - load 0 1";
+
     let toks := cast (TokenStack, tokenize_string(fib));
 
     printf("Program tokens:\n");

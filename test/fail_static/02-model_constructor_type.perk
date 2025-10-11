@@ -1,0 +1,13 @@
+import "stdio.h"
+import "malloc.h"
+
+model Test {
+    fun constructor(): void {
+        printf("Test constructor\n");
+    }
+}
+
+fun main (): int {
+    let x := summon Test();
+    return 0;
+}

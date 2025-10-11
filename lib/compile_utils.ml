@@ -49,12 +49,18 @@ let ast_of_filename filename =
   in
   let ast = ast_of_channel inchn in
   close_in inchn;
-  Utils.fnm := old_fnm;
+  if old_fnm <> "" then Utils.fnm := old_fnm;
   ast
 
 let rec compile_program ?(dir : string option) ?(dry_run = false)
-    ?(json_format = false) (input_file : string) (output_file : string option) =
+    ?(json_format = false) (static_compilation : bool) (verbose : bool)
+    (input_file : string) (output_file : string option) (c_compiler : string)
+    (c_flags : string) =
   (* let out_ast_file = Filename.chop_suffix input_file ".perk" ^ ".ast" in *)
+  Utils.static_compilation := static_compilation;
+  Utils.verbose := verbose;
+  Utils.c_compiler := c_compiler;
+  Utils.c_flags := c_flags;
   try
     let _ast, compiled = process_file ?dir input_file in
     if not dry_run then (
@@ -183,5 +189,22 @@ and expand_opens (dir : string) (ast : topleveldef_a list) : topleveldef_a list
           (ast_of_filename open_filename)
         @ expand_opens dir rest
       else expand_opens dir rest
+  (* | ({ loc = _; node = Import i } as node) :: rest ->
+      if String.starts_with ~prefix:"\"" i then (
+        let i = String.sub i 1 (String.length i - 2) in
+        let import_filename =
+          if Fpath.is_rel (Fpath.v i) then
+            Fpath.(to_string (normalize (v dir // v i)))
+          else Fpath.(to_string (normalize (v i)))
+        in
+        let did_add = add_import import_filename in
+        if not (Sys.file_exists import_filename) then
+          raise_compilation_error node
+            (Printf.sprintf "File %s does not exist" import_filename);
+        if did_add then
+          let import_filename = "\"" ^ import_filename ^ "\"" in
+          annot_copy node (Import import_filename) :: expand_opens dir rest
+        else expand_opens dir rest)
+      else node :: expand_opens dir rest *)
   | x :: rest -> x :: expand_opens dir rest
   | [] -> []

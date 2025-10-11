@@ -14,6 +14,10 @@ let json_format =
   let doc = "Output errors and warnings in JSON format" in
   Arg.(value & flag & info [ "j"; "json" ] ~doc)
 
+let static_compilation =
+  let doc = "Compile in static mode" in
+  Arg.(value & flag & info [ "s"; "static" ] ~doc)
+
 let verbose =
   let doc = "Enable verbose output" in
   Arg.(value & flag & info [ "v"; "verbose" ] ~doc)
@@ -29,22 +33,34 @@ let dir =
   let doc = "Behave as if the input file were in this directory" in
   Arg.(value & opt (some string) None & info [ "d"; "dir" ] ~docv:"DIR" ~doc)
 
+let c_compiler =
+  let doc = "C compiler to use (default: gcc)" in
+  Arg.(value & opt string "gcc" & info [ "cc"; "c-compiler" ] ~docv:"CC" ~doc)
+
+let c_flags =
+  let doc = "Additional flags to pass to the C compiler" in
+  Arg.(value & opt string "" & info [ "cflags" ] ~docv:"CFLAGS" ~doc)
+
 (* Main command implementation *)
-let perkc_cmd check_only json_format verbose output_file input_file
-    (dir : string option) =
+let perkc_cmd check_only json_format static_compilation verbose output_file
+    input_file (dir : string option) (c_compiler : string) (c_flags : string) =
   if verbose then (
     Printf.printf "Processing file: %s\n" input_file;
+    Printf.printf "Running in %s mode\n"
+      (if static_compilation then "static" else "hosted");
     Perk.Utils.verbose := true);
 
   if check_only then (
     if verbose then Printf.printf "Running syntax and type check only\n";
     ignore
       (compile_program ?dir ?dry_run:(Some check_only)
-         ?json_format:(Some json_format) input_file None);
+         ?json_format:(Some json_format) static_compilation verbose input_file
+         None c_compiler c_flags);
     `Ok ())
   else (
     if verbose then Printf.printf "Compiling to C\n";
-    compile_program ?dir ?json_format:(Some json_format) input_file output_file;
+    compile_program ?dir ?json_format:(Some json_format) static_compilation
+      verbose input_file output_file c_compiler c_flags;
     `Ok ())
 
 (* Command definition *)
@@ -70,7 +86,7 @@ let cmd =
   Cmd.v info
     Term.(
       ret
-        (const perkc_cmd $ check_only $ json_format $ verbose $ output_file
-       $ input_file $ dir))
+        (const perkc_cmd $ check_only $ json_format $ static_compilation
+       $ verbose $ output_file $ input_file $ dir $ c_compiler $ c_flags))
 
 let () = exit (Cmd.eval cmd)
