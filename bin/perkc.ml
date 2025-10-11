@@ -46,6 +46,8 @@ let perkc_cmd check_only json_format static_compilation verbose output_file
     input_file (dir : string option) (c_compiler : string) (c_flags : string) =
   if verbose then (
     Printf.printf "Processing file: %s\n" input_file;
+    Printf.printf "Running in %s mode\n"
+      (if static_compilation then "static" else "hosted");
     Perk.Utils.verbose := true);
 
   if check_only then (

@@ -57,13 +57,13 @@ let rec compile_program ?(dir : string option) ?(dry_run = false)
     (input_file : string) (output_file : string option) (c_compiler : string)
     (c_flags : string) =
   (* let out_ast_file = Filename.chop_suffix input_file ".perk" ^ ".ast" in *)
+  Utils.static_compilation := static_compilation;
+  Utils.verbose := verbose;
+  Utils.c_compiler := c_compiler;
+  Utils.c_flags := c_flags;
   try
     let _ast, compiled = process_file ?dir input_file in
     if not dry_run then (
-      Utils.static_compilation := static_compilation;
-      Utils.verbose := verbose;
-      Utils.c_compiler := c_compiler;
-      Utils.c_flags := c_flags;
       let out_file =
         if Option.is_some output_file then Option.get output_file
         else Filename.chop_suffix input_file ".perk" ^ ".c"
@@ -208,48 +208,3 @@ and expand_opens (dir : string) (ast : topleveldef_a list) : topleveldef_a list
       else node :: expand_opens dir rest *)
   | x :: rest -> x :: expand_opens dir rest
   | [] -> []
-
-and check_file ?dir (static_compilation : bool) (verbose : bool)
-    (filename : string) (c_compiler : string) (c_flags : string) : unit =
-  Utils.static_compilation := static_compilation;
-  Utils.verbose := verbose;
-  Utils.c_compiler := c_compiler;
-  Utils.c_flags := c_flags;
-  try process_file ?dir filename |> ignore with
-  | Syntax_error ((start_line, start_col), (end_line, end_col), input_file, msg)
-    ->
-      Printf.printf
-        "{\"error\": \"syntax\", \"start_line\": %d, \"start_col\": %d, \
-         \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
-         \"%s\"}\n"
-        start_line start_col end_line end_col (String.escaped msg) input_file;
-      exit 0
-  | Lexing_error ((start_line, start_col), (end_line, end_col), input_file, msg)
-    ->
-      Printf.printf
-        "{\"error\": \"lexing\", \"start_line\": %d, \"start_col\": %d, \
-         \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
-         \"%s\"}\n"
-        start_line start_col end_line end_col (String.escaped msg) input_file;
-      exit 0
-  | Type_error ((start_line, start_col), (end_line, end_col), input_file, msg)
-    ->
-      Printf.printf
-        "{\"error\": \"typecheck\", \"start_line\": %d, \"start_col\": %d, \
-         \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
-         \"%s\"}\n"
-        start_line start_col end_line end_col (String.escaped msg) input_file;
-      exit 0
-  | Parser.Error ->
-      Printf.printf
-        "{\"error\": \"parse\", \"message\": \"Unexpected token in file %s\"}\n"
-        !Utils.fnm;
-      exit 0
-  | Compilation_error
-      ((start_line, start_col), (end_line, end_col), input_file, msg) ->
-      Printf.printf
-        "{\"error\": \"compilation\", \"start_line\": %d, \"start_col\": %d, \
-         \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
-         \"%s\"}\n"
-        start_line start_col end_line end_col (String.escaped msg) input_file;
-      exit 0
