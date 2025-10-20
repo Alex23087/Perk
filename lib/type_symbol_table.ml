@@ -378,8 +378,19 @@ let dependencies_of_type (typ : perktype) : perkident list =
                     (res_t @ acc, res_l))
                   ([ type_descriptor_of_perktype typ ], lst)
                   field_types
-            | AlgebraicType (_, _constructors) ->
-                ([ type_descriptor_of_perktype typ ], typ :: lst)
+            | AlgebraicType (_, constructors) ->
+                let field_types =
+                  (List.map (fun (_id, typ) -> typ) constructors) |> List.flatten
+                in
+                let lst = typ :: lst in
+                List.fold_left
+                  (fun (acc, lst) field ->
+                    let res_t, res_l =
+                      dependencies_of_type_aux ~voidize field lst
+                    in
+                    (res_t @ acc, res_l))
+                  ([ type_descriptor_of_perktype typ ], lst)
+                  field_types
             | ArcheType (name, decls) ->
                 let lst = typ :: lst in
                 let decls_t, decls_l =

@@ -1389,10 +1389,14 @@ and typecheck_expr_list (exprs : expr_a list) (types : perktype list) :
 and fill_nothing (expr : expr_a) (exprtyp : perktype) (typ : perktype) :
     expr_a * perktype =
   let expr = autoas expr exprtyp typ in
-  match (( $ ) expr, typ) with
-  | Nothing _, ([], Optiontype _, []) -> (annot_copy expr (Nothing typ), typ)
-  | Nothing _, _ ->
-      raise_type_error expr "Nothing can only be used with Optiontype"
+  match (( $ ) expr, discard_type_aq typ) with
+  | Nothing _, Optiontype _ -> (annot_copy expr (Nothing typ), typ)
+  | Nothing _, Infer ->
+      raise_compilation_error expr "Cannot infer type for Nothing"
+  | Nothing _, t ->
+      raise_type_error expr
+        (Printf.sprintf "Nothing can only be used with Optiontype, not %s"
+           (show_perktype ([], t, [])))
   | _ -> (expr, exprtyp)
 
 (* Add more type checking logic as needed: pepperepeppe     peppè! culo*)
@@ -1414,6 +1418,8 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
     else
       let (_, expected', _), (_, actual', _) = (expected, actual) in
       match (expected', actual') with
+      | _, Infer -> expected
+      | Infer, _ -> actual
       | Basetype t1, Basetype t2 when t1 = t2 -> actual
       | Pointertype t1, Pointertype t2 when t1 = t2 -> actual
       | Funtype (params1, ret1), Funtype (params2, ret2)
@@ -1478,7 +1484,6 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
               (name1, archetypes1, decls_types, constr_types, member_funcs1),
             [] )
       | Vararg, Vararg -> actual
-      | Infer, _ | _, Infer -> actual
       | Optiontype t, Optiontype s -> ([], Optiontype (match_types_aux t s), [])
       | Tupletype t1, Tupletype t2 ->
           ([], Tupletype (List.map2 match_types_aux t1 t2), [])

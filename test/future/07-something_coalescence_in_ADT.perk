@@ -1,0 +1,7 @@
+type Example =
+	| Something (char*?)
+
+fun main(): void {
+	// The following should be coalesced to an option (some "")
+	let e1: Example = Something("");
+}
