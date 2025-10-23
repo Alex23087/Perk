@@ -17,9 +17,16 @@ let generate_tags lib_paths =
   let libs_expanded =
     Filename.concat (Filename.get_temp_dir_name ()) "libs_expanded.h"
   in
+  (* Printf.printf "Running command: %s %s -E -P -dD -w %s > %s \n"
+    !Utils.c_compiler !Utils.c_flags
+    (String.concat " " lib_paths)
+    libs_expanded;
+  flush stdout; *)
+
+  (* suppressed warnings here, otherwise it complains "warning: #pragma once in main file" *)
   let status =
     Sys.command
-      (Printf.sprintf "%s %s -E -P -dD %s > %s " !Utils.c_compiler
+      (Printf.sprintf "%s %s -E -P -dD -w %s > %s " !Utils.c_compiler
          !Utils.c_flags
          (String.concat " " lib_paths)
          libs_expanded)

@@ -1,0 +1,11 @@
+import "stdio.h"
+
+fun <T> sum (a : T, b : T) : T{
+    return a + b;
+}
+
+fun main () : void {
+    printf("%d\n", sum @ int (10, 15));
+    printf("%f\n", sum @ float (3.14159, 2.71828));
+    return;
+}

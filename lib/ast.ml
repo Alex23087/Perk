@@ -132,6 +132,7 @@ and expr_t =
   | Char of char
   | String of string
   | Var of perkident
+  | PolymorphicVar of perkident * perktype
   | Apply of expr_a * expr_a list * perktype option
   | Binop of binop * expr_a * expr_a
   | PreUnop of preunop * expr_a
@@ -193,6 +194,7 @@ and topleveldef_t =
   | Extern of perkident * perktype
   | Def of perkdef * perktype option
   | Fundef of perkfundef
+  | PolymorphicFundef of perkfundef * perktype
   | Archetype of perkident * declorfun_a list
   | Model of perkident * perkident list * deforfun_a list
   | Struct of perkident * perkdef list

@@ -4,6 +4,7 @@ open Ast
 open Errors
 open Utils
 open Type_symbol_table
+open Polymorphism
 
 exception TypeError of string
 
@@ -173,69 +174,70 @@ and bind_function_type (ident : perkident) (typ : perktype) : unit =
 
 (** Transforms a perk program into a string containing the corresponding C
     program. *)
-and codegen_program (tldfs : topleveldef_a list) : string =
-  let s =
-    say_here "codegen_program";
-    filter_var_table ();
-    (* List.iter
+and codegen_program (header_name : string) (prog_is_main : bool)
+    (tldfs : topleveldef_a list) : string * string =
+  say_here "codegen_program";
+  filter_var_table ();
+  (* List.iter
        (fun (id, typ) ->
          Printf.printf "%s: %s\n" id (type_descriptor_of_perktype typ))
        !all_vars; *)
-    let body =
-      String.concat "\n"
-        (List.map
-           (fun tldf ->
-             let code = codegen_topleveldef tldf in
-             if String.length code = 0 then "" else Printf.sprintf "%s\n" code)
-           tldfs)
-      |> String.trim
-    in
+  let body =
+    String.concat "\n"
+      (List.map
+         (fun tldf ->
+           let code = codegen_topleveldef tldf in
+           if String.length code = 0 then "" else Printf.sprintf "%s\n" code)
+         tldfs)
+    |> String.trim
+  in
+
+  let preamble =
+    "#pragma once\n"
     (* Write includes *)
-    (if !Utils.static_compilation then ""
-     else "#include <malloc.h>\n#include <string.h>\n#include <stdbool.h>\n")
+    ^ (if !Utils.static_compilation then ""
+       else "#include <malloc.h>\n#include <string.h>\n#include <stdbool.h>\n")
     ^ String.concat "\n"
         (List.rev
            (List.map (fun lib -> Printf.sprintf "#include %s" lib) !import_list))
-    ^ "\n\n"
-    (* Write macros *)
-    (* ^ "typedef struct env_ {} env_;\n" *)
-    ^ (if !Utils.static_compilation then ""
-       else
-         "typedef struct _lambdummy_type {\n\
+    ^ (if (not !Utils.static_compilation) && not prog_is_main then
+         "\n\n\
+          #ifndef LAMBDUMMY_PERK\n\
+          #define LAMBDUMMY_PERK\n\
+          typedef struct _lambdummy_type {\n\
          \    void *env;\n\
          \    void *func;\n\
           } __lambdummy_type;\n\
-          static __lambdummy_type *__lambdummy;\n\n\
-         \ __lambdummy_type *alloclabmd(int size, void *labmda, void *env)\n\
-          {\n\
-         \    __lambdummy_type *ptr = malloc(sizeof(__lambdummy_type));\n\
-         \    ptr->env = malloc(size);\n\
-         \    memcpy(ptr->env, env, size);\n\
-         \    ptr->func = labmda;\n\
-         \    return ptr;\n\
-          }" ^ "\n\n"
-         ^ "#define CALL_LAMBDA0(l, t) (__lambdummy = (__lambdummy_type *)l, \
-            ((t)(__lambdummy->func))())\n\
-            #define CALL_LAMBDA(l, t, ...) (__lambdummy = (__lambdummy_type \
-            *)l,       ((t)(__lambdummy->func))(__VA_ARGS__))" ^ "\n\n")
-    ^ generate_types () ^ "\n"
+          extern __lambdummy_type *__lambdummy;\n\n\
+          #define CALL_LAMBDA0(l, t) (__lambdummy = (__lambdummy_type *)l, \
+          ((t)(__lambdummy->func))())\n\
+          #define CALL_LAMBDA(l, t, ...) (__lambdummy = (__lambdummy_type \
+          *)l,       ((t)(__lambdummy->func))(__VA_ARGS__))\n\
+          #endif\n"
+       else "")
+    ^ "\n\n" ^ generate_types () ^ "\n"
     ^ Hashtbl.fold
         (fun id typ acc ->
           Printf.sprintf "%s%s;\n" acc (codegen_fundecl id typ))
         fundecl_symbol_table ""
     (* Write program code *)
     ^ "\n"
+  in
+  let compiled_body =
+    Printf.sprintf "#include \"%s\"\n" header_name
     ^ body ^ "\n"
     (* Write lambdas *)
     ^ Hashtbl.fold
         (fun _ v acc -> Printf.sprintf "%s\n%s\n" acc (snd_4 v))
         lambdas_hashmap ""
   in
-  (* Printf.printf "dependenciesoftype called: %d\nused: %d\nunused: %d\n"
+
+  (preamble, compiled_body)
+
+(* Printf.printf "dependenciesoftype called: %d\nused: %d\nunused: %d\n"
        !called_counter !used_counter !unused_counter;
      Printf.printf "resolve_type called: %d\nused: %d\nunused: %d\n" !resolve_count
        !resolve_hit !resolve_miss; *)
-  s
 
 (** Generates code for a top level definition. *)
 and codegen_topleveldef (tldf : topleveldef_a) : string =
@@ -564,6 +566,26 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
       ""
   | InlineC s -> s
   | Fundef (t, id, args, body) -> indent_string ^ codegen_fundef t id args body
+  | PolymorphicFundef ((t_res, id, args, body), t_param) ->
+      if not (Hashtbl.mem polyfun_instances id) then
+        (* there are no instances *)
+        ""
+      else
+        let instances = Hashtbl.find polyfun_instances id in
+        let instanced_funs =
+          List.map
+            (fun t_actual ->
+              Fundef
+                ( subst_type t_res t_param t_actual,
+                  id ^ "perk_polym_" ^ type_descriptor_of_perktype t_actual,
+                  List.map (fun x -> subst_perkvardesc x t_param t_actual) args,
+                  subst_type_command body t_param t_actual ))
+            instances
+        in
+        String.concat "\n\n"
+          (List.map
+             (fun x -> codegen_topleveldef (annot_copy tldf x))
+             instanced_funs)
   | Extern _ -> ""
   (* Externs are only useful for type checking. No need to keep it for codegen step *)
   | Def ((t, e), deftype) ->
@@ -952,6 +974,11 @@ and codegen_expr (e : expr_a) : string =
   | Char c -> Printf.sprintf "'%c'" c
   | String s -> Printf.sprintf "\"%s\"" (String.escaped s)
   | Var id -> id
+  | PolymorphicVar (id, param) ->
+      (* TODO there should be more checks here... *)
+      codegen_expr
+        (Var (id ^ "perk_polym_" ^ type_descriptor_of_perktype param)
+        |> annot_copy e)
   | Apply (e, args, _app_type) -> (
       (* Printf.printf "Applying lambda with type %s\n"
          (match _app_type with

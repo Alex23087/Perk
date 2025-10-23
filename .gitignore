@@ -9,6 +9,7 @@ perf.*
 test/**/*.out
 test/**/*.ast
 test/**/*.c
+test/**/*.h
 
 tools/vscode-extensions/perk-vscode-lsp/node_modules
 tools/vscode-extensions/perk-vscode-lsp/out

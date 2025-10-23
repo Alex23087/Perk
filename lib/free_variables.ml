@@ -81,6 +81,7 @@ and free_variables_expr (e : expr_a) : perkident list * perkident list =
       | Nothing _ | Bool _ | Int _ | Float _ | Char _ | String _ -> []
       | Something (e1, _) -> free_variables_expr e1 |> fst
       | Var id -> [ id ]
+      | PolymorphicVar (id, _) -> [ id ]
       | Apply (e1, el, _) ->
           fst (free_variables_expr e1)
           @ List.flatten (List.map (fun x -> free_variables_expr x |> fst) el)

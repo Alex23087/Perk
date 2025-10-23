@@ -1,0 +1,5 @@
+// THIS TOO MUST PASS!
+
+fun culo () : void {
+    return
+}

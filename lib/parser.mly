@@ -25,7 +25,7 @@
 %token Archetype Model Summon Banish Cast
 %token Struct Make
 %token ADT Pipe Match When Matchall Constr Var BTICK
-%token Nothing Something Of
+%token Nothing Something Of Poly
 
 /* Precedence and associativity specification */
 %left Semicolon
@@ -97,6 +97,7 @@ topleveldef:
   | ADT i = Ident Assign option(Pipe) l = separated_nonempty_list(Pipe, constructor_type)                  { annotate_2_code !fnm $loc (Ast.ADT (i, l)) }   
   | ADT Ident error                                                                                        { raise (ParseError(!fnm, "expected a list of constructors after ADT definition")) }           
   | Fun pf = perkfun                                                                                       { annotate_2_code !fnm $loc (Ast.Fundef (pf)) }
+  | Fun Lt t=perktype Gt pf = perkfun                                                                      { annotate_2_code !fnm $loc (Ast.PolymorphicFundef (pf, t)) }
   | error                                                                                                  { raise (ParseError(!fnm, "top-level definition expected")) }
 
 
@@ -192,6 +193,7 @@ expr:
   | c = Character                                                                                          { annotate_2_code !fnm $loc (Ast.Char (c)) }
   | s = String                                                                                             { annotate_2_code !fnm $loc (Ast.String (s)) }
   | i = Ident                                                                                              { annotate_2_code !fnm $loc (Ast.Var(i)) }
+  | i = Ident Poly t = perktype                                                                            { annotate_2_code !fnm $loc (Ast.PolymorphicVar(i, t)) }
   | LParen e = expr RParen                                                                                 { annotate_2_code !fnm $loc (Ast.Parenthesised e) }
   | e1 = expr LBracket e2 = expr RBracket                                                                  { annotate_2_code !fnm $loc (Ast.Subscript (e1, e2)) }
   | Summon i = Ident LParen l = expr_list RParen                                                           { annotate_2_code !fnm $loc (Summon (i, l)) }

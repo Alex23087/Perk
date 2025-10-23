@@ -8,6 +8,7 @@ open Var_symbol_table
 open Free_variables
 open Parse_tags
 open Parse_lexing_commons
+open Polymorphism
 
 (** List of library functions and their types :
     [(perkident * perktype) list ref]*)
@@ -214,6 +215,12 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
         bind_type_if_needed funtype;
         annot_copy tldf (Fundef (ret_type, id, params, body))
         (* |> ignore; typecheck_deferred_function tldf *))
+  | PolymorphicFundef ((ret_type, id, params, body), type_param) ->
+      (* add the instance to the hasthable -- TODO more thorough typechecking *)
+      let param_types = List.map fst params in
+      Hashtbl.add defined_polyfuns id (param_types, ret_type, type_param);
+      annot_copy tldf
+        (PolymorphicFundef ((ret_type, id, params, body), type_param))
   | Extern (id, typ) ->
       (if id = "self" then raise_type_error tldf "Identifier self is reserved"
        else
@@ -895,6 +902,25 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
               else (expr, t))
       | Some t -> (expr, t)
       | None -> raise_type_error expr ("Unknown identifier: " ^ id))
+  | PolymorphicVar (id, t) ->
+      if not (Hashtbl.mem defined_polyfuns id) then
+        raise_type_error expr ("Unknown polymorphic identifier: " ^ id);
+
+      let current_instances =
+        if Hashtbl.mem polyfun_instances id then
+          Hashtbl.find polyfun_instances id
+        else []
+      in
+      Hashtbl.replace polyfun_instances id (current_instances @ [ t ]);
+
+      let param_types, ret_type, tparam = Hashtbl.find defined_polyfuns id in
+      ( annot_copy expr (PolymorphicVar (id, t)),
+        (* TODO check if it's ok to forget qualifiers here -- if not do right thing *)
+        ( [],
+          Funtype
+            ( List.map (fun x -> subst_type x tparam t) param_types,
+              subst_type ret_type tparam t ),
+          [] ) )
   | Apply (func, params, _) ->
       let fun_expr, fun_type =
         typecheck_expr
