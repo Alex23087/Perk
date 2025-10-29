@@ -11,6 +11,7 @@ let static_compilation : bool ref = ref false
 
 (** Internal flag to enable verbose compilation *)
 let verbose : bool ref = ref false
+
 let c_compiler : string ref = ref "gcc"
 let c_flags : string ref = ref ""
 
@@ -217,3 +218,19 @@ and add_lambda_name (e : expr_a) (name : perkident) : expr_a =
   | Lambda (typ, params, body, free_vars, _) ->
       annot_copy e (Lambda (typ, params, body, free_vars, Some name))
   | _ -> e
+
+let rec mkdir_p path =
+  if Sys.file_exists path then
+    if Sys.is_directory path then ()
+    else failwith (path ^ " exists but is not a directory")
+  else
+    let parent = Filename.dirname path in
+    if parent <> path then mkdir_p parent;
+    Sys.mkdir path 0o755
+
+let create_file_with_dirs path =
+  let dir = Filename.dirname path in
+  mkdir_p dir;
+  let oc = open_out path in
+  (* write something if desired *)
+  close_out oc

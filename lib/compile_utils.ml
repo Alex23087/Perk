@@ -2,12 +2,16 @@ open Ast
 open Codegen
 open Errors (*EWWOWS*)
 open Typecheck
+open File_info
 
 let opens_hashmap : (string, unit) Hashtbl.t = Hashtbl.create 16
 
+(** the directory to which the output will be saved *)
+let target_dir_name = ref ""
+
 let add_import (import : string) : bool =
   let import = Fpath.to_string (Fpath.normalize (Fpath.v import)) in
-  Printf.printf "%s" (Printf.sprintf "Adding import to hashmap: %s\n" import);
+  (* Printf.printf "%s" (Printf.sprintf "Adding import to hashmap: %s\n" import); *)
   if Hashtbl.mem opens_hashmap import then false
   else (
     Hashtbl.add opens_hashmap import ();
@@ -76,30 +80,42 @@ let singletonamble =
 
 let rec compile_program ?(dir : string option) ?(dry_run = false)
     ?(json_format = false) (static_compilation : bool) (verbose : bool)
-    (input_file : string) (output_file : string option) (c_compiler : string)
+    (input_file : string) (output_dir : string option) (c_compiler : string)
     (c_flags : string) =
   (* let out_ast_file = Filename.chop_suffix input_file ".perk" ^ ".ast" in *)
   Utils.static_compilation := static_compilation;
   Utils.verbose := verbose;
   Utils.c_compiler := c_compiler;
   Utils.c_flags := c_flags;
+
+  target_dir_name :=
+    if Option.is_some output_dir then Option.get output_dir else "";
+
   try
     let _ast, (compiled_preamble, compiled_body) =
       process_file ?dir input_file true
     in
     if not dry_run then (
       let out_file_c =
-        if Option.is_some output_file then Option.get output_file
-        else Filename.chop_suffix input_file ".perk" ^ ".c"
+        (* if Option.is_some output_file then Option.get output_file else *)
+        Filename.concat !target_dir_name
+          (Filename.chop_suffix input_file ".perk" ^ ".c")
       in
 
       let out_file_h =
-        if Option.is_some output_file then Option.get output_file
-        else Filename.chop_suffix input_file ".perk" ^ ".h"
+        (* if Option.is_some output_file then Option.get output_file else *)
+        Filename.concat !target_dir_name
+          (Filename.chop_suffix input_file ".perk" ^ ".h")
       in
       let lambdummy_h =
-        Filename.concat (Filename.dirname input_file) "perklang.h"
+        Filename.concat !target_dir_name
+          (Filename.concat (Filename.dirname input_file) "perklang.h")
       in
+
+      Utils.create_file_with_dirs out_file_c;
+      Utils.create_file_with_dirs out_file_h;
+      Utils.create_file_with_dirs lambdummy_h;
+
       (* let oaf = open_out out_ast_file in
     output_string oaf ast; *)
       let oc = open_out out_file_c in
@@ -184,8 +200,56 @@ let rec compile_program ?(dir : string option) ?(dry_run = false)
           start_line start_col msg end_line end_col input_file;
       exit 1
 
+(** Generates the global polyfun definitions that are not local to the current
+    file *)
+and add_polydefs ast =
+  let definitions =
+    List.fold_right
+      (fun (tld, t_actual) acc ->
+        annot_copy tld
+          (match ( $ ) tld with
+          | PolymorphicFundef ((t_res, id, args, body), t_param) ->
+              if not (polyfun_is_already_codegened id t_actual) then (
+                let param_types = List.map fst args in
+                (* the definition is added to the file-local polyfun hashtable *)
+                Hashtbl.add
+                  (File_info.get_file_local_polyfuns ())
+                  id
+                  (param_types, t_res, t_param);
+
+                (* Printf.printf
+                  "function %s<%s> bout to be instantieted in add polydefs\n" id
+                  (show_perktype t_actual); *)
+
+                (* the polyfun instance is set as code-generated so it is not generated again *)
+                set_polyfun_as_codegened id t_actual;
+                Fundef
+                  ( ( Polymorphism.subst_type t_res t_param t_actual,
+                      id ^ "perk_polym_"
+                      ^ Type_symbol_table.type_descriptor_of_perktype t_actual,
+                      List.map
+                        (fun x ->
+                          Polymorphism.subst_perkvardesc x t_param t_actual)
+                        args,
+                      Polymorphism.subst_type_command body t_param t_actual ),
+                    false ))
+              else
+                (* Printf.printf "%s<%s> was already defined\n" id
+                  (show_perktype t_actual); *)
+                TLSkip
+          | _ ->
+              failwith
+                "should not happen - non-polydef was passed to add_polydefs")
+        :: acc)
+      !(get_polyfuns_to_be_defined ())
+      []
+  in
+  definitions @ ast
+
 and process_file ?(dir : string option) (filename : string) (is_main : bool) :
     string * (string * string) =
+  (* creates new file info tables*)
+  set_new_file_info ();
   let filename =
     (* If a directory override is provided, behave as if the file were in that directory *)
     if Option.is_some dir then
@@ -199,9 +263,9 @@ and process_file ?(dir : string option) (filename : string) (is_main : bool) :
   let header_name =
     Filename.chop_suffix (Filename.basename filename_canonical) ".perk" ^ ".h"
   in
-  Printf.printf "%s"
+  (* Printf.printf "%s"
     (Printf.sprintf "Processing file: %s (canonical: %s)\n" filename
-       filename_canonical);
+       filename_canonical); *)
   add_import filename_canonical |> ignore;
   let dirname =
     if dir = None then Filename.dirname filename else Option.get dir
@@ -212,10 +276,20 @@ and process_file ?(dir : string option) (filename : string) (is_main : bool) :
   let ast = opens_to_imports dirname ast in
   let ast = remove_opens ast in
   let ast = typecheck_program ast in
+  let ast = add_polydefs ast in
   let out =
     ( String.concat "\n" (List.map show_topleveldef_a ast),
       ast |> codegen_program header_name is_main )
   in
+  (* Hashtbl.clear Codegen.lambdas_hashmap;
+  Hashtbl.clear Codegen.public_fundecl_symbol_table;
+  Hashtbl.clear Codegen.private_fundecl_symbol_table;
+  import_list := [];
+  (* local polyfuns and polyfun instances are removed - only global polyfuns are preserved *)
+  Hashtbl.clear Polymorphism.polyfun_instances;
+  Hashtbl.clear Polymorphism.file_local_polyfuns;
+  Polymorphism.polyfuns_to_be_defined := []; *)
+
   if old_fnm <> "" then Utils.fnm := old_fnm;
   out
 
@@ -248,12 +322,11 @@ and opens_to_imports (dir : string) (ast : topleveldef_a list) :
     List.map
       (fun (i, n) ->
         Printf.printf "import file: %s, dir: %s, fnm: %s\n" i dir !Utils.fnm;
-
         annot_copy n
-          (* PROBLEM: the file i has path local to the source directory... *)
           (Import
              ("\""
-             ^ (Filename.chop_suffix (remove_dir_from_path i dir) ".perk" ^ ".h")
+             ^ (Filename.chop_suffix (remove_dir_from_path i dir) ".perk"
+               (* *) ^ ".h")
              ^ "\"")))
       import_paths
   in
@@ -281,13 +354,27 @@ and process_opens (dir : string) (ast : topleveldef_a list) :
         raise_compilation_error node
           (Printf.sprintf "File %s does not exist" open_filename);
       if did_add then (
+        let fi = save_file_info () in
         let _ast, (compiled_preamble, compiled_body) =
-          Printf.printf "%s"
-            (Printf.sprintf "Processing open file: %s\n" open_filename);
+          (* Printf.printf "%s"
+            (Printf.sprintf "Processing open file: %s\n" open_filename); *)
           process_file open_filename false
         in
-        let out_file_c = Filename.chop_suffix open_filename ".perk" ^ ".c" in
-        let out_file_h = Filename.chop_suffix open_filename ".perk" ^ ".h" in
+        restore_file_info fi;
+
+        (* TODO makeshift implementation, does not work for nested opens *)
+        let out_file_c =
+          Filename.concat !target_dir_name
+            (Filename.chop_suffix open_filename ".perk" ^ ".c")
+        in
+        let out_file_h =
+          Filename.concat !target_dir_name
+            (Filename.chop_suffix open_filename ".perk" ^ ".h")
+        in
+
+        Utils.create_file_with_dirs out_file_c;
+        Utils.create_file_with_dirs out_file_h;
+
         let oc = open_out out_file_c in
         Printf.printf "%s" (Printf.sprintf "saving file %s\n" out_file_c);
         output_string oc compiled_body;

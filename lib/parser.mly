@@ -96,7 +96,7 @@ topleveldef:
   | Struct Ident LBrace error                                                                              { raise (ParseError(!fnm, "unexpected token in struct definition")) }
   | ADT i = Ident Assign option(Pipe) l = separated_nonempty_list(Pipe, constructor_type)                  { annotate_2_code !fnm $loc (Ast.ADT (i, l)) }   
   | ADT Ident error                                                                                        { raise (ParseError(!fnm, "expected a list of constructors after ADT definition")) }           
-  | Fun pf = perkfun                                                                                       { annotate_2_code !fnm $loc (Ast.Fundef (pf)) }
+  | Fun pf = perkfun                                                                                       { annotate_2_code !fnm $loc (Ast.Fundef (pf, true)) }
   | Fun Lt t=perktype Gt pf = perkfun                                                                      { annotate_2_code !fnm $loc (Ast.PolymorphicFundef (pf, t)) }
   | error                                                                                                  { raise (ParseError(!fnm, "top-level definition expected")) }
 

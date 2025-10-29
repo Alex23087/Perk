@@ -22,12 +22,10 @@ let verbose =
   let doc = "Enable verbose output" in
   Arg.(value & flag & info [ "v"; "verbose" ] ~doc)
 
-let output_file =
-  let doc = "Output file name (default: derived from input file)" in
+let output_dir =
+  let doc = "Output directory name (default: \"\")" in
   Arg.(
-    value
-    & opt (some string) None
-    & info [ "o"; "output" ] ~docv:"OUT_FILE" ~doc)
+    value & opt (some string) None & info [ "o"; "output" ] ~docv:"OUT_DIR" ~doc)
 
 let dir =
   let doc = "Behave as if the input file were in this directory" in
@@ -42,7 +40,7 @@ let c_flags =
   Arg.(value & opt string "" & info [ "cflags" ] ~docv:"CFLAGS" ~doc)
 
 (* Main command implementation *)
-let perkc_cmd check_only json_format static_compilation verbose output_file
+let perkc_cmd check_only json_format static_compilation verbose output_dir
     input_file (dir : string option) (c_compiler : string) (c_flags : string) =
   if verbose then (
     Printf.printf "Processing file: %s\n" input_file;
@@ -60,7 +58,7 @@ let perkc_cmd check_only json_format static_compilation verbose output_file
   else (
     if verbose then Printf.printf "Compiling to C\n";
     compile_program ?dir ?json_format:(Some json_format) static_compilation
-      verbose input_file output_file c_compiler c_flags;
+      verbose input_file output_dir c_compiler c_flags;
     `Ok ())
 
 (* Command definition *)
@@ -87,6 +85,6 @@ let cmd =
     Term.(
       ret
         (const perkc_cmd $ check_only $ json_format $ static_compilation
-       $ verbose $ output_file $ input_file $ dir $ c_compiler $ c_flags))
+       $ verbose $ output_dir $ input_file $ dir $ c_compiler $ c_flags))
 
 let () = exit (Cmd.eval cmd)

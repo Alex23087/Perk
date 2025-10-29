@@ -193,12 +193,13 @@ and topleveldef_t =
   | Open of string
   | Extern of perkident * perktype
   | Def of perkdef * perktype option
-  | Fundef of perkfundef
+  | Fundef of perkfundef * bool  (** fundef, is public?*)
   | PolymorphicFundef of perkfundef * perktype
   | Archetype of perkident * declorfun_a list
   | Model of perkident * perkident list * deforfun_a list
   | Struct of perkident * perkdef list
   | ADT of perkident * (perkident * perktype list) list
+  | TLSkip
 
 and deforfun_t =
   | DefVar of perktype_attribute list * perkdef

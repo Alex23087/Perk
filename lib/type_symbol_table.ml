@@ -32,14 +32,17 @@ let rec is_builtin_type_unlabeled typ =
   | _, Pointertype typ1, _ -> is_builtin_type_unlabeled typ1
   | _ -> List.mem typ builtin_types_unlabeled
 
-let type_symbol_table : (perkident, perktype * string option) Hashtbl.t =
-  let tbl = Hashtbl.create 10 in
-  List.iter (fun (id, t) -> Hashtbl.add tbl id t) builtin_types;
+let type_symbol_table :
+    (perkident, (perktype * string option) * string) Hashtbl.t =
+  let tbl : (perkident, (perktype * string option) * string) Hashtbl.t =
+    Hashtbl.create 10
+  in
+  List.iter (fun (id, t) -> Hashtbl.add tbl id (t, "")) builtin_types;
   tbl
 
 let lookup_type (id : perkident) : perktype option =
   if Hashtbl.mem type_symbol_table id then
-    let t, _code = Hashtbl.find type_symbol_table id in
+    let (t, _code), _from = Hashtbl.find type_symbol_table id in
     Some t
   else None
 
@@ -254,7 +257,8 @@ and type_descriptor_of_environment ?(erase_env = false)
 let print_type_symbol_table () =
   Printf.printf "Type Symbol Table:\n";
   Hashtbl.iter
-    (fun id (typ, _code) -> Printf.printf "%s: %s,\n\n" id (show_perktype typ))
+    (fun id ((typ, _code), _from) ->
+      Printf.printf "%s: %s,\n\n" id (show_perktype typ))
     type_symbol_table
 
 (* Binds a type in the symble table. NOT Throws an exception if the name has already been defined *)
@@ -262,7 +266,7 @@ let bind_type (t : perktype) =
   say_here (Printf.sprintf "bind_type: %s" (show_perktype t));
   let id = type_descriptor_of_perktype t in
   (* if not (Hashtbl.mem type_symbol_table id) then *)
-  Hashtbl.add type_symbol_table id (t, None)
+  Hashtbl.add type_symbol_table id ((t, None), !Utils.fnm)
 (* else
     match t with
     | _, Basetype _, _
@@ -283,7 +287,7 @@ let bind_type (t : perktype) =
 (* Replaces a type in the symbol table. Throws an exception if the name is not bound. Used by typecheck_deferred_function to replace temporary function types *)
 let rebind_type (id : perkident) (t : perktype) =
   if Hashtbl.mem type_symbol_table id then
-    Hashtbl.replace type_symbol_table id (t, None)
+    Hashtbl.replace type_symbol_table id ((t, None), !Utils.fnm)
   else raise (Undeclared ("Type not found in symbol table: " ^ id))
 
 let used_counter, unused_counter, called_counter = (ref 0, ref 0, ref 0)
@@ -380,7 +384,7 @@ let dependencies_of_type (typ : perktype) : perkident list =
                   field_types
             | AlgebraicType (_, constructors) ->
                 let field_types =
-                  (List.map (fun (_id, typ) -> typ) constructors) |> List.flatten
+                  List.map (fun (_id, typ) -> typ) constructors |> List.flatten
                 in
                 let lst = typ :: lst in
                 List.fold_left
@@ -552,5 +556,5 @@ let rec bind_type_if_needed (typ : perktype) =
 let add_code_to_type_binding (_typ : perktype) (code : string) : unit =
   bind_type_if_needed _typ;
   let key = type_descriptor_of_perktype _typ in
-  let _t, _code = Hashtbl.find type_symbol_table key in
-  Hashtbl.replace type_symbol_table key (_t, Some code)
+  let (_t, _code), from = Hashtbl.find type_symbol_table key in
+  Hashtbl.replace type_symbol_table key ((_t, Some code), from)

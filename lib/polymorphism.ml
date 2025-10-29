@@ -1,18 +1,55 @@
 open Ast
 
-(** maps polyfun ids to their signature and type parameter*)
-let defined_polyfuns : (string, perktype list * perktype * perktype) Hashtbl.t =
-  Hashtbl.create 10
+(** Polyfuns that were EVER defined (in any file) -- maps polyfun ids to their
+    signature and type parameter*)
+let global_polyfuns : (string, topleveldef_a) Hashtbl.t = Hashtbl.create 10
 
-(** maps polyfun ids to their instances*)
-let polyfun_instances : (string, perktype list) Hashtbl.t = Hashtbl.create 10
-
-let subst_perkvardesc ((pt, piden) : perkvardesc) (placeholder : perktype)
+let rec subst_perkvardesc ((pt, piden) : perkvardesc) (placeholder : perktype)
     (actual : perktype) =
-  let subst_maybe t = if t = placeholder then actual else t in
+  let subst_maybe t = subst_type t placeholder actual in
   (subst_maybe pt, piden)
 
-let rec subst_perkdef (pvd, e) (placeholder : perktype) (actual : perktype) :
+and subst_type (t : perktype) (placeholder : perktype) (actual : perktype) =
+  let base_subst t = if t = placeholder then actual else t in
+  let subst_pvd t = subst_perkvardesc t placeholder actual in
+  let subst_e e = subst_type_expr e placeholder actual in
+  let subst_def (pvd, e) = (subst_pvd pvd, subst_e e) in
+  match t with
+  | _, Basetype _, _ -> base_subst t
+  | a, Funtype (tl, t), b ->
+      (a, Funtype (List.map base_subst tl, base_subst t), b)
+  | a, Lambdatype (tl, t, pvl), b ->
+      ( a,
+        Lambdatype (List.map base_subst tl, base_subst t, List.map subst_pvd pvl),
+        b )
+  | a, Pointertype t, b -> (a, Pointertype (base_subst t), b)
+  | a, Arraytype (t, io), b -> (a, Arraytype (base_subst t, io), b)
+  | a, Structtype (s, defl), b -> (a, Structtype (s, List.map subst_def defl), b)
+  | a, ArcheType (id, decll), b ->
+      (a, ArcheType (id, List.map subst_pvd decll), b)
+  | a, Modeltype (id, idl, attr_and_decl_list, tl, idl1), b ->
+      ( a,
+        Modeltype
+          ( id,
+            idl,
+            List.map (fun (a, d) -> (a, subst_pvd d)) attr_and_decl_list,
+            List.map base_subst tl,
+            idl1 ),
+        b )
+  | a, AlgebraicType (id, id_and_tl_list), b ->
+      ( a,
+        AlgebraicType
+          ( id,
+            List.map
+              (fun (id, tl) -> (id, List.map base_subst tl))
+              id_and_tl_list ),
+        b )
+  | a, Optiontype t, b -> (a, Optiontype (base_subst t), b)
+  | a, Tupletype tl, b -> (a, Tupletype (List.map base_subst tl), b)
+  | a, ArchetypeSum tl, b -> (a, ArchetypeSum (List.map base_subst tl), b)
+  | _, Vararg, _ | _, Infer, _ -> t
+
+and subst_perkdef (pvd, e) (placeholder : perktype) (actual : perktype) :
     perkdef =
   ( subst_perkvardesc pvd placeholder actual,
     subst_type_expr e placeholder actual )
@@ -27,7 +64,7 @@ and subst_mel (MatchCase (mc, eo, c)) (placeholder : perktype)
 and subst_mc (mc : match_case_a) (placeholder : perktype) (actual : perktype) :
     match_case_a =
   let subst_e = fun x -> subst_type_expr x placeholder actual in
-  let subst_maybe t = if t = placeholder then actual else t in
+  let subst_maybe t = subst_type t placeholder actual in
   annot_copy mc
     (match ( $ ) mc with
     | Matchall -> Matchall
@@ -38,7 +75,7 @@ and subst_mc (mc : match_case_a) (placeholder : perktype) (actual : perktype) :
 
 and subst_type_expr (e : expr_a) (placeholder : perktype) (actual : perktype) =
   let subst_e = fun x -> subst_type_expr x placeholder actual in
-  let subst_maybe t = if t = placeholder then actual else t in
+  let subst_maybe t = subst_type t placeholder actual in
   let subst_pvd pvd = subst_perkvardesc pvd placeholder placeholder in
   annot_copy e
     (match ( $ ) e with
@@ -79,7 +116,7 @@ and subst_type_command (c : command_a) (placeholder : perktype)
     (actual : perktype) =
   let subst_e = fun x -> subst_type_expr x placeholder actual in
   let subst_c = fun x -> subst_type_command x placeholder actual in
-  let subst_maybe t = if t = placeholder then actual else t in
+  let subst_maybe t = subst_type t placeholder actual in
   let subst_def d = subst_perkdef d placeholder actual in
   annot_copy c
     (match ( $ ) c with
@@ -103,5 +140,3 @@ and subst_type_command (c : command_a) (placeholder : perktype)
         Switch (subst_e e1, List.map (fun (e, c) -> (subst_e e, subst_c c)) ecl)
     | Return eo -> Return (Option.map subst_e eo)
     | Match (e1, mel, t) -> Match (subst_e e1, mel, Option.map subst_maybe t))
-
-let subst_type t placeholder actual = if t = placeholder then actual else t

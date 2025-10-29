@@ -108,7 +108,7 @@ let rec typecheck_program (ast : topleveldef_a list) : topleveldef_a list =
 (** Typechecks functions after everything else *)
 and typecheck_deferred_function (tldf : topleveldef_a) : topleveldef_a =
   match ( $ ) tldf with
-  | Fundef (ret_type, id, params, body) ->
+  | Fundef ((ret_type, id, params, body), public) ->
       push_symbol_table ();
       List.iter
         (fun (typ, id) ->
@@ -121,17 +121,19 @@ and typecheck_deferred_function (tldf : topleveldef_a) : topleveldef_a =
       if (not body_returns) && not (is_unit_type ret_type) then
         raise_type_error tldf "Not all code paths return a value";
       pop_symbol_table ();
+      (* TODO: add public/private to qualifiers *)
       let funtype =
         ([], Funtype (List.map (fun (typ, _) -> typ) params, ret_type), [])
       in
       rebind_var id funtype;
       rebind_type (type_descriptor_of_perktype funtype) funtype;
-      annot_copy tldf (Fundef (ret_type, id, params, body_res))
+      annot_copy tldf (Fundef ((ret_type, id, params, body_res), public))
   | _ -> tldf
 
 (** Typechecks toplevel definitions *)
 and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
   match ( $ ) tldf with
+  | TLSkip -> annot_copy tldf TLSkip
   | Import s ->
       import_path_list := get_lib_path s :: !import_path_list;
       generate_tags !import_path_list;
@@ -197,7 +199,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
         bind_type_if_needed typ'';
         bind_var id typ'';
         annot_copy tldf (Def (((typ'', id), expr_res), deftype))
-  | Fundef (ret_type, id, params, body) ->
+  | Fundef ((ret_type, id, params, body), public) ->
       if id = "self" then raise_type_error tldf "Identifier self is reserved"
       else (
         if
@@ -208,17 +210,25 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
               | _ -> false)
             params
         then raise_type_error tldf "Cannot have void parameters in a function";
+        (* TODO add private / public to qualifiers *)
         let funtype =
           ([], Funtype (List.map (fun (typ, _) -> typ) params, ret_type), [])
         in
         bind_var id funtype;
         bind_type_if_needed funtype;
-        annot_copy tldf (Fundef (ret_type, id, params, body))
+        annot_copy tldf (Fundef ((ret_type, id, params, body), public))
         (* |> ignore; typecheck_deferred_function tldf *))
   | PolymorphicFundef ((ret_type, id, params, body), type_param) ->
-      (* add the instance to the hasthable -- TODO more thorough typechecking *)
       let param_types = List.map fst params in
-      Hashtbl.add defined_polyfuns id (param_types, ret_type, type_param);
+      (* the definition is added to the file-local polyfun hashtable, to allow it to be instantiated in this file *)
+      Hashtbl.add
+        (File_info.get_file_local_polyfuns ())
+        id
+        (param_types, ret_type, type_param);
+      (* the definition is added to the global polyfun hashtable, to allow it to be instantiated in other files *)
+      Hashtbl.add global_polyfuns id
+        (PolymorphicFundef ((ret_type, id, params, body), type_param)
+        |> annot_copy tldf);
       annot_copy tldf
         (PolymorphicFundef ((ret_type, id, params, body), type_param))
   | Extern (id, typ) ->
@@ -903,17 +913,35 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       | Some t -> (expr, t)
       | None -> raise_type_error expr ("Unknown identifier: " ^ id))
   | PolymorphicVar (id, t) ->
-      if not (Hashtbl.mem defined_polyfuns id) then
+      if not (Hashtbl.mem global_polyfuns id) then
         raise_type_error expr ("Unknown polymorphic identifier: " ^ id);
 
-      let current_instances =
-        if Hashtbl.mem polyfun_instances id then
-          Hashtbl.find polyfun_instances id
-        else []
-      in
-      Hashtbl.replace polyfun_instances id (current_instances @ [ t ]);
+      if not (Hashtbl.mem (File_info.get_file_local_polyfuns ()) id) then (
+        (* if the polyfun is defined globally but not locally, add it to a "to be defined" list *)
+        (* Printf.printf "adding definition of %s instantiated on %s to tbd\n" id
+          (show_perktype t); *)
+        let def = Hashtbl.find global_polyfuns id in
+        File_info.get_polyfuns_to_be_defined ()
+        := (def, t) :: !(File_info.get_polyfuns_to_be_defined ());
+        let current_instances =
+          if Hashtbl.mem (File_info.get_polyfun_instances ()) id then
+            Hashtbl.find (File_info.get_polyfun_instances ()) id
+          else []
+        in
+        Hashtbl.replace
+          (File_info.get_polyfun_instances ())
+          id
+          (current_instances @ [ (t, false) ]));
 
-      let param_types, ret_type, tparam = Hashtbl.find defined_polyfuns id in
+      let def = Hashtbl.find global_polyfuns id in
+
+      let param_types, ret_type, tparam =
+        match ( $ ) def with
+        | PolymorphicFundef ((t_res, _id, args, _body), t_param) ->
+            (List.map fst args, t_res, t_param)
+        | _ -> failwith "scass tutt cos"
+      in
+
       ( annot_copy expr (PolymorphicVar (id, t)),
         (* TODO check if it's ok to forget qualifiers here -- if not do right thing *)
         ( [],

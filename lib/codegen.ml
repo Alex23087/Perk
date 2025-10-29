@@ -24,18 +24,6 @@ let fresh_var (s : string) : string =
   fresh_var_counter := v + 1;
   Printf.sprintf "__perk_%s_%d" s v
 
-(** table of lambdas: Lambda expression, identifier, generated code, capture
-    list, type_descriptor*)
-let lambdas_hashmap : (expr_a, string * string * string list * string) Hashtbl.t
-    =
-  Hashtbl.create 10
-
-(** Symbol table of function declarations *)
-let fundecl_symbol_table : (perkident, perktype) Hashtbl.t = Hashtbl.create 10
-
-(** list of imported libraries *)
-let import_list : string list ref = ref []
-
 (** hashtable of archetypes*)
 let archetype_hashtable : (string, (string, perktype) Hashtbl.t) Hashtbl.t =
   Hashtbl.create 10
@@ -60,7 +48,9 @@ let add_binding_to_archetype (name : string) (id : perkident) (typ : perktype) :
 
 (** Adds an import to the import list *)
 let add_import (lib : string) : unit =
-  if not (List.mem lib !import_list) then import_list := lib :: !import_list
+  (* Printf.printf "added import %s\n" lib; *)
+  if not (List.mem lib !(File_info.get_import_list ())) then
+    File_info.get_import_list () := lib :: !(File_info.get_import_list ())
 
 let lambda_environments : (string * string) list ref = ref []
 let lambda_typedefs : string list ref = ref []
@@ -71,7 +61,7 @@ let generated_freevars = ref ""
 
 (** codegens a function or a lambda *)
 let rec codegen_functional ~(is_lambda : bool) (e : expr_a) : string =
-  try fst_4 (Hashtbl.find lambdas_hashmap e)
+  try fst_4 (Hashtbl.find (File_info.get_lambdas_hashmap ()) e)
   with Not_found -> (
     let id = fresh_var "lambda" in
     let compiled, (free_variables : perkvardesc list), type_descriptor =
@@ -149,7 +139,9 @@ let rec codegen_functional ~(is_lambda : bool) (e : expr_a) : string =
           (* with Not_inferred s -> raise_type_error e s *))
       | _ -> failwith "get_lambda: not a lambda expression"
     in
-    Hashtbl.add lambdas_hashmap e
+    Hashtbl.add
+      (File_info.get_lambdas_hashmap ())
+      e
       (id, compiled, List.map snd free_variables, type_descriptor);
     match free_variables with
     | [] when !static_compilation || not is_lambda -> id
@@ -166,11 +158,18 @@ let rec codegen_functional ~(is_lambda : bool) (e : expr_a) : string =
    type_descriptor id) *)
 
 (** Binds a function type to the [fundecl_symbol_table]. *)
-and bind_function_type (ident : perkident) (typ : perktype) : unit =
+and bind_function_type ?(public : bool = true) (ident : perkident)
+    (typ : perktype) : unit =
+  (* Printf.printf "function %s is %s\n" ident
+    (if public then "public" else "private"); *)
+  let symtab =
+    if public then File_info.get_public_fundecl_symbol_table ()
+    else File_info.get_private_fundecl_symbol_table ()
+  in
   try
-    let _ = Hashtbl.find fundecl_symbol_table ident in
+    let _ = Hashtbl.find symtab ident in
     ()
-  with Not_found -> Hashtbl.add fundecl_symbol_table ident typ
+  with Not_found -> Hashtbl.add symtab ident typ
 
 (** Transforms a perk program into a string containing the corresponding C
     program. *)
@@ -199,7 +198,9 @@ and codegen_program (header_name : string) (prog_is_main : bool)
        else "#include <malloc.h>\n#include <string.h>\n#include <stdbool.h>\n")
     ^ String.concat "\n"
         (List.rev
-           (List.map (fun lib -> Printf.sprintf "#include %s" lib) !import_list))
+           (List.map
+              (fun lib -> Printf.sprintf "#include %s" lib)
+              !(File_info.get_import_list ())))
     ^ (if (not !Utils.static_compilation) && not prog_is_main then
          "\n\n\
           #ifndef LAMBDUMMY_PERK\n\
@@ -215,21 +216,30 @@ and codegen_program (header_name : string) (prog_is_main : bool)
           *)l,       ((t)(__lambdummy->func))(__VA_ARGS__))\n\
           #endif\n"
        else "")
-    ^ "\n\n" ^ generate_types () ^ "\n"
+    ^ "\n\n" ^ generate_types () ^ "\n" ^ "// public function declarations:\n"
     ^ Hashtbl.fold
         (fun id typ acc ->
           Printf.sprintf "%s%s;\n" acc (codegen_fundecl id typ))
-        fundecl_symbol_table ""
+        (File_info.get_public_fundecl_symbol_table ())
+        ""
     (* Write program code *)
     ^ "\n"
   in
   let compiled_body =
     Printf.sprintf "#include \"%s\"\n" header_name
-    ^ body ^ "\n"
+    ^ "// private function declarations:\n"
+    ^ Hashtbl.fold
+        (fun id typ acc ->
+          Printf.sprintf "%s%s;\n" acc (codegen_fundecl id typ))
+        (File_info.get_private_fundecl_symbol_table ())
+        ""
+    ^ "// body:\n" ^ body ^ "\n"
     (* Write lambdas *)
+    ^ "// lambdas:\n"
     ^ Hashtbl.fold
         (fun _ v acc -> Printf.sprintf "%s\n%s\n" acc (snd_4 v))
-        lambdas_hashmap ""
+        (File_info.get_lambdas_hashmap ())
+        ""
   in
 
   (preamble, compiled_body)
@@ -245,6 +255,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
   say_here (Printf.sprintf "codegen_topleveldef: %s" (show_topleveldef_a tldf));
   let indent_string = "" in
   match ( $ ) tldf with
+  | TLSkip -> ""
   | Archetype (i, l) ->
       let _ = add_archetype i in
       (* Remove discrimination between function declarations and
@@ -529,7 +540,9 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
         (fun (c, (t : perktype list)) ->
           bind_function_type c ([], Funtype (t, adt_type), []);
 
-          Hashtbl.add lambdas_hashmap (annotate_dummy (Int 1))
+          Hashtbl.add
+            (File_info.get_lambdas_hashmap ())
+            (annotate_dummy (Int 1))
             ( c,
               (match t with
               | [] ->
@@ -565,27 +578,44 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
         constructors;
       ""
   | InlineC s -> s
-  | Fundef (t, id, args, body) -> indent_string ^ codegen_fundef t id args body
+  | Fundef ((t, id, args, body), public) ->
+      indent_string ^ codegen_fundef ~public t id args body
   | PolymorphicFundef ((t_res, id, args, body), t_param) ->
-      if not (Hashtbl.mem polyfun_instances id) then
+      if not (Hashtbl.mem (File_info.get_polyfun_instances ()) id) then
+        (* let _ = Printf.printf "THERE ARE NO INSTANCES of %s\n" id in *)
         (* there are no instances *)
         ""
       else
-        let instances = Hashtbl.find polyfun_instances id in
+        let instances = Hashtbl.find (File_info.get_polyfun_instances ()) id in
         let instanced_funs =
           List.map
-            (fun t_actual ->
-              Fundef
-                ( subst_type t_res t_param t_actual,
-                  id ^ "perk_polym_" ^ type_descriptor_of_perktype t_actual,
-                  List.map (fun x -> subst_perkvardesc x t_param t_actual) args,
-                  subst_type_command body t_param t_actual ))
+            (fun (t_actual, was_instantiated) ->
+              if was_instantiated then
+                (* Printf.printf "function %s<%s> was already instantiated\n" id
+                  (show_perktype t_actual); *)
+                None
+              else
+                (* let _ =
+                  Printf.printf
+                    "function %s<%s> was not instantiated, now it is\n" id
+                    (show_perktype t_actual)
+                in *)
+                Some
+                  (Fundef
+                     ( ( subst_type t_res t_param t_actual,
+                         id ^ "perk_polym_"
+                         ^ type_descriptor_of_perktype t_actual,
+                         List.map
+                           (fun x -> subst_perkvardesc x t_param t_actual)
+                           args,
+                         subst_type_command body t_param t_actual ),
+                       false )))
             instances
         in
         String.concat "\n\n"
           (List.map
              (fun x -> codegen_topleveldef (annot_copy tldf x))
-             instanced_funs)
+             (List.filter Option.is_some instanced_funs |> List.map Option.get))
   | Extern _ -> ""
   (* Externs are only useful for type checking. No need to keep it for codegen step *)
   | Def ((t, e), deftype) ->
@@ -895,8 +925,8 @@ and codegen_decl (t : perkvardesc) : string =
   Printf.sprintf "%s %s" type_str id
 
 (** Generates code for perk function definitions. *)
-and codegen_fundef (t : perktype) (id : perkident) (args : perkvardesc list)
-    (body : command_a) : string =
+and codegen_fundef ?(public : bool = true) (t : perktype) (id : perkident)
+    (args : perkvardesc list) (body : command_a) : string =
   let type_str = codegen_type t in
   let args_str =
     String.concat ", "
@@ -907,7 +937,7 @@ and codegen_fundef (t : perktype) (id : perkident) (args : perkvardesc list)
   in
   let body_str = codegen_command body 1 in
   let funtype = ([], Funtype (List.map (fun (t, _) -> t) args, t), []) in
-  bind_function_type id funtype;
+  bind_function_type ~public id funtype;
   Printf.sprintf "%s %s(%s) {\n%s\n}" type_str id args_str body_str
 
 (**transforms a perktype into a C type *)
@@ -976,9 +1006,28 @@ and codegen_expr (e : expr_a) : string =
   | Var id -> id
   | PolymorphicVar (id, param) ->
       (* TODO there should be more checks here... *)
-      codegen_expr
-        (Var (id ^ "perk_polym_" ^ type_descriptor_of_perktype param)
-        |> annot_copy e)
+
+      (* check if the monomorphized function was ever defined (even in another file) *)
+      if Hashtbl.mem global_polyfuns id then
+        let instances =
+          try Hashtbl.find (File_info.get_polyfun_instances ()) id
+          with Not_found ->
+            failwith
+              "instance list of globally defined polyfun was not found, this \
+               should not happen"
+        in
+        (* Printf.printf "Instance of %s found\n" id; *)
+        if List.mem param (List.map fst instances) then
+          codegen_expr
+            (Var (id ^ "perk_polym_" ^ type_descriptor_of_perktype param)
+            |> annot_copy e)
+        else
+          failwith
+            "corresponding polymorphic instance should have been defined by \
+             typechecker"
+      else
+        raise_compilation_error e
+          (Printf.sprintf "polymorphic variable %s was not found" id)
   | Apply (e, args, _app_type) -> (
       (* Printf.printf "Applying lambda with type %s\n"
          (match _app_type with
@@ -1263,8 +1312,8 @@ and generate_types () =
   let ft_list =
     ref
       (Hashtbl.fold
-         (fun k (typ, code) acc ->
-           if is_builtin_type k (typ, code) then acc
+         (fun k ((typ, code), from) acc ->
+           if is_builtin_type k (typ, code) || from != !Utils.fnm then acc
            else (
              out := !out ^ generate_forward_declaration typ;
              (k, (typ, code, dependencies_of_type typ)) :: acc))
@@ -1308,7 +1357,7 @@ and generate_types () =
 (** Generates code for type definitions. *)
 and codegen_type_definition (t : perktype) : string =
   let key = type_descriptor_of_perktype t in
-  let _t, _code = Hashtbl.find type_symbol_table key in
+  let (_t, _code), _from = Hashtbl.find type_symbol_table key in
   match _code with
   (* Some types (e.g., Models, Archetypes) will have code already generated *)
   | Some c -> c
@@ -1328,7 +1377,12 @@ and codegen_type_definition (t : perktype) : string =
                  ^ ";")
               type_str
           in
-          Hashtbl.replace type_symbol_table key (_t, Some compiled);
+          let (_, _), from =
+            if Hashtbl.mem type_symbol_table key then
+              Hashtbl.find type_symbol_table key
+            else failwith "should not happen?"
+          in
+          Hashtbl.replace type_symbol_table key ((_t, Some compiled), from);
           compiled
       | _, Optiontype u, _ ->
           let u = resolve_type u in
@@ -1343,7 +1397,12 @@ and codegen_type_definition (t : perktype) : string =
               | _ -> type_descriptor_of_perktype u)
               key
           in
-          Hashtbl.replace type_symbol_table key (_t, Some compiled);
+          let (_, _), from =
+            if Hashtbl.mem type_symbol_table key then
+              Hashtbl.find type_symbol_table key
+            else failwith "should not happen?"
+          in
+          Hashtbl.replace type_symbol_table key ((_t, Some compiled), from);
           compiled
       | _, Funtype (args, ret), _ ->
           let type_str = type_descriptor_of_perktype t in
@@ -1355,7 +1414,12 @@ and codegen_type_definition (t : perktype) : string =
                   (List.map (fun t -> codegen_type t ~expand:true) args)
               ^ ");")
           in
-          Hashtbl.replace type_symbol_table key (t, Some typedef_str);
+          let (_, _), from =
+            if Hashtbl.mem type_symbol_table key then
+              Hashtbl.find type_symbol_table key
+            else failwith "should not happen?"
+          in
+          Hashtbl.replace type_symbol_table key ((t, Some typedef_str), from);
           (* Hashtbl.add function_type_hashmap t (type_str, typedef_str, expanded_str); *)
           typedef_str
       | _, Pointertype t, _ ->
@@ -1377,7 +1441,12 @@ and codegen_type_definition (t : perktype) : string =
               (type_descriptor_of_perktype t)
               (type_descriptor_of_perktype t)
           in
-          Hashtbl.replace type_symbol_table key (_t, Some compiled);
+          let (_, _), from =
+            if Hashtbl.mem type_symbol_table key then
+              Hashtbl.find type_symbol_table key
+            else failwith "should not happen?"
+          in
+          Hashtbl.replace type_symbol_table key ((_t, Some compiled), from);
           compiled
       | _, Arraytype (at, n), _ ->
           let compiled =
@@ -1388,7 +1457,12 @@ and codegen_type_definition (t : perktype) : string =
             | None ->
                 Printf.sprintf "typedef %s %s[];" (c_type_of_perktype at) key
           in
-          Hashtbl.replace type_symbol_table key (_t, Some compiled);
+          let (_, _), from =
+            if Hashtbl.mem type_symbol_table key then
+              Hashtbl.find type_symbol_table key
+            else failwith "should not happen?"
+          in
+          Hashtbl.replace type_symbol_table key ((_t, Some compiled), from);
           compiled
       | _, Lambdatype _, _ -> codegen_lambda_capture t
       | _ ->
