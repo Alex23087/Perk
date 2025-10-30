@@ -6,9 +6,6 @@ open File_info
 
 let opens_hashmap : (string, unit) Hashtbl.t = Hashtbl.create 16
 
-(** the directory to which the output will be saved *)
-let target_dir_name = ref ""
-
 let add_import (import : string) : bool =
   let import = Fpath.to_string (Fpath.normalize (Fpath.v import)) in
   (* Printf.printf "%s" (Printf.sprintf "Adding import to hashmap: %s\n" import); *)
@@ -88,7 +85,7 @@ let rec compile_program ?(dir : string option) ?(dry_run = false)
   Utils.c_compiler := c_compiler;
   Utils.c_flags := c_flags;
 
-  target_dir_name :=
+  Utils.target_dir_name :=
     if Option.is_some output_dir then Option.get output_dir else "";
 
   try
@@ -98,17 +95,17 @@ let rec compile_program ?(dir : string option) ?(dry_run = false)
     if not dry_run then (
       let out_file_c =
         (* if Option.is_some output_file then Option.get output_file else *)
-        Filename.concat !target_dir_name
+        Filename.concat !Utils.target_dir_name
           (Filename.chop_suffix input_file ".perk" ^ ".c")
       in
 
       let out_file_h =
         (* if Option.is_some output_file then Option.get output_file else *)
-        Filename.concat !target_dir_name
+        Filename.concat !Utils.target_dir_name
           (Filename.chop_suffix input_file ".perk" ^ ".h")
       in
       let lambdummy_h =
-        Filename.concat !target_dir_name
+        Filename.concat !Utils.target_dir_name
           (Filename.concat (Filename.dirname input_file) "perklang.h")
       in
 
@@ -259,6 +256,14 @@ and process_file ?(dir : string option) (filename : string) (is_main : bool) :
   let filename_canonical =
     Fpath.to_string (Fpath.normalize (Fpath.v filename))
   in
+  let dirname =
+    if dir = None then Filename.dirname filename else Option.get dir
+  in
+
+  if not (!Utils.target_dir_name = "") then
+    Utils.copy_non_perk_files dirname
+      (Filename.concat !Utils.target_dir_name dirname);
+
   (* Get base name here because generated .h is in the same directory as the .c *)
   let header_name =
     Filename.chop_suffix (Filename.basename filename_canonical) ".perk" ^ ".h"
@@ -267,9 +272,7 @@ and process_file ?(dir : string option) (filename : string) (is_main : bool) :
     (Printf.sprintf "Processing file: %s (canonical: %s)\n" filename
        filename_canonical); *)
   add_import filename_canonical |> ignore;
-  let dirname =
-    if dir = None then Filename.dirname filename else Option.get dir
-  in
+
   let old_fnm = !Utils.fnm in
   Utils.fnm := filename;
   let ast = ast_of_filename filename in
@@ -295,39 +298,14 @@ and process_file ?(dir : string option) (filename : string) (is_main : bool) :
 
 and opens_to_imports (dir : string) (ast : topleveldef_a list) :
     topleveldef_a list =
-  (* this is pretty fucking stupid -- does not work with .. *)
-  (* let rec remove_dir_from_path path dir =
-    let aux path dir =
-      let parts = String.split_on_char '/' path in
-      match parts with
-      | [] -> path
-      | first :: rest -> if first = dir then String.concat "/" rest else path
-    in
-    (* Printf.printf "remove %s from %s\n" dir path; *)
-    let path =
-      if String.starts_with ~prefix:"./" path then
-        remove_dir_from_path (aux path ".") "."
-      else path
-    in
-    let dir =
-      if String.starts_with ~prefix:"./" dir then
-        remove_dir_from_path (aux dir ".") "."
-      else dir
-    in
-    aux path dir
-  in *)
-  let remove_dir_from_path i _dir = i in
   let import_paths = process_opens dir ast in
   let imports =
     List.map
       (fun (i, n) ->
-        Printf.printf "import file: %s, dir: %s, fnm: %s\n" i dir !Utils.fnm;
+        (* Printf.printf "import file: %s, dir: %s, fnm: %s, adj: %s\n" i dir
+          !Utils.fnm i; *)
         annot_copy n
-          (Import
-             ("\""
-             ^ (Filename.chop_suffix (remove_dir_from_path i dir) ".perk"
-               (* *) ^ ".h")
-             ^ "\"")))
+          (Import ("\"" ^ (Filename.chop_suffix i ".perk" (* *) ^ ".h") ^ "\"")))
       import_paths
   in
   imports @ ast
@@ -364,11 +342,11 @@ and process_opens (dir : string) (ast : topleveldef_a list) :
 
         (* TODO makeshift implementation, does not work for nested opens *)
         let out_file_c =
-          Filename.concat !target_dir_name
+          Filename.concat !Utils.target_dir_name
             (Filename.chop_suffix open_filename ".perk" ^ ".c")
         in
         let out_file_h =
-          Filename.concat !target_dir_name
+          Filename.concat !Utils.target_dir_name
             (Filename.chop_suffix open_filename ".perk" ^ ".h")
         in
 
@@ -376,11 +354,11 @@ and process_opens (dir : string) (ast : topleveldef_a list) :
         Utils.create_file_with_dirs out_file_h;
 
         let oc = open_out out_file_c in
-        Printf.printf "%s" (Printf.sprintf "saving file %s\n" out_file_c);
+        (* Printf.printf "%s" (Printf.sprintf "saving file %s\n" out_file_c); *)
         output_string oc compiled_body;
         close_out oc;
         let oc = open_out out_file_h in
-        Printf.printf "%s" (Printf.sprintf "saving file %s\n" out_file_h);
+        (* Printf.printf "%s" (Printf.sprintf "saving file %s\n" out_file_h); *)
         output_string oc compiled_preamble;
         close_out oc;
         [ (i, node) ] @ process_opens dir rest)

@@ -219,6 +219,7 @@ and add_lambda_name (e : expr_a) (name : perkident) : expr_a =
       annot_copy e (Lambda (typ, params, body, free_vars, Some name))
   | _ -> e
 
+(** creates a directory along with all the directories along a path *)
 let rec mkdir_p path =
   if Sys.file_exists path then
     if Sys.is_directory path then ()
@@ -234,3 +235,38 @@ let create_file_with_dirs path =
   let oc = open_out path in
   (* write something if desired *)
   close_out oc
+
+(** the directory to which the output will be saved *)
+let target_dir_name = ref ""
+
+let copy_file src dst =
+  mkdir_p (Filename.dirname dst);
+  (* Printf.printf "copying file %s %s\n" src dst; *)
+  let buffer_size = 4096 in
+  let buffer = Bytes.create buffer_size in
+  let ic = open_in_bin src in
+  let oc = open_out_bin dst in
+  let rec loop () =
+    match input ic buffer 0 buffer_size with
+    | 0 -> ()
+    | n ->
+        output oc buffer 0 n;
+        loop ()
+  in
+  loop ();
+  close_in ic;
+  close_out oc
+
+(** copies all non source files to a target directory *)
+let copy_non_perk_files src_dir dst_dir =
+  let files = Sys.readdir src_dir in
+  Array.iter
+    (fun file ->
+      let src_path = Filename.concat src_dir file in
+      let dst_path = Filename.concat dst_dir file in
+      (* Skip directories -- TODO: SKIPNT *)
+      if not (Sys.is_directory src_path) then
+        (* Skip .perk files *)
+        if not (Filename.check_suffix file ".perk") then
+          copy_file src_path dst_path)
+    files

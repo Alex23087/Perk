@@ -14,6 +14,20 @@ type parse_result =
 (** Generates the [tags] file, by first expanding the libraries and merging
     them, and then calling [ctags].*)
 let generate_tags lib_paths =
+  let lib_paths =
+    List.map
+      (fun x ->
+        if not (Filename.is_relative x) then x
+        else
+          let _adjusted_import_path =
+            if not (!Utils.target_dir_name = "") then
+              Filename.concat !Utils.target_dir_name x
+            else x
+          in
+          _adjusted_import_path)
+      lib_paths
+  in
+
   let libs_expanded =
     Filename.concat (Filename.get_temp_dir_name ()) "libs_expanded.h"
   in

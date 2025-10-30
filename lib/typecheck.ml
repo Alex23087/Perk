@@ -831,7 +831,7 @@ and typecheck_match_case (match_type : perktype) case =
       annot_copy case (MatchVar (x, Some match_type))
   | MatchExpr e -> (
       let e1, t = typecheck_expr e in
-      Printf.printf "MatchExpr type: %s\n" (show_perktype t);
+      (* Printf.printf "MatchExpr type: %s\n" (show_perktype t); *)
       if not (is_equatable_type t) then
         raise_type_error case
           (Printf.sprintf "Expression in case has non-equatable type %s"
