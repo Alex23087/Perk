@@ -1,5 +1,18 @@
 open Ast
 
+(** bounds for generic types -- add more *)
+type bound = Numeric_Bound [@@deriving show]
+
+type generic_type = {
+  bounds : bound list;
+  inferred_type : perktype option;
+}
+[@@deriving show]
+(** type of generic types *)
+
+(** Hash table of currently generic types, their bounds and inferred exact type*)
+let generic_types_table : (perktype, generic_type) Hashtbl.t = Hashtbl.create 10
+
 type file_info = {
   lambdas_hashmap : (expr_a, string * string * string list * string) Hashtbl.t;
       (** table of lambdas: Lambda expression, identifier, generated code,
@@ -11,6 +24,7 @@ type file_info = {
       (** id -> (type, was_codegen'd) list *)
   file_local_polyfuns : (string, perktype list * perktype * perktype) Hashtbl.t;
   polyfuns_to_be_defined : (topleveldef_a * perktype) list ref;
+  polyfun_bounds : (string, generic_type) Hashtbl.t;
 }
 
 let allocate_file_info () =
@@ -23,6 +37,7 @@ let allocate_file_info () =
       polyfun_instances = Hashtbl.create 10;
       file_local_polyfuns = Hashtbl.create 10;
       polyfuns_to_be_defined = ref [];
+      polyfun_bounds = Hashtbl.create 10;
     }
 
 let current_file_info = allocate_file_info ()
@@ -43,29 +58,7 @@ let get_import_list () = !current_file_info.import_list
 let get_polyfun_instances () = !current_file_info.polyfun_instances
 let get_file_local_polyfuns () = !current_file_info.file_local_polyfuns
 let get_polyfuns_to_be_defined () = !current_file_info.polyfuns_to_be_defined
-
-(* Setters *)
-let set_lambdas_hashmap v =
-  current_file_info := { !current_file_info with lambdas_hashmap = v }
-
-let set_fundecl_symbol_table v =
-  current_file_info :=
-    { !current_file_info with public_fundecl_symbol_table = v }
-
-let set_private_fundecl_symbol_table fi v =
-  fi := { !current_file_info with private_fundecl_symbol_table = v }
-
-let set_import_list v =
-  current_file_info := { !current_file_info with import_list = v }
-
-let set_polyfun_instances v =
-  current_file_info := { !current_file_info with polyfun_instances = v }
-
-let set_file_local_polyfuns v =
-  current_file_info := { !current_file_info with file_local_polyfuns = v }
-
-let set_polyfuns_to_be_defined v =
-  current_file_info := { !current_file_info with polyfuns_to_be_defined = v }
+let get_polyfun_bounds () = !current_file_info.polyfun_bounds
 
 let set_polyfun_as_codegened id t =
   let remove_first x lst =

@@ -220,16 +220,20 @@ and add_polydefs ast =
 
                 (* the polyfun instance is set as code-generated so it is not generated again *)
                 set_polyfun_as_codegened id t_actual;
-                Fundef
-                  ( ( Polymorphism.subst_type t_res t_param t_actual,
-                      id ^ "perk_polym_"
-                      ^ Type_symbol_table.type_descriptor_of_perktype t_actual,
-                      List.map
-                        (fun x ->
-                          Polymorphism.subst_perkvardesc x t_param t_actual)
-                        args,
-                      Polymorphism.subst_type_command body t_param t_actual ),
-                    false ))
+                let x =
+                  Fundef
+                    ( ( Polymorphism.subst_type t_res t_param t_actual,
+                        id ^ "perk_polym_"
+                        ^ Type_symbol_table.type_descriptor_of_perktype t_actual,
+                        List.map
+                          (fun x ->
+                            Polymorphism.subst_perkvardesc x t_param t_actual)
+                          args,
+                        Polymorphism.subst_type_command body t_param t_actual ),
+                      false )
+                in
+                let t = typecheck_topleveldef (annot_copy tld x) in
+                ( $ ) t)
               else
                 (* Printf.printf "%s<%s> was already defined\n" id
                   (show_perktype t_actual); *)
@@ -242,6 +246,40 @@ and add_polydefs ast =
       []
   in
   definitions @ ast
+
+(** for each polydef, typedefs all of its instances. TODO check if this is
+    necessary *)
+and check_polydefs_pass (ast : topleveldef_a list) =
+  List.map
+    (fun tld ->
+      match ( $ ) tld with
+      | PolymorphicFundef ((t_res, id, args, body), t_param) ->
+          let instances =
+            try Hashtbl.find (File_info.get_polyfun_instances ()) id
+            with Not_found -> []
+          in
+
+          List.map
+            (fun (t_actual, _) ->
+              let fundef =
+                Fundef
+                  ( ( Polymorphism.subst_type t_res t_param t_actual,
+                      id ^ "perk_polym_"
+                      ^ Type_symbol_table.type_descriptor_of_perktype t_actual,
+                      List.map
+                        (fun x ->
+                          Polymorphism.subst_perkvardesc x t_param t_actual)
+                        args,
+                      Polymorphism.subst_type_command body t_param t_actual ),
+                    false )
+              in
+              let t = typecheck_topleveldef (annot_copy tld fundef) in
+              t)
+            instances
+          |> ignore
+      | _ -> ())
+    ast
+  |> ignore
 
 and process_file ?(dir : string option) (filename : string) (is_main : bool) :
     string * (string * string) =
@@ -280,6 +318,7 @@ and process_file ?(dir : string option) (filename : string) (is_main : bool) :
   let ast = remove_opens ast in
   let ast = typecheck_program ast in
   let ast = add_polydefs ast in
+  check_polydefs_pass ast;
   let out =
     ( String.concat "\n" (List.map show_topleveldef_a ast),
       ast |> codegen_program header_name is_main )

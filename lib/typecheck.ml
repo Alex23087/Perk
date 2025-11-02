@@ -9,6 +9,7 @@ open Free_variables
 open Parse_tags
 open Parse_lexing_commons
 open Polymorphism
+open File_info
 
 (** List of library functions and their types :
     [(perkident * perktype) list ref]*)
@@ -54,7 +55,7 @@ let is_integral (_, typ, _) =
   List.mem typ nums
 
 (** check if type is numerical *)
-let is_numerical (_, typ, _) =
+let rec is_numerical ((_, typ, _) as t) =
   let nums =
     [
       Basetype "int";
@@ -72,13 +73,55 @@ let is_numerical (_, typ, _) =
       Basetype "char";
     ]
   in
-  List.mem typ nums
+  List.mem typ nums || is_generic_numeric t
+
+(** a generic type is numerical if either
+    - its inferred type is empty and a numeric bound is present
+    - its inferred type is non-etmpy and is numeric *)
+and is_generic_numeric t =
+  if Hashtbl.mem generic_types_table t then
+    let g = Hashtbl.find generic_types_table t in
+    (List.mem Numeric_Bound g.bounds && Option.is_none g.inferred_type)
+    ||
+    if Option.is_some g.inferred_type then
+      is_numerical (Option.get g.inferred_type)
+    else false
+  else false
+
+(** a generic type is non-numerical only when its inferred type is non numerical
+*)
+and is_generic_non_numeric t =
+  if Hashtbl.mem generic_types_table t then
+    let g = Hashtbl.find generic_types_table t in
+    if Option.is_some g.inferred_type then
+      not (is_numerical (Option.get g.inferred_type))
+    else false
+  else false
+
+(** Adds a numeric bound to a generic type. The second argument is an annotated
+    whatever, used for error localization. *)
+and add_numeric_bound t annotated_thing =
+  if not (Hashtbl.mem generic_types_table t) then
+    raise_type_error annotated_thing
+      (Printf.sprintf "%s is not a generic type" (show_perktype t));
+
+  if is_generic_non_numeric t then
+    raise_type_error annotated_thing
+      (Printf.sprintf
+         "tried to impose numerical bound on non-numerical generic type %s"
+         (show_perktype t));
+
+  let g = Hashtbl.find generic_types_table t in
+
+  if not (List.mem Numeric_Bound g.bounds) then
+    Hashtbl.replace generic_types_table t
+      { g with bounds = Numeric_Bound :: g.bounds }
 
 (* TODO: This ranking cannot be done with a total order, signed and unsigned are not comparable *)
 
 (** provides an integer ranking of numerical types: higher values are most
     general types *)
-let numerical_rank : perktype -> int = function
+let rec numerical_rank : perktype -> int = function
   | _, Basetype "double", _ -> 12
   | _, Basetype "float", _ -> 11
   | _, Basetype "int64_t", _ -> 10
@@ -93,6 +136,14 @@ let numerical_rank : perktype -> int = function
   | _, Basetype "char", _ ->
       2 (* char's signedness is implementation dependent *)
   | _, Basetype "uint8_t", _ -> 1
+  | t when Hashtbl.mem generic_types_table t ->
+      let g = Hashtbl.find generic_types_table t in
+      if Option.is_none g.inferred_type && List.mem Numeric_Bound g.bounds then
+        (* an unspecified numerical type has precedence above all specified ones *)
+        max_int
+      else if Option.is_some g.inferred_type then
+        numerical_rank (Option.get g.inferred_type)
+      else 0
   | _ -> 0 (* non‐numeric or unknown *)
 
 (** typechecks a set of toplevel definitions, instancing the inferred types *)
@@ -219,6 +270,31 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
         annot_copy tldf (Fundef ((ret_type, id, params, body), public))
         (* |> ignore; typecheck_deferred_function tldf *))
   | PolymorphicFundef ((ret_type, id, params, body), type_param) ->
+      (* add the type parameter to the hashtable, setting empty bounds and inferred type*)
+      Hashtbl.add generic_types_table type_param
+        { bounds = []; inferred_type = None };
+
+      (* typecheck the body *)
+      push_symbol_table ();
+      List.iter
+        (fun (typ, id) ->
+          try bind_var id typ
+          with Double_declaration msg -> raise_type_error tldf msg)
+        params;
+      let body_res, _body_type, body_returns =
+        typecheck_command ~retype:(Some ret_type) body
+      in
+      if (not body_returns) && not (is_unit_type ret_type) then
+        raise_type_error tldf "Not all code paths return a value";
+      pop_symbol_table ();
+
+      (* add the generic type (bounds and inferred type) to the polyfun_bounds hashtable *)
+      let param_gen_type = Hashtbl.find generic_types_table type_param in
+      Hashtbl.add (get_polyfun_bounds ()) id param_gen_type;
+      (* remove the type parameter from the hashtable *)
+      Hashtbl.remove generic_types_table type_param;
+      unbind_generic_types ();
+
       let param_types = List.map fst params in
       (* the definition is added to the file-local polyfun hashtable, to allow it to be instantiated in this file *)
       Hashtbl.add
@@ -227,10 +303,10 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
         (param_types, ret_type, type_param);
       (* the definition is added to the global polyfun hashtable, to allow it to be instantiated in other files *)
       Hashtbl.add global_polyfuns id
-        (PolymorphicFundef ((ret_type, id, params, body), type_param)
+        (PolymorphicFundef ((ret_type, id, params, body_res), type_param)
         |> annot_copy tldf);
       annot_copy tldf
-        (PolymorphicFundef ((ret_type, id, params, body), type_param))
+        (PolymorphicFundef ((ret_type, id, params, body_res), type_param))
   | Extern (id, typ) ->
       (if id = "self" then raise_type_error tldf "Identifier self is reserved"
        else
@@ -916,22 +992,43 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       if not (Hashtbl.mem global_polyfuns id) then
         raise_type_error expr ("Unknown polymorphic identifier: " ^ id);
 
-      if not (Hashtbl.mem (File_info.get_file_local_polyfuns ()) id) then (
-        (* if the polyfun is defined globally but not locally, add it to a "to be defined" list *)
-        (* Printf.printf "adding definition of %s instantiated on %s to tbd\n" id
+      (if Hashtbl.mem (get_polyfun_bounds ()) id then
+         let g = Hashtbl.find (get_polyfun_bounds ()) id in
+         if Option.is_some g.inferred_type then
+           if not (t = Option.get g.inferred_type) then
+             raise_type_error expr
+               (Printf.sprintf
+                  "Type parameter of %s was inferred to be %s: type %s is \
+                   incompatible"
+                  id
+                  (show_perktype (Option.get g.inferred_type))
+                  (show_perktype t))
+           else if List.mem Numeric_Bound g.bounds then
+             if not (t = Option.get g.inferred_type) then
+               raise_type_error expr
+                 (Printf.sprintf
+                    "Type parameter of %s was inferred to be numerical: type \
+                     %s is not"
+                    id (show_perktype t)));
+
+      (if not (Hashtbl.mem (File_info.get_file_local_polyfuns ()) id) then
+         (* if the polyfun is defined globally but not locally, add it to a "to be defined" list *)
+         (* Printf.printf "adding definition of %s instantiated on %s to tbd\n" id
           (show_perktype t); *)
-        let def = Hashtbl.find global_polyfuns id in
-        File_info.get_polyfuns_to_be_defined ()
-        := (def, t) :: !(File_info.get_polyfuns_to_be_defined ());
-        let current_instances =
-          if Hashtbl.mem (File_info.get_polyfun_instances ()) id then
-            Hashtbl.find (File_info.get_polyfun_instances ()) id
-          else []
-        in
-        Hashtbl.replace
-          (File_info.get_polyfun_instances ())
-          id
-          (current_instances @ [ (t, false) ]));
+         let def = Hashtbl.find global_polyfuns id in
+         File_info.get_polyfuns_to_be_defined ()
+         := (def, t) :: !(File_info.get_polyfuns_to_be_defined ()));
+
+      (* update the instance list *)
+      let current_instances =
+        if Hashtbl.mem (File_info.get_polyfun_instances ()) id then
+          Hashtbl.find (File_info.get_polyfun_instances ()) id
+        else []
+      in
+      Hashtbl.replace
+        (File_info.get_polyfun_instances ())
+        id
+        (current_instances @ [ (t, false) ]);
 
       let def = Hashtbl.find global_polyfuns id in
 
@@ -939,7 +1036,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
         match ( $ ) def with
         | PolymorphicFundef ((t_res, _id, args, _body), t_param) ->
             (List.map fst args, t_res, t_param)
-        | _ -> failwith "scass tutt cos"
+        | _ -> failwith "Should not happen: definition is not a polyfundef"
       in
 
       ( annot_copy expr (PolymorphicVar (id, t)),
@@ -998,8 +1095,20 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           let lhs_res, lhs_type = typecheck_expr lhs in
           let rhs_res, rhs_type = typecheck_expr rhs in
           let lhs_res, lhs_type, rhs_res, rhs_type =
+            (* if one or both types are generic and compatible with numerical type, add the numerical constraint *)
+            if
+              Hashtbl.mem generic_types_table lhs_type
+              && not (is_generic_non_numeric lhs_type)
+            then add_numeric_bound lhs_type expr;
+            if
+              Hashtbl.mem generic_types_table lhs_type
+              && not (is_generic_non_numeric lhs_type)
+            then add_numeric_bound lhs_type expr;
+
+            (* check if both are numerical and choose a winner for casting *)
             if is_numerical lhs_type && is_numerical rhs_type then
               let winner_type = cast_priority lhs_type rhs_type in
+              (* Printf.printf "the winner is: %s\n" (show_perktype winner_type); *)
               ( annot_copy lhs_res (Cast ((lhs_type, winner_type), lhs_res)),
                 winner_type,
                 annot_copy rhs_res (Cast ((rhs_type, winner_type), rhs_res)),
@@ -1457,11 +1566,16 @@ and fill_nothing (expr : expr_a) (exprtyp : perktype) (typ : perktype) :
 
 (* Add more type checking logic as needed: pepperepeppe     peppè! culo*)
 
+and check_type_constraint_for_inference g candidate_inferred =
+  if List.mem Numeric_Bound g.bounds then is_numerical candidate_inferred
+  else true
+
 (** Checks if two types are the same or not. *)
 and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
     (expected : perktype) (actual : perktype) : perktype =
   let expected = resolve_type expected in
   let actual = resolve_type actual in
+
   let rec match_types_aux expected actual =
     (* This catches the case where one type has not been bound yet and thus results as a basetype *)
     let equal =
@@ -1472,12 +1586,65 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
     in
     if equal then actual
     else
-      let (_, expected', _), (_, actual', _) = (expected, actual) in
+      let (_, expected', _), (act_attr, actual', act_qual) =
+        (expected, actual)
+      in
       match (expected', actual') with
       | _, Infer -> expected
       | Infer, _ -> actual
       | Basetype t1, Basetype t2 when t1 = t2 -> actual
-      | Pointertype t1, Pointertype t2 when t1 = t2 -> actual
+      | _, Basetype _ ->
+          (* Printf.printf "actual: %s, expected: %s\n" (show_perktype actual)
+            (show_perktype expected); *)
+
+          (* let _ =
+            if Hashtbl.mem generic_types_table expected then
+              let g = Hashtbl.find generic_types_table expected in
+              Printf.printf "%s\n" (show_generic_type g)
+          in *)
+
+          (* Case: the actual type is a basetype that is != expected *)
+          let new_actual =
+            if Hashtbl.mem generic_types_table actual then
+              let g = Hashtbl.find generic_types_table actual in
+              if
+                Option.is_none g.inferred_type
+                && check_type_constraint_for_inference g expected
+              then (
+                Hashtbl.replace generic_types_table actual
+                  { g with inferred_type = Some expected };
+                expected)
+              else Option.get g.inferred_type
+            else actual
+          in
+
+          (* and what if the expected type is a generic type? E.g. in an assignment *)
+          let new_expected =
+            if Hashtbl.mem generic_types_table expected then
+              let g = Hashtbl.find generic_types_table expected in
+              if
+                Option.is_none g.inferred_type
+                && check_type_constraint_for_inference g actual
+              then (
+                Hashtbl.replace generic_types_table expected
+                  { g with inferred_type = Some actual };
+                actual)
+              else Option.get g.inferred_type
+            else expected
+          in
+          (* Printf.printf "new actual: %s, new expected: %s\n"
+            (show_perktype new_actual)
+            (show_perktype new_expected); *)
+          if (not (actual = new_actual)) || not (expected = new_expected) then
+            match_types_aux new_expected new_actual
+          else
+            raise
+              (Type_match_error
+                 (Printf.sprintf "Type mismatch 1: expected %s,\ngot %s instead"
+                    (Codegen.codegen_type ~expand:true expected)
+                    (Codegen.codegen_type ~expand:true actual)))
+      | Pointertype t1, Pointertype t2 ->
+          (act_attr, Pointertype (match_types_aux t1 t2), act_qual)
       | Funtype (params1, ret1), Funtype (params2, ret2)
         when List.length params1 = List.length params2 ->
           let param_types = List.map2 match_types_aux params1 params2 in
@@ -1488,8 +1655,8 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
           let t = match_types_aux t1 t2 in
           ([], Arraytype (t, n2), [])
       | Arraytype (t1, Some n1), Arraytype (t2, Some n2)
-        when t1 = t2 && array_init && n1 >= n2 ->
-          ([], Arraytype (t1, Some n1), [])
+        when array_init && n1 >= n2 ->
+          ([], Arraytype (match_types_aux t1 t2, Some n1), [])
       | Structtype (t1, _), Structtype (t2, _) when t1 = t2 ->
           actual (* TODO: Needs deeper matching *)
       | ArcheType (name1, decls1), ArcheType (name2, decls2)
@@ -1555,7 +1722,7 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
           with Type_match_error _ | Type_error _ ->
             raise
               (Type_match_error
-                 (Printf.sprintf "Type mismatch: expected %s,\ngot %s instead"
+                 (Printf.sprintf "Type mismatch 2: expected %s,\ngot %s instead"
                     (Codegen.codegen_type ~expand:true expected)
                     (Codegen.codegen_type ~expand:true actual))))
       | ArchetypeSum t1, Modeltype (_, archetypes, _, _, _) -> (
@@ -1573,7 +1740,7 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
           with Type_match_error _ | Type_error _ ->
             raise
               (Type_match_error
-                 (Printf.sprintf "Type mismatch: expected %s,\ngot %s instead"
+                 (Printf.sprintf "Type mismatch 3: expected %s,\ngot %s instead"
                     (Codegen.codegen_type ~expand:true expected)
                     (Codegen.codegen_type ~expand:true actual))))
       | Lambdatype (params1, ret1, _), Funtype (params2, ret2) ->
@@ -1588,7 +1755,7 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
       | _ ->
           raise
             (Type_match_error
-               (Printf.sprintf "Type mismatch: expected %s,\ngot %s instead"
+               (Printf.sprintf "Type mismatch 4: expected %s,\ngot %s instead"
                   (Codegen.codegen_type ~expand:true expected)
                   (Codegen.codegen_type ~expand:true actual)))
     (* (show_perktype expected)

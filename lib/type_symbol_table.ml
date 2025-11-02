@@ -261,8 +261,16 @@ let print_type_symbol_table () =
       Printf.printf "%s: %s,\n\n" id (show_perktype typ))
     type_symbol_table
 
+let to_be_unbound : perktype list ref = ref []
+
+let unbind_generic_types () =
+  List.iter
+    (fun x -> Hashtbl.remove type_symbol_table (type_descriptor_of_perktype x))
+    !to_be_unbound
+
 (* Binds a type in the symble table. NOT Throws an exception if the name has already been defined *)
 let bind_type (t : perktype) =
+  if Polymorphism.is_type_generic t then to_be_unbound := t :: !to_be_unbound;
   say_here (Printf.sprintf "bind_type: %s" (show_perktype t));
   let id = type_descriptor_of_perktype t in
   (* if not (Hashtbl.mem type_symbol_table id) then *)

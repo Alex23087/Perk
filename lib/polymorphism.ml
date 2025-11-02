@@ -140,3 +140,19 @@ and subst_type_command (c : command_a) (placeholder : perktype)
         Switch (subst_e e1, List.map (fun (e, c) -> (subst_e e, subst_c c)) ecl)
     | Return eo -> Return (Option.map subst_e eo)
     | Match (e1, mel, t) -> Match (subst_e e1, mel, Option.map subst_maybe t))
+
+let rec is_type_generic (t : perktype) : bool =
+  match t with
+  | _, Basetype _, _ -> Hashtbl.mem File_info.generic_types_table t
+  | _, Funtype (tl, t1), _ ->
+      List.exists is_type_generic tl || is_type_generic t1
+  | _, Lambdatype (tl, t1, pvdl), _ ->
+      List.exists is_type_generic tl
+      || is_type_generic t1
+      || List.exists (fun (t, _) -> is_type_generic t) pvdl
+  | _, Pointertype t1, _ -> is_type_generic t1
+  | _, Arraytype (t1, _), _ -> is_type_generic t1
+  | _ ->
+      (* TODO !!!! I REALLY REALLY REALLY REALLY HAVE NO WILL TO WRITE THIS FUNCTION 
+         RIGHT NOW PLEASE GOD LET SOMEBODY ELSE WRITE THIS, FUCKING HELL*)
+      false

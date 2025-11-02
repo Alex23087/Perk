@@ -1,0 +1,17 @@
+import "stdio.h"
+
+fun bananize (a : char*) : void {
+    printf ("%s is now a banana!\n", a);
+}
+
+fun multi_explode (a : int) : void {
+    for (let i := 0; i < a; i++) {
+        printf("boom!\n");
+    }
+}
+
+fun <T> sum (a : T, b : T) : T {
+    bananize(a);
+    return a + b;
+} 
+
