@@ -157,6 +157,7 @@ deforfun:
 
 perkdef:
   | Let vd = perkvardesc Assign e = expr                                                                   { (vd, e) }
+  | Let i = Ident t = perktype Assign e = expr                                                             { raise (ParseError(!fnm, "missing ':' after variable name '" ^ i ^ "'. Expected: let " ^ i ^ " : <type> = ...")) }
   | Let perkvardesc error                                                                                  { raise (ParseError(!fnm, "expression expected: value must be initialized")) }
   | error { raise (ParseError(!fnm, "definition expected (e.g. let banana : int = 5)")) }
 
