@@ -3,6 +3,7 @@
   open Ast
   open Utils
   open Parse_lexing_commons
+  open Keyword_tracker
 %}
 
 /* Tokens declarations */
@@ -157,22 +158,20 @@ deforfun:
 
 perkdef:
   | Let vd = perkvardesc Assign e = expr                                                                   { (vd, e) }
-  | Let i = Ident t = perktype Assign e = expr                                                             { raise (ParseError(!fnm, "missing ':' after variable name '" ^ i ^ "'. Expected: let " ^ i ^ " : <type> = ...")) }
   | Let perkvardesc error                                                                                  { raise (ParseError(!fnm, "expression expected: value must be initialized")) }
-  | error { raise (ParseError(!fnm, "definition expected (e.g. let banana : int = 5)")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "definition expected (e.g. let banana : int = 5)")) }
 
 perkfun:
   | i = Ident LParen id_list = perkvardesc_list RParen Colon rt = perktype LBrace c = command RBrace       { (rt, i, id_list, c) }
   | i = Ident LParen RParen Colon rt = perktype LBrace c = command RBrace                                  { (rt, i, [], c) }
   | Ident LParen perkvardesc_list RParen error                                                             { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
   | Ident LParen RParen error                                                                              { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
-  
 
 perkvardesc:
   | i = Ident Colon t = perktype                                                                           { (t, i) }
   | i = Ident Colon                                                                                        { (([], Ast.Infer, []), i) }
-  | error { raise (ParseError(!fnm, "variable descriptor expected (e.g. banana : int)")) }
-  | Ident error { raise (ParseError(!fnm, "variable descriptor expected (e.g. banana : int)")) }
+  | Ident error                                                                                            { raise (ParseError(!fnm, "type declaration expected (e.g. banana : int)")) }
+  | error                                                                                                  { match !last_keyword with | Some kw when kw <> "let" -> raise (ParseError(!fnm, "keyword '" ^ kw ^ "' cannot be used as variable descriptor")) | _ -> raise (ParseError(!fnm, "variable descriptor expected (e.g. banana : int)")) }
 
 perkfundesc:
   | Fun i = Ident Colon t = perktype                                                                       { (t, i) }

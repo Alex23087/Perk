@@ -3,6 +3,7 @@
 open Parser
 open Utils
 open Errors
+open Keyword_tracker
 
 let string_buffer = Buffer.create 512
 let digit = [%sedlex.regexp? '0' .. '9']
@@ -55,7 +56,8 @@ let unescape ch lexbuf =
         (Lexing_error (start_pos, end_pos, !fnm, "Invalid escape character"))
 
 let rec token lexbuf =
-  match%sedlex lexbuf with
+  let tracking =
+    match%sedlex lexbuf with
   | "BEGIN_C" ->
       Buffer.clear string_buffer;
       inlineC lexbuf;
@@ -187,6 +189,18 @@ let rec token lexbuf =
              Printf.sprintf "Unrecognised character: '%s'"
                (Sedlexing.Utf8.lexeme lexbuf) ))
   | _ -> failwith "Impossible!"
+  in
+  (* Dynamic keyword detection *)
+  (match tracking with
+   | Ident _ | Integer _ | Float _ | Character _ | String _ -> clear ()
+   | _ ->
+       let lx = Sedlexing.Utf8.lexeme lexbuf in
+       if lx <> "" then (
+         match lx.[0] with
+         | 'a'..'z' | 'A'..'Z' | '_' -> set lx
+         | _ -> clear ()
+       ));
+      tracking
 
 and comment lexbuf =
   match%sedlex lexbuf with
