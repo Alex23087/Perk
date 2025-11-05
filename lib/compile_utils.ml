@@ -287,7 +287,7 @@ and process_file ?(dir : string option) (filename : string) (is_main : bool) :
   set_new_file_info ();
   let filename =
     (* If a directory override is provided, behave as if the file were in that directory *)
-    if Option.is_some dir then
+    if Option.is_some dir && not is_main then
       Filename.concat (Option.get dir) (Filename.basename filename)
     else filename
   in

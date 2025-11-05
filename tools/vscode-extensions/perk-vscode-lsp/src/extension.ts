@@ -7,39 +7,52 @@ import { execSync } from 'child_process';
 export function activate(context: vscode.ExtensionContext) {
     const diagnosticCollection = vscode.languages.createDiagnosticCollection('Perk');
 
-    vscode.workspace.onDidChangeTextDocument((event) => {
-        const document = event.document;
-        if (document.languageId === 'perk') {
-            const diagnostics: vscode.Diagnostic[] = [];
+    // debounce timers per-document
+    const debounceTimers = new Map<string, NodeJS.Timeout>();
 
-            // Run your compiler and get errors
-            const errors = runCompiler(document.getText(), document.uri.fsPath);
+    const handleDocument = (document: vscode.TextDocument) => {
+        if (!(document.languageId === 'perk')) return;
 
-            errors.forEach((error) => {
-                // Ensure the range is valid
-                const startLine = Math.max(0, error.startLine - 1);
-                const endLine = Math.max(0, error.endLine - 1);
-                const range = new vscode.Range(
-                    new vscode.Position(startLine, error.characterStart),
-                    new vscode.Position(endLine, error.characterEnd)
-                );
-                diagnostics.push(new vscode.Diagnostic(
-                    range,
-                    `${(error.errorType.charAt(0).toUpperCase() + error.errorType.slice(1) + " Error")}: ${error.message}`,
-                    vscode.DiagnosticSeverity.Error
-                ));
-            });
+        const diagnostics: vscode.Diagnostic[] = [];
 
-            // Set diagnostics or clear them if no errors
-            if (diagnostics.length > 0) {
-                diagnosticCollection.set(document.uri, diagnostics);
-            } else {
-                diagnosticCollection.set(document.uri, []); // Clear diagnostics
-            }
+        // pass undefined for dir when unsaved/untitled
+        const dir = document.isUntitled ? undefined : document.uri.fsPath;
+        const errors = runCompiler(document.getText(), dir);
+
+        errors.forEach((error) => {
+            const startLine = Math.max(0, error.startLine);
+            const endLine = Math.max(0, error.endLine);
+            const range = new vscode.Range(
+                new vscode.Position(startLine, Math.max(0, error.characterStart)),
+                new vscode.Position(endLine, Math.max(0, error.characterEnd))
+            );
+            diagnostics.push(new vscode.Diagnostic(
+                range,
+                `${(error.errorType.charAt(0).toUpperCase() + error.errorType.slice(1) + " Error")}: ${error.message}`,
+                vscode.DiagnosticSeverity.Error
+            ));
+        });
+
+        diagnosticCollection.set(document.uri, diagnostics.length ? diagnostics : []);
+    };
+
+    // debounced change handler
+    const changeSub = vscode.workspace.onDidChangeTextDocument((event) => {
+        const key = event.document.uri.toString();
+        if (debounceTimers.has(key)) {
+            clearTimeout(debounceTimers.get(key)!);
         }
+        debounceTimers.set(key, setTimeout(() => {
+            debounceTimers.delete(key);
+            handleDocument(event.document);
+        }, 350));
     });
 
-    context.subscriptions.push(diagnosticCollection);
+    // also run on open/save so user sees diagnostics quickly
+    const openSub = vscode.workspace.onDidOpenTextDocument(handleDocument);
+    const saveSub = vscode.workspace.onDidSaveTextDocument(handleDocument);
+
+    context.subscriptions.push(diagnosticCollection, changeSub, openSub, saveSub);
 }
 
 export function deactivate() { }
@@ -49,7 +62,7 @@ function runCompiler(sourceCode: string, dir: string | undefined): { errorType: 
 
     // Create a temporary file to store the source code
     const tmpDir: string = os.tmpdir();
-    const tmpFile: string = path.join(tmpDir, dir ? path.basename(dir) : `source-${Date.now()}.tmp`);
+    const tmpFile: string = path.join(tmpDir, dir ? path.basename(dir) : `source-${Date.now()}.tmp.perk`);
 
     fs.writeFileSync(tmpFile, sourceCode, 'utf8');
 
@@ -71,7 +84,15 @@ function runCompiler(sourceCode: string, dir: string | undefined): { errorType: 
             });
         }
     } catch (execError: any) {
-        vscode.window.showErrorMessage(`Error executing command: ${execError.message}`);
+        // If the compiler returns an error, print it as a regular error
+        errors.push({
+            errorType: 'execution',
+            startLine: -1,
+            endLine: -1,
+            characterStart: -1,
+            characterEnd: -1,
+            message: execError.message,
+        });
     }
 
     // Clean up the temporary file
