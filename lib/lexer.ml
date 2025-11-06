@@ -3,6 +3,7 @@
 open Parser
 open Utils
 open Errors
+open Keyword_tracker
 
 let string_buffer = Buffer.create 512
 let digit = [%sedlex.regexp? '0' .. '9']
@@ -55,138 +56,151 @@ let unescape ch lexbuf =
         (Lexing_error (start_pos, end_pos, !fnm, "Invalid escape character"))
 
 let rec token lexbuf =
-  match%sedlex lexbuf with
-  | "BEGIN_C" ->
-      Buffer.clear string_buffer;
-      inlineC lexbuf;
-      InlineC (Buffer.contents string_buffer)
-  | "+" -> Plus
-  | "==" -> Eq
-  | "!=" | 0x2260 -> Neq (* ≠ *)
-  | "<=" | 0x2264 -> Leq (* ≤ *)
-  | "<" -> Lt
-  | ">=" | 0x2265 -> Geq (* ≥ *)
-  | ">>" -> ShR
-  | "<<" -> ShL
-  | ">" -> Gt
-  | "-" -> Minus
-  | "!" | 0x00AC -> Bang (* ¬ *)
-  | "and" | 0x2227 | "&&" -> Land (* ∧ *)
-  | "or" | 0x2228 | "||" -> Lor (* ∨ *)
-  | "fun" -> Fun
-  | "=" -> Assign
-  | "++" -> PlusPlus
-  | "--" -> MinusMinus
-  | "&" -> Ampersand
-  | "." -> Dot
-  | "..." -> Ellipsis
-  | "?" -> Question
-  | "nothing" | "none" -> Nothing
-  | "something" | "some" | "just" -> Something
-  | "cast" -> Cast
-  (* | "☠" | "forget" | "forgor" -> Forgor *)
-  | "if" -> If
-  | "then" -> Then
-  | "else" -> Else
-  | "while" -> While
-  | "do" -> Do
-  | "for" -> For
-  | "return" -> Return
-  (* | "switch"        -> Switch *)
-  | "break" -> Break
-  | "continue" -> Continue
-  | "skip" -> Skip
-  | "let" -> Let
-  | "public" -> Public
-  | "private" -> Private
-  | "static" -> Static
-  | "extern" -> Extern
-  | "const" -> Const
-  | "volatile" -> Volatile
-  | "restrict" -> Restrict
-  | "import" -> Import
-  | "import_local" ->
-      ImportLocal (* TODO: This token is as ugly as it gets, change *)
-  | "open" -> Open
-  (* | "true" -> Integer 1
+  let tracking =
+    match%sedlex lexbuf with
+    | "BEGIN_C" ->
+        Buffer.clear string_buffer;
+        inlineC lexbuf;
+        InlineC (Buffer.contents string_buffer)
+    | "+" -> Plus
+    | "==" -> Eq
+    | "!=" | 0x2260 -> Neq (* ≠ *)
+    | "<=" | 0x2264 -> Leq (* ≤ *)
+    | "<" -> Lt
+    | ">=" | 0x2265 -> Geq (* ≥ *)
+    | ">>" -> ShR
+    | "<<" -> ShL
+    | ">" -> Gt
+    | "-" -> Minus
+    | "!" | 0x00AC -> Bang (* ¬ *)
+    | "and" | 0x2227 | "&&" -> Land (* ∧ *)
+    | "or" | 0x2228 | "||" -> Lor (* ∨ *)
+    | "fun" -> Fun
+    | "=" -> Assign
+    | "++" -> PlusPlus
+    | "--" -> MinusMinus
+    | "&" -> Ampersand
+    | "." -> Dot
+    | "..." -> Ellipsis
+    | "?" -> Question
+    | "nothing" | "none" -> Nothing
+    | "something" | "some" | "just" -> Something
+    | "cast" -> Cast
+    (* | "☠" | "forget" | "forgor" -> Forgor *)
+    | "if" -> If
+    | "then" -> Then
+    | "else" -> Else
+    | "while" -> While
+    | "do" -> Do
+    | "for" -> For
+    | "return" -> Return
+    (* | "switch"        -> Switch *)
+    | "break" -> Break
+    | "continue" -> Continue
+    | "skip" -> Skip
+    | "let" -> Let
+    | "public" -> Public
+    | "private" -> Private
+    | "static" -> Static
+    | "extern" -> Extern
+    | "const" -> Const
+    | "volatile" -> Volatile
+    | "restrict" -> Restrict
+    | "import" -> Import
+    | "import_local" ->
+        ImportLocal (* TODO: This token is as ugly as it gets, change *)
+    | "open" -> Open
+    (* | "true" -> Integer 1
      | "false" -> Integer 0 *)
-  | "archetype" | "theory" | "interface" | "prototype" | "trait" | "typeclass"
-    ->
-      Archetype (* TODO reinvent the wheel*)
-  | "model" | "impl" | "class" -> Model
-  | "summon" -> Summon
-  | "banish" -> Banish
-  | "struct" -> Struct
-  | "make" -> Make
-  | "type" -> ADT
-  | "|" -> Pipe
-  | "_" -> Matchall
-  | "constr" -> Constr
-  | "var" -> Var
-  | "match" -> Match
-  | "when" -> When
-  | "@" -> Poly (* temporary poly thing *)
-  | "`" -> BTICK
-  | "~>" | "as" | 0x2933 | 0x21DD -> As (* ⤳ ⇝ *)
-  | "->" | 0x2192 -> Arrow (* → *)
-  | "=>" | 0x21D2 -> Bigarrow (* ⇒ *)
-  | "true" -> Boolean true
-  | "false" -> Boolean false
-  | "of" -> Of
-  | identifier -> Ident (Sedlexing.Utf8.lexeme lexbuf)
-  | "0x", hex_number -> Integer (int_of_string (Sedlexing.Utf8.lexeme lexbuf))
-  | "0b", Plus ('0' | '1') ->
-      Integer (int_of_string (Sedlexing.Utf8.lexeme lexbuf))
-  | "0o", oct_number ->
-      Integer
-        (int_of_string
-           ("0o"
-           ^
-           let s = Sedlexing.Utf8.lexeme lexbuf in
-           String.sub s 2 (String.length s - 2)))
-  | dec_number -> Integer (int_of_string (Sedlexing.Utf8.lexeme lexbuf))
-  | float_number -> Float (float_of_string (Sedlexing.Utf8.lexeme lexbuf))
-  | "'" -> char lexbuf
-  | '"' ->
-      Buffer.clear string_buffer;
-      string_literal lexbuf;
-      String (Buffer.contents string_buffer)
-  | white_space -> token lexbuf
-  | "," -> Comma
-  | ";" -> Semicolon
-  | ":" -> Colon
-  | "(" -> LParen
-  | ")" -> RParen
-  | "{" -> LBrace
-  | "}" -> RBrace
-  | "[" -> LBracket
-  | "]" -> RBracket
-  | "!" -> Bang
-  | "*" | 0x00D7 -> Star (* × *)
-  | "/" -> Div
-  | "//" -> comment lexbuf
-  | "/*" -> multiline_comment lexbuf
-  | eof -> EOF
-  (* | inline_c_content, "}" -> INLINEC_CONTENT (Sedlexing.Utf8.lexeme lexbuf) *)
-  | any ->
-      let start_pos =
-        ( (fst (Sedlexing.lexing_positions lexbuf)).pos_lnum,
-          (fst (Sedlexing.lexing_positions lexbuf)).pos_cnum
-          - (fst (Sedlexing.lexing_positions lexbuf)).pos_bol )
-      in
-      let end_pos =
-        ( (snd (Sedlexing.lexing_positions lexbuf)).pos_lnum,
-          (snd (Sedlexing.lexing_positions lexbuf)).pos_cnum
-          - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol )
-      in
-      raise
-        (Lexing_error
-           ( start_pos,
-             end_pos,
-             !fnm,
-             Printf.sprintf "Unrecognised character: '%s'"
-               (Sedlexing.Utf8.lexeme lexbuf) ))
-  | _ -> failwith "Impossible!"
+    | "archetype" | "theory" | "interface" | "prototype" | "trait" | "typeclass"
+      ->
+        Archetype (* TODO reinvent the wheel*)
+    | "model" | "impl" | "class" -> Model
+    | "summon" -> Summon
+    | "banish" -> Banish
+    | "struct" -> Struct
+    | "make" -> Make
+    | "type" -> ADT
+    | "|" -> Pipe
+    | "_" -> Matchall
+    | "constr" -> Constr
+    | "var" -> Var
+    | "match" -> Match
+    | "when" -> When
+    | "@" -> Poly (* temporary poly thing *)
+    | "`" -> BTICK
+    | "~>" | "as" | 0x2933 | 0x21DD -> As (* ⤳ ⇝ *)
+    | "->" | 0x2192 -> Arrow (* → *)
+    | "=>" | 0x21D2 -> Bigarrow (* ⇒ *)
+    | "true" -> Boolean true
+    | "false" -> Boolean false
+    | "of" -> Of
+    | identifier -> Ident (Sedlexing.Utf8.lexeme lexbuf)
+    | "0x", hex_number -> Integer (int_of_string (Sedlexing.Utf8.lexeme lexbuf))
+    | "0b", Plus ('0' | '1') ->
+        Integer (int_of_string (Sedlexing.Utf8.lexeme lexbuf))
+    | "0o", oct_number ->
+        Integer
+          (int_of_string
+             ("0o"
+             ^
+             let s = Sedlexing.Utf8.lexeme lexbuf in
+             String.sub s 2 (String.length s - 2)))
+    | dec_number -> Integer (int_of_string (Sedlexing.Utf8.lexeme lexbuf))
+    | float_number -> Float (float_of_string (Sedlexing.Utf8.lexeme lexbuf))
+    | "'" -> char lexbuf
+    | '"' ->
+        Buffer.clear string_buffer;
+        string_literal lexbuf;
+        String (Buffer.contents string_buffer)
+    | white_space -> token lexbuf
+    | "," -> Comma
+    | ";" -> Semicolon
+    | ":" -> Colon
+    | "(" -> LParen
+    | ")" -> RParen
+    | "{" -> LBrace
+    | "}" -> RBrace
+    | "[" -> LBracket
+    | "]" -> RBracket
+    | "!" -> Bang
+    | "*" | 0x00D7 -> Star (* × *)
+    | "/" -> Div
+    | "//" -> comment lexbuf
+    | "/*" -> multiline_comment lexbuf
+    | eof -> EOF
+    (* | inline_c_content, "}" -> INLINEC_CONTENT (Sedlexing.Utf8.lexeme lexbuf) *)
+    | any ->
+        let start_pos =
+          ( (fst (Sedlexing.lexing_positions lexbuf)).pos_lnum,
+            (fst (Sedlexing.lexing_positions lexbuf)).pos_cnum
+            - (fst (Sedlexing.lexing_positions lexbuf)).pos_bol )
+        in
+        let end_pos =
+          ( (snd (Sedlexing.lexing_positions lexbuf)).pos_lnum,
+            (snd (Sedlexing.lexing_positions lexbuf)).pos_cnum
+            - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol )
+        in
+        raise
+          (Lexing_error
+             ( start_pos,
+               end_pos,
+               !fnm,
+               Printf.sprintf "Unrecognised character: '%s'"
+                 (Sedlexing.Utf8.lexeme lexbuf) ))
+    | _ -> failwith "Impossible!"
+  in
+  (* Dynamic keyword detection *)
+  (match tracking with
+  | Ident _ | Integer _ | Float _ | Character _ | String _ ->
+      last_keyword_clear ()
+  | _ -> (
+      let lx = Sedlexing.Utf8.lexeme lexbuf in
+      if lx <> "" then
+        match lx.[0] with
+        | 'a' .. 'z' | 'A' .. 'Z' | '_' -> last_keyword_set lx
+        | _ -> last_keyword_clear ()));
+  tracking
 
 and comment lexbuf =
   match%sedlex lexbuf with
