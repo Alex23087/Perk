@@ -192,13 +192,13 @@ let rec token lexbuf =
   in
   (* Dynamic keyword detection *)
   (match tracking with
-   | Ident _ | Integer _ | Float _ | Character _ | String _ -> clear ()
+   | Ident _ | Integer _ | Float _ | Character _ | String _ -> last_keyword_clear ()
    | _ ->
        let lx = Sedlexing.Utf8.lexeme lexbuf in
        if lx <> "" then (
          match lx.[0] with
-         | 'a'..'z' | 'A'..'Z' | '_' -> set lx
-         | _ -> clear ()
+         | 'a'..'z' | 'A'..'Z' | '_' -> last_keyword_set lx
+         | _ -> last_keyword_clear ()
        ));
       tracking
 

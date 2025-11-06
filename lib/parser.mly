@@ -171,7 +171,7 @@ perkvardesc:
   | i = Ident Colon t = perktype                                                                           { (t, i) }
   | i = Ident Colon                                                                                        { (([], Ast.Infer, []), i) }
   | Ident error                                                                                            { raise (ParseError(!fnm, "type declaration expected (e.g. banana : int)")) }
-  | error                                                                                                  { match !last_keyword with | Some kw when kw <> "let" -> raise (ParseError(!fnm, "keyword '" ^ kw ^ "' cannot be used as variable descriptor")) | _ -> raise (ParseError(!fnm, "variable descriptor expected (e.g. banana : int)")) }
+  | error                                                                                                  { match !last_keyword with | Some kw when kw <> "let" -> raise (ParseError(!fnm, "keyword '" ^ kw ^ "' cannot be used as variable identifier")) | _ -> raise (ParseError(!fnm, "variable descriptor expected (e.g. banana : int)")) }
 
 perkfundesc:
   | Fun i = Ident Colon t = perktype                                                                       { (t, i) }
