@@ -3,20 +3,19 @@
 This directory provides a minimal Vim plugin for Perk syntax highlighting and filetype detection.
 
 ## Installation
-Copy (or symlink) the contents into your Vim runtime path, e.g.:
+Copy (or symlink) the contents into your vim (or nvim) runtime path, e.g.:
 
 ```
 mkdir -p ~/.vim/pack/perk/start/perk
 cp -R ./* ~/.vim/pack/perk/start/perk/
 ```
 
-For Neovim:
+For vim-plug:
 ```
-mkdir -p ~/.local/share/nvim/site/pack/perk/start/perk
-cp -R ./* ~/.local/share/nvim/site/pack/perk/start/perk/
+call plug#begin()
+Plug '~/{path-to-perk}/tools/vim-extensions/perk-syntax'
+call plug#end()
 ```
-
-Or use a plugin manager (lazy.nvim, vim-plug, etc.) pointing to `tools/vim-extensions/perk`.
 
 ## Features
 - Highlights Perk keywords, types, numbers, strings (with escapes), comments and TODOs.
