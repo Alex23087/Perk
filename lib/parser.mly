@@ -166,6 +166,7 @@ perkfun:
   | i = Ident LParen RParen Colon rt = perktype LBrace c = command RBrace                                  { (rt, i, [], c) }
   | Ident LParen perkvardesc_list RParen error                                                             { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
   | Ident LParen RParen error                                                                              { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
+  | error                                                                                                  { match !last_keyword with | Some kw when kw <> "fun" -> raise (ParseError(!fnm, "keyword '" ^ kw ^ "' cannot be used as function identifier")) | _ -> raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
 
 perkvardesc:
   | i = Ident Colon t = perktype                                                                           { (t, i) }
@@ -175,6 +176,7 @@ perkvardesc:
 
 perkfundesc:
   | Fun i = Ident Colon t = perktype                                                                       { (t, i) }
+  | error                                                                                        { raise (ParseError(!fnm, "1type declaration expected (e.g. banana : int)")) }
 
 declorfun:
   | d = perkvardesc                                                                                        { annotate_2_code !fnm $loc (Ast.DeclVar d) }
