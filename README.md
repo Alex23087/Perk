@@ -17,7 +17,9 @@ We love new people joining the community, and are always happy to help out new c
 - [Running Perk](#running-perk)
     - [Nix](#nix)
     - [Arch Linux](#arch-linux)
-- [VSCode Extensions](#vscode-extensions)
+- [Extensions](#extensions)
+    - [VSCode](#vscode)
+    - [Vim](#vim)
 - **[Contributing](CONTRIBUTING.md)**
 
 ---
@@ -143,9 +145,33 @@ This package pulls the latest Perk version from the main branch of this reposito
 
 ---
 
-## VSCode Extensions
+# Extensions
+
+## VSCode
+
 We have two extensions for VSCode, located in `tools/vscode-extensions/`:
 - `perk-syntax`: provides syntax highlighting for Perk files;
 - `perk-lsp`: provides error checking using `perkc --check`.
 
 To install them, you should build them using `make extensions` and then install them in VSCode using the "Install from VSIX..." option.
+
+## Vim
+
+An extension is available for Vim (or NeoVim), located in `tools/vim-extensions/`:
+
+- `perk-syntax`: provides syntax highlighting for Perk files;
+
+To install it, copy the content of the `tools/vim-extensions/perk-syntax/` in your Vim pack directory:
+```
+mkdir -p ~/.vim/pack/perk/start/perk
+cp -R ./tools/vim-extensions/perk-syntax/* ~/.vim/pack/perk/start/perk/
+```
+
+For vim-plug:
+```
+call plug#begin()
+Plug '~/{path-to-perk}/tools/vim-extensions/perk-syntax'
+call plug#end()
+```
+
+For more details refer to the [README.md](./tools/vim-extensions/perk-syntax/README.md) of the extension.
