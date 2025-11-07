@@ -174,4 +174,4 @@ Plug '~/{path-to-perk}/tools/vim-extensions/perk-syntax'
 call plug#end()
 ```
 
-For more details refer to the [README.md](./tools/vim-extenstions/perk-syntax/README.md) of the extension.
+For more details refer to the [README.md](./tools/vim-extensions/perk-syntax/README.md) of the extension.
