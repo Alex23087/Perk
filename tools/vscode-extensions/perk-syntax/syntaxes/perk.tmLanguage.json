@@ -95,7 +95,7 @@
       "patterns": [
         {
           "name": "keyword.control.perk",
-          "match": "\\b(let|import|open|extern|archetype|model|struct|private|public|fun|for|while|do|if|then|else|return|summon|banish|make|cast|of|just|nothing|type|match)\\b"
+          "match": "\\b(let|import|import_local|open|extern|archetype|model|struct|private|public|fun|for|while|do|if|then|else|return|summon|banish|make|cast|of|just|nothing|type|match)\\b"
         },
         {
           "name": "keyword.other.begin-c.perk",
