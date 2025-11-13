@@ -196,7 +196,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
         (fun (id, t) ->
           say_here
             (Printf.sprintf "Adding library function %s of type %s" id
-               (type_descriptor_of_perktype t));
+               (show_perktype t));
           if Option.is_none (lookup_var id) then bind_var id t
           else say_here "Skipping")
         !library_functions;

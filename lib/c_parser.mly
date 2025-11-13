@@ -31,6 +31,7 @@ return_type:
 
 signature:
   | Signature LParen RParen EOF {[]}
+  | Signature LParen bs = BaseSort RParen EOF {if bs = "void" then [] else raise (ParseError "expected 'void' only in single argument")}
   | Signature LParen cl=arg_list RParen EOF {cl}
 
 typed_var:

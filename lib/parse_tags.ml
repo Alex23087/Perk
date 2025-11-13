@@ -169,10 +169,16 @@ let to_ctypes (p : parse_result) : (string * ctype * typed_var list) option =
         let ctype_sig = parse_signature signature in
         let ctype_ret = parse_ret_type ret in
         Some (name, ctype_ret, ctype_sig)
-      with _ ->
-        Utils.say_here
-          (Printf.sprintf "Warning: could not parse prototype for %s\n" name);
-        None)
+      with
+      | Syntax_error (_, _, msg) ->
+          Utils.say_here
+            (Printf.sprintf "Warning: could not parse prototype for %s: %s\n"
+               name msg);
+          None
+      | _ ->
+          Utils.say_here
+            (Printf.sprintf "Warning: could not parse prototype for %s\n" name);
+          None)
   | _ -> failwith "Trying to convert non-prototype to ctype"
 
 (** Debug function to print C prototype types. *)
