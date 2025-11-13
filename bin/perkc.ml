@@ -47,10 +47,20 @@ let include_paths =
 let perkc_cmd check_only json_format static_compilation verbose output_dir
     input_file (dir : string option) (c_compiler : string) (c_flags : string)
     (include_paths : string list) =
+  let base_dir =
+    let cwd = Sys.getcwd () in
+    match dir with
+    | Some provided ->
+        let absolute =
+          if Filename.is_relative provided then Filename.concat cwd provided
+          else provided
+        in
+        Fpath.(absolute |> v |> normalize |> to_string)
+    | None -> Fpath.(cwd |> v |> normalize |> to_string)
+  in
   let normalize_include_path path =
     let absolute =
-      if Filename.is_relative path then Filename.concat (Sys.getcwd ()) path
-      else path
+      if Filename.is_relative path then Filename.concat base_dir path else path
     in
     Fpath.(absolute |> v |> normalize |> to_string)
   in
