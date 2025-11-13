@@ -39,9 +39,35 @@ let c_flags =
   let doc = "Additional flags to pass to the C compiler" in
   Arg.(value & opt string "" & info [ "cflags" ] ~docv:"CFLAGS" ~doc)
 
+let include_paths =
+  let doc = "Add DIR to the include search path (repeatable)" in
+  Arg.(value & opt_all string [] & info [ "I"; "include-dir" ] ~docv:"DIR" ~doc)
+
 (* Main command implementation *)
 let perkc_cmd check_only json_format static_compilation verbose output_dir
-    input_file (dir : string option) (c_compiler : string) (c_flags : string) =
+    input_file (dir : string option) (c_compiler : string) (c_flags : string)
+    (include_paths : string list) =
+  let normalize_include_path path =
+    let absolute =
+      if Filename.is_relative path then Filename.concat (Sys.getcwd ()) path
+      else path
+    in
+    Fpath.(absolute |> v |> normalize |> to_string)
+  in
+  let normalized_include_paths =
+    List.map normalize_include_path include_paths
+  in
+  Perk.Utils.include_paths :=
+    !Perk.Utils.include_paths @ normalized_include_paths;
+  let include_flag_string =
+    normalized_include_paths
+    |> List.map (Printf.sprintf "-I%s ")
+    |> String.concat " "
+  in
+  let combined_c_flags =
+    String.concat " "
+      (List.filter (fun s -> s <> "") [ c_flags; include_flag_string ])
+  in
   if verbose then (
     Printf.printf "Processing file: %s\n" input_file;
     Printf.printf "Running in %s mode\n"
@@ -53,12 +79,12 @@ let perkc_cmd check_only json_format static_compilation verbose output_dir
     ignore
       (compile_program ?dir ?dry_run:(Some check_only)
          ?json_format:(Some json_format) static_compilation verbose input_file
-         None c_compiler c_flags);
+         None c_compiler combined_c_flags);
     `Ok ())
   else (
     if verbose then Printf.printf "Compiling to C\n";
     compile_program ?dir ?json_format:(Some json_format) static_compilation
-      verbose input_file output_dir c_compiler c_flags;
+      verbose input_file output_dir c_compiler combined_c_flags;
     `Ok ())
 
 (* Command definition *)
@@ -85,6 +111,7 @@ let cmd =
     Term.(
       ret
         (const perkc_cmd $ check_only $ json_format $ static_compilation
-       $ verbose $ output_dir $ input_file $ dir $ c_compiler $ c_flags))
+       $ verbose $ output_dir $ input_file $ dir $ c_compiler $ c_flags
+       $ include_paths))
 
 let () = exit (Cmd.eval cmd)

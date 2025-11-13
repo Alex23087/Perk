@@ -24,11 +24,38 @@ let get_lib_path s =
     let len = String.length s in
     if len <= 2 then "" else String.sub s 1 (len - 2)
   in
-  (* TODO actual includepaths *)
-  Printf.sprintf "%s/%s"
-    (if String.starts_with ~prefix:"<" s then "/usr/include"
-     else Fpath.(to_string (normalize (v (Filename.dirname !Utils.fnm)))))
-    (remove_first_last s)
+  (* If global include, search for the library in the include paths *)
+  if String.starts_with ~prefix:"<" s then
+    let lib = remove_first_last s in
+    let rec find_path = function
+      | [] ->
+          raise
+            (Compilation_error
+               ( (0, 0),
+                 (0, 0),
+                 !Utils.fnm,
+                 Printf.sprintf "Could not find library %s in include paths" lib
+               ))
+      | dir :: rest ->
+          let candidate = Filename.concat dir lib in
+          if Sys.file_exists candidate then candidate else find_path rest
+    in
+    find_path !Utils.include_paths
+  else
+    (* If local include, search for the library in the current directory *)
+    let path =
+      Printf.sprintf "%s/%s"
+        Fpath.(to_string (normalize (v (Filename.dirname !Utils.fnm))))
+        (remove_first_last s)
+    in
+    if Sys.file_exists path then path
+    else
+      raise
+        (Compilation_error
+           ( (0, 0),
+             (0, 0),
+             !Utils.fnm,
+             Printf.sprintf "Could not find library %s" path ))
 
 (** Hash table of the defined ADT constructors*)
 let defined_constructors : (perkident, unit) Hashtbl.t = Hashtbl.create 10

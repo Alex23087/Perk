@@ -12,6 +12,7 @@ let static_compilation : bool ref = ref false
 (** Internal flag to enable verbose compilation *)
 let verbose : bool ref = ref false
 
+let include_paths : string list ref = ref [ "/usr/include" ]
 let c_compiler : string ref = ref "gcc"
 let c_flags : string ref = ref ""
 
