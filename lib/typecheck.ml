@@ -68,6 +68,7 @@ let is_integral (_, typ, _) =
     [
       Basetype "int";
       Basetype "size_t";
+      Basetype "ssize_t";
       Basetype "int64_t";
       Basetype "int32_t";
       Basetype "int16_t";
@@ -89,6 +90,7 @@ let rec is_numerical ((_, typ, _) as t) =
       Basetype "float";
       Basetype "double";
       Basetype "size_t";
+      Basetype "ssize_t";
       Basetype "int64_t";
       Basetype "int32_t";
       Basetype "int16_t";
@@ -149,10 +151,11 @@ and add_numeric_bound t annotated_thing =
 (** provides an integer ranking of numerical types: higher values are most
     general types *)
 let rec numerical_rank : perktype -> int = function
-  | _, Basetype "double", _ -> 12
-  | _, Basetype "float", _ -> 11
-  | _, Basetype "int64_t", _ -> 10
-  | _, Basetype "size_t", _ -> 9
+  | _, Basetype "double", _ -> 13
+  | _, Basetype "float", _ -> 12
+  | _, Basetype "int64_t", _ -> 11
+  | _, Basetype "size_t", _ -> 10
+  | _, Basetype "ssize_t", _ -> 9
   | _, Basetype "uint64_t", _ -> 8
   | _, Basetype "int32_t", _ -> 7
   | _, Basetype "uint32_t", _ -> 6
