@@ -23,7 +23,7 @@
 %token Const Volatile Restrict
 %token <string> InlineC
 %token Import ImportLocal Open
-%token Archetype Model Summon Banish Cast
+%token Archetype Model Summon Banish Cast Sizeof
 %token Struct Make
 %token ADT Pipe Match When Matchall Constr Var BTICK
 %token Nothing Something Of Poly
@@ -211,6 +211,7 @@ expr:
   | LBracket RBracket                                                                                      { annotate_2_code !fnm $loc (Ast.Array [])}
   | LBracket l = separated_nonempty_list (Comma, expr) RBracket                                            { annotate_2_code !fnm $loc (Ast.Array l)}
   | Cast LParen typ = perktype Comma e = expr RParen                                                       { annotate_2_code !fnm $loc (Ast.Cast ((([],Ast.Infer,[]), typ), e)) }
+  | Sizeof LParen t = perktype RParen                                                                      { annotate_2_code !fnm $loc (Ast.Sizeof t) }
   | If guard = expr Then e1 = expr Else e2 = expr                                                          { annotate_2_code !fnm $loc (Ast.IfThenElseExpr (guard, e1, e2)) }
 
   | error                                                                                                  { raise (ParseError(!fnm, "expression expected")) }

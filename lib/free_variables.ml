@@ -101,6 +101,7 @@ and free_variables_expr (e : expr_a) : perkident list * perkident list =
           List.flatten (List.map (fun x -> fst (free_variables_expr x)) el)
       | As (expr, _, _) -> free_variables_expr expr |> fst
       | Cast (_, e1) -> fst (free_variables_expr e1)
+      | Sizeof _ -> []
       | IfThenElseExpr (e1, e2, e3) ->
           fst (free_variables_expr e1)
           @ fst (free_variables_expr e2)

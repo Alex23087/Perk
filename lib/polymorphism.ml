@@ -109,6 +109,7 @@ and subst_type_expr (e : expr_a) (placeholder : perktype) (actual : perktype) =
         As (subst_e e1, List.map subst_maybe tl, Option.map subst_maybe t)
     | Array el -> Array (List.map subst_e el)
     | Cast ((t1, t2), e1) -> Cast ((subst_maybe t1, subst_maybe t2), subst_e e1)
+    | Sizeof t1 -> Sizeof (subst_maybe t1)
     | IfThenElseExpr (e1, e2, e3) ->
         IfThenElseExpr (subst_e e1, subst_e e2, subst_e e3))
 

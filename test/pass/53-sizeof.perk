@@ -1,0 +1,12 @@
+import "stdio.h"
+
+fun main(): void {
+    let x: int = 42;
+    let size: size_t = sizeof(int);
+    let sizeC: size_t = cast(size_t, 0);
+    BEGIN_C
+    // Making sure we are getting the same size from C code
+    sizeC = sizeof(int);
+    END_C;
+    printf("Difference between Perk sizeof and C sizeof: %d\n", cast(int, size - sizeC));
+}

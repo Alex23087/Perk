@@ -86,6 +86,7 @@ let rec token lexbuf =
     | "nothing" | "none" -> Nothing
     | "something" | "some" | "just" -> Something
     | "cast" -> Cast
+    | "sizeof" -> Sizeof
     (* | "☠" | "forget" | "forgor" -> Forgor *)
     | "if" -> If
     | "then" -> Then

@@ -1492,6 +1492,9 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
   | Cast (t, e) ->
       bind_type_if_needed (snd t);
       (annot_copy expr (Cast (t, fst (typecheck_expr e))), snd t)
+  | Sizeof t ->
+      bind_type_if_needed t;
+      (expr, ([], Basetype "size_t", []))
   | IfThenElseExpr (guard, then_e, else_e) ->
       let guard_res, guard_type =
         typecheck_expr ~expected_return:(Some bool_type) guard

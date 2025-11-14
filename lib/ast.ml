@@ -153,6 +153,7 @@ and expr_t =
   | As of expr_a * perktype list * perktype option
   | Array of expr_a list  (** Cast ((from_type, to_type), expression)*)
   | Cast of (perktype * perktype) * expr_a
+  | Sizeof of perktype
   | IfThenElseExpr of expr_a * expr_a * expr_a
 [@@deriving show, eq]
 

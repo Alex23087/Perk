@@ -1232,6 +1232,7 @@ and codegen_expr (e : expr_a) : string =
       | _ ->
           Printf.sprintf "((%s)(%s))" (c_type_of_perktype to_t) (codegen_expr e)
       )
+  | Sizeof t -> Printf.sprintf "sizeof(%s)" (codegen_type t)
   | IfThenElseExpr (guard, then_e, else_e) ->
       Printf.sprintf "(%s ? %s : %s)" (codegen_expr guard) (codegen_expr then_e)
         (codegen_expr else_e)
