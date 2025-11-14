@@ -6,6 +6,7 @@ let extract_keywords filename =
   let ic = open_in filename in
   let keywords = ref [] in
   let in_token_function = ref false in
+  let pending_keywords = ref [] in
   
   let rec loop () =
     try
@@ -21,21 +22,21 @@ let extract_keywords filename =
       if !in_token_function && String.starts_with ~prefix:"and " trimmed then
         in_token_function := false;
       
-      (* Extract keyword patterns like: | "keyword" -> Token *)
+      (* If we see an arrow, flush any pending keywords *)
+      if !in_token_function && (String.contains trimmed '-' && String.contains line '>') then begin
+        keywords := !keywords @ !pending_keywords;
+        pending_keywords := []
+      end;
+      
+      (* Extract keyword patterns like: | "keyword" -> Token or | "keyword" | "keyword2" *)
       if !in_token_function && String.contains trimmed '|' then begin
         (* Match patterns: | "word" -> TokenName (or | "word1" | "word2" -> ...) *)
         let parts = String.split_on_char '|' line in
         List.iter (fun part ->
           let part = String.trim part in
-          (* Look for quoted strings before -> *)
-          if String.contains part '"' && String.contains part '-' then begin
-            let before_arrow = 
-              try
-                let arrow_pos = String.index part '-' in
-                String.sub part 0 arrow_pos
-              with Not_found -> part
-            in
-            (* Extract all quoted strings *)
+          (* Look for quoted strings *)
+          if String.contains part '"' then begin
+            (* Extract all quoted strings from this part *)
             let rec extract_quoted str pos acc =
               try
                 let start = String.index_from str pos '"' in
@@ -49,8 +50,12 @@ let extract_keywords filename =
                   extract_quoted str (end_pos + 1) acc
               with Not_found -> acc
             in
-            let found = extract_quoted before_arrow 0 [] in
-            keywords := !keywords @ found
+            let found = extract_quoted part 0 [] in
+            (* If line has arrow, add immediately; otherwise, add to pending *)
+            if String.contains line '-' && String.contains line '>' then
+              keywords := !keywords @ found
+            else
+              pending_keywords := !pending_keywords @ found
           end
         ) parts
       end;
