@@ -90,12 +90,12 @@ topleveldef:
   | Extern id = Ident Colon t = perktype                                                                   { annotate_2_code !fnm $loc (Ast.Extern (id, t)) }
   | ic = InlineC                                                                                           { annotate_2_code !fnm $loc (Ast.InlineC(ic)) }
   | d = perkdef                                                                                            { annotate_2_code !fnm $loc (Ast.Def (d, None)) }
-  | Archetype i = Ident LBrace l = perkdeclorfun_list RBrace                                               { annotate_2_code !fnm $loc (Ast.Archetype (i, l)) }
-  | Model i = Ident Colon il = ident_list LBrace l = perkdeforfun_list RBrace                              { annotate_2_code !fnm $loc (Ast.Model (i, il, l)) }
-  | Model i = Ident LBrace l = perkdeforfun_list RBrace                                                    { annotate_2_code !fnm $loc (Ast.Model (i, [], l)) }
-  | Struct i = Ident LBrace l = separated_list(Comma, perkdef) RBrace                                      { annotate_2_code !fnm $loc (Ast.Struct (i, l)) }
+  | Archetype i = Ident LBrace l = perkdeclorfun_list RBrace                                               { Keyword_tracker.validate_archetype_identifier i; annotate_2_code !fnm $loc (Ast.Archetype (i, l)) }
+  | Model i = Ident Colon il = ident_list LBrace l = perkdeforfun_list RBrace                              { Keyword_tracker.validate_model_identifier i; annotate_2_code !fnm $loc (Ast.Model (i, il, l)) }
+  | Model i = Ident LBrace l = perkdeforfun_list RBrace                                                    { Keyword_tracker.validate_model_identifier i; annotate_2_code !fnm $loc (Ast.Model (i, [], l)) }
+  | Struct i = Ident LBrace l = separated_list(Comma, perkdef) RBrace                                      { Keyword_tracker.validate_struct_identifier i; annotate_2_code !fnm $loc (Ast.Struct (i, l)) }
   | Struct Ident LBrace error                                                                              { raise (ParseError(!fnm, "unexpected token in struct definition")) }
-  | ADT i = Ident Assign option(Pipe) l = separated_nonempty_list(Pipe, constructor_type)                  { annotate_2_code !fnm $loc (Ast.ADT (i, l)) }   
+  | ADT i = Ident Assign option(Pipe) l = separated_nonempty_list(Pipe, constructor_type)                  { Keyword_tracker.validate_type_identifier i; annotate_2_code !fnm $loc (Ast.ADT (i, l)) }   
   | ADT Ident error                                                                                        { raise (ParseError(!fnm, "expected a list of constructors after ADT definition")) }           
   | Fun pf = perkfun                                                                                       { annotate_2_code !fnm $loc (Ast.Fundef (pf, true)) }
   | Fun Lt t=perktype Gt pf = perkfun                                                                      { annotate_2_code !fnm $loc (Ast.PolymorphicFundef (pf, t)) }
@@ -162,14 +162,14 @@ perkdef:
   | error                                                                                                  { raise (ParseError(!fnm, "definition expected (e.g. let banana : int = 5)")) }
 
 perkfun:
-  | i = Ident LParen id_list = perkvardesc_list RParen Colon rt = perktype LBrace c = command RBrace       { (rt, i, id_list, c) }
-  | i = Ident LParen RParen Colon rt = perktype LBrace c = command RBrace                                  { (rt, i, [], c) }
+  | i = Ident LParen id_list = perkvardesc_list RParen Colon rt = perktype LBrace c = command RBrace       { Keyword_tracker.validate_fun_identifier i; (rt, i, id_list, c) }
+  | i = Ident LParen RParen Colon rt = perktype LBrace c = command RBrace                                  { Keyword_tracker.validate_fun_identifier i; (rt, i, [], c) }
   | Ident LParen perkvardesc_list RParen error                                                             { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
   | Ident LParen RParen error                                                                              { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
   | error                                                                                                  { match !last_keyword with | Some kw when kw <> "fun" -> raise (ParseError(!fnm, "keyword '" ^ kw ^ "' cannot be used as function identifier")) | _ -> raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
 
 perkvardesc:
-  | i = Ident Colon t = perktype                                                                           { (t, i) }
+  | i = Ident Colon t = perktype                                                                           { Keyword_tracker.validate_var_identifier i; (t, i) }
   | i = Ident Colon                                                                                        { (([], Ast.Infer, []), i) }
   | Ident error                                                                                            { raise (ParseError(!fnm, "type declaration expected (e.g. banana : int)")) }
   | error                                                                                                  { match !last_keyword with | Some kw when kw <> "let" -> raise (ParseError(!fnm, "keyword '" ^ kw ^ "' cannot be used as variable identifier")) | _ -> raise (ParseError(!fnm, "variable descriptor expected (e.g. banana : int)")) }

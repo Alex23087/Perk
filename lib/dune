@@ -1,3 +1,8 @@
+(rule
+ (targets keyword_list.ml)
+ (deps lexer.ml extract_keywords.ml)
+ (action (run ocaml %{dep:extract_keywords.ml} %{dep:lexer.ml} %{targets})))
+
 (library
  (name Perk)
  (public_name perk)
