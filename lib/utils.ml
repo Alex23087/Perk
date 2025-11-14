@@ -259,15 +259,19 @@ let copy_file src dst =
   close_out oc
 
 (** copies all non source files to a target directory *)
-let copy_non_perk_files src_dir dst_dir =
+let rec copy_non_perk_files src_dir dst_dir =
   let files = Sys.readdir src_dir in
   Array.iter
     (fun file ->
       let src_path = Filename.concat src_dir file in
       let dst_path = Filename.concat dst_dir file in
       (* Skip directories -- TODO: SKIPNT *)
-      if not (Sys.is_directory src_path) then
-        (* Skip .perk files *)
-        if not (Filename.check_suffix file ".perk") then
-          copy_file src_path dst_path)
+      if not (Sys.is_directory src_path) then (
+        if
+          (* Skip .perk files *)
+          not (Filename.check_suffix file ".perk")
+        then copy_file src_path dst_path)
+      else
+        (* If directory, copy recursively *)
+        copy_non_perk_files src_path dst_path)
     files
