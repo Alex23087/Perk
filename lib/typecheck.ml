@@ -82,6 +82,35 @@ let is_integral (_, typ, _) =
   in
   List.mem typ nums
 
+let get_type_length (_, typ, _) =
+  match typ with
+  | Basetype "int" -> Hashtbl.find Utils.numerical_sizes "__SIZEOF_INT__"
+  | Basetype "float" -> Hashtbl.find Utils.numerical_sizes "__SIZEOF_FLOAT__"
+  | Basetype "double" -> Hashtbl.find Utils.numerical_sizes "__SIZEOF_DOUBLE__"
+  | Basetype "size_t" -> Hashtbl.find Utils.numerical_sizes "__SIZEOF_SIZE_T__"
+  | Basetype "ssize_t" ->
+      Hashtbl.find Utils.numerical_sizes
+        "__SIZEOF_SIZE_T__" (* is it really same as size_t??*)
+  | Basetype "int64_t" ->
+      8
+      (* find more automated way of doing this (needs resolving typedefs/defines) *)
+  | Basetype "int32_t" -> 4
+  | Basetype "int16_t" -> 2
+  | Basetype "int8_t" -> 1
+  | Basetype "uint64_t" -> 8
+  | Basetype "uint32_t" -> 4
+  | Basetype "uint16_t" -> 2
+  | Basetype "uint8_t" -> 1
+  | Basetype "char" -> 1
+  | _ ->
+      raise
+        (Compilation_error
+           ( (-1, -1),
+             (-1, -1),
+             !Utils.fnm,
+             Printf.sprintf "Unable to determine size for type %s"
+               (show_perktype_partial typ) ))
+
 (** check if type is numerical *)
 let rec is_numerical ((_, typ, _) as t) =
   let nums =
@@ -1626,6 +1655,30 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
       | _, Infer -> expected
       | Infer, _ -> actual
       | Basetype t1, Basetype t2 when t1 = t2 -> actual
+      | Basetype _t1, Basetype _t2
+        when is_numerical expected && is_numerical actual ->
+          (* If one of the types is generic, we don't have size/integerness information, so we just let checks pass *)
+          if Polymorphism.is_type_generic expected then actual
+          else if Polymorphism.is_type_generic actual then expected
+          else
+            let int1 = is_integral expected in
+            let int2 = is_integral actual in
+            let len1 = get_type_length expected in
+            let len2 = get_type_length actual in
+            if len1 >= len2 && int1 = int2 then actual
+            else
+              raise
+                (Type_match_error
+                   (Printf.sprintf
+                      "Type mismatch 0: expected %s,\n\
+                       got %s instead. Expected a %s number with size %d, got \
+                       a %s with size %d"
+                      (Codegen.codegen_type ~expand:true expected)
+                      (Codegen.codegen_type ~expand:true actual)
+                      (if int1 then "integral" else "floating")
+                      len1
+                      (if int2 then "integral" else "floating")
+                      len2))
       | _, Basetype _ ->
           (* Printf.printf "actual: %s, expected: %s\n" (show_perktype actual)
             (show_perktype expected); *)
@@ -1676,6 +1729,8 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
                  (Printf.sprintf "Type mismatch 1: expected %s,\ngot %s instead"
                     (Codegen.codegen_type ~expand:true expected)
                     (Codegen.codegen_type ~expand:true actual)))
+      | Pointertype t1, Pointertype _t2 when t1 = void_type -> actual
+      | Pointertype _t1, Pointertype t2 when t2 = void_type -> expected
       | Pointertype t1, Pointertype t2 ->
           (act_attr, Pointertype (match_types_aux t1 t2), act_qual)
       | Funtype (params1, ret1), Funtype (params2, ret2)

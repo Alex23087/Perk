@@ -16,6 +16,10 @@ let include_paths : string list ref = ref [ "/usr/include" ]
 let c_compiler : string ref = ref "gcc"
 let c_flags : string ref = ref ""
 
+(** Hashtable containing sizes of numerical types - I am the walnut -- goo goo
+    g-joob*)
+let numerical_sizes : (string, int) Hashtbl.t = Hashtbl.create 10
+
 (** Debug function that can be enabled to track function call numbers. *)
 let rec say_here (_msg : string) : unit =
   if !verbose then (

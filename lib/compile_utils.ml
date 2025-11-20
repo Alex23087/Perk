@@ -14,6 +14,33 @@ let add_import (import : string) : bool =
     Hashtbl.add opens_hashmap import ();
     true)
 
+let run_and_capture cmd =
+  let tmp = Filename.temp_file "ocaml_cmd" ".txt" in
+  let full_cmd = cmd ^ " > " ^ tmp in
+  let _ = Sys.command full_cmd in
+  let ic = open_in tmp in
+  let len = in_channel_length ic in
+  let result = really_input_string ic len in
+  close_in ic;
+  Sys.remove tmp;
+  result
+
+let gather_numerical_lengths () : unit =
+  let res = run_and_capture "echo | gcc -dM -E - | grep SIZEOF" in
+  res |> String.split_on_char '\n'
+  |> List.filter (fun line -> String.trim line <> "")
+  |> List.iter (fun line ->
+         match String.split_on_char ' ' (String.trim line) with
+         | [ def; macro; value ] when String.starts_with ~prefix:"#define" def
+           ->
+             let key = macro in
+             let value = int_of_string value in
+             Utils.say_here (Printf.sprintf "Added size type: %s %d" key value);
+             Hashtbl.add Utils.numerical_sizes key value
+         | _ as s ->
+             failwith
+               ("Unexpected format in numerical lengths: " ^ String.concat " " s))
+
 let ast_of_filename filename =
   let inchn = open_in filename in
   let ast_of_channel inchn =
@@ -80,6 +107,8 @@ let rec compile_program ?(dir : string option) ?(dry_run = false)
     (input_file : string) (output_dir : string option) (c_compiler : string)
     (c_flags : string) =
   (* let out_ast_file = Filename.chop_suffix input_file ".perk" ^ ".ast" in *)
+  gather_numerical_lengths ();
+
   Utils.static_compilation := static_compilation;
   Utils.verbose := verbose;
   Utils.c_compiler := c_compiler;
