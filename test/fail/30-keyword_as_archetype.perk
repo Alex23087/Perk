@@ -1,0 +1,6 @@
+// Test that using a reserved keyword as an archetype name fails
+// Should produce: keyword 'while' cannot be used as archetype identifier
+
+archetype while {
+    let x : int = 0
+}
