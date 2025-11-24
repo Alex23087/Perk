@@ -95,10 +95,11 @@ topleveldef:
   | Model Ident error                                                                                      { Keyword_tracker.raise_keyword_error fnm "model" }
   | Model error                                                                                            { Keyword_tracker.raise_keyword_error fnm "model" }
   | Struct i = Ident LBrace l = separated_list(Comma, perkdef) RBrace                                      { Keyword_tracker.validate_struct_identifier i; annotate_2_code !fnm $loc (Ast.Struct (i, l)) }
+  | Struct Ident LBrace error                                                                              { raise (ParseError(!fnm, "unexpected token in struct definition")) }
   | Struct Ident error                                                                                     { Keyword_tracker.raise_keyword_error fnm "struct" }
   | Struct error                                                                                           { Keyword_tracker.raise_keyword_error fnm "struct" }
   | ADT i = Ident Assign option(Pipe) l = separated_nonempty_list(Pipe, constructor_type)                  { Keyword_tracker.validate_type_identifier i; annotate_2_code !fnm $loc (Ast.ADT (i, l)) }   
-  | ADT Ident error                                                                                        { Keyword_tracker.raise_keyword_error fnm "type" }
+  | ADT Ident error                                                                                        { raise (ParseError(!fnm, "expected a list of constructors after ADT definition")) }
   | ADT error                                                                                              { Keyword_tracker.raise_keyword_error fnm "type" }
   | Fun pf = perkfun                                                                                       { annotate_2_code !fnm $loc (Ast.Fundef (pf, true)) }
   | Fun Lt t=perktype Gt pf = perkfun                                                                      { annotate_2_code !fnm $loc (Ast.PolymorphicFundef (pf, t)) }
@@ -167,14 +168,14 @@ perkdef:
 perkfun:
   | i = Ident LParen id_list = perkvardesc_list RParen Colon rt = perktype LBrace c = command RBrace       { Keyword_tracker.validate_fun_identifier i; (rt, i, id_list, c) }
   | i = Ident LParen RParen Colon rt = perktype LBrace c = command RBrace                                  { Keyword_tracker.validate_fun_identifier i; (rt, i, [], c) }
-  | Ident LParen perkvardesc_list RParen error                                                             { Keyword_tracker.raise_keyword_error fnm "function" }
-  | Ident LParen RParen error                                                                              { Keyword_tracker.raise_keyword_error fnm "function" }
+  | Ident LParen perkvardesc_list RParen error                                                             { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
+  | Ident LParen RParen error                                                                              { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
   | error                                                                                                  { Keyword_tracker.raise_keyword_error fnm "function" }
 
 perkvardesc:
   | i = Ident Colon t = perktype                                                                           { Keyword_tracker.validate_var_identifier i; (t, i) }
   | i = Ident Colon                                                                                        { (([], Ast.Infer, []), i) }
-  | Ident error                                                                                            { Keyword_tracker.raise_keyword_error fnm "variable" }
+  | Ident error                                                                                            { raise (ParseError(!fnm, "type declaration expected (e.g. banana : int)")) }
   | error                                                                                                  { Keyword_tracker.raise_keyword_error fnm "variable" }
 
 perkfundesc:
