@@ -135,7 +135,7 @@ and expr_t =
   | PolymorphicVar of perkident * perktype
   | Apply of expr_a * expr_a list * perktype option
   | Binop of binop * expr_a * expr_a
-  | PreUnop of preunop * expr_a
+  | PreUnop of preunop * expr_a * perktype option
   | Lambda of
       perktype
       * perkvardesc list

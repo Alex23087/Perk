@@ -353,7 +353,7 @@ let dependencies_of_type (typ : perktype) : perkident list =
                   dependencies_of_type_aux ~voidize:true ret (ret :: params_l)
                 in
                 ((type_descriptor_of_perktype typ :: params_t) @ ret_t, ret_l)
-            | Lambdatype (params, ret, _free_vars) ->
+            | Lambdatype (params, ret, free_vars) ->
                 let lst = typ :: lst in
                 let params_t, params_l =
                   List.fold_right
@@ -364,6 +364,17 @@ let dependencies_of_type (typ : perktype) : perkident list =
                       (res_t @ acc, res_l))
                     params ([], lst)
                 in
+
+                let fvs_t, fvs_l =
+                  List.fold_right
+                    (fun (t, _) (acc, lst) ->
+                      let res_t, res_l =
+                        dependencies_of_type_aux ~voidize:true t lst
+                      in
+                      (res_t @ acc, res_l))
+                    free_vars ([], lst)
+                in
+
                 let ret_t, ret_l =
                   dependencies_of_type_aux ~voidize:true ret (ret :: params_l)
                 in
@@ -372,9 +383,10 @@ let dependencies_of_type (typ : perktype) : perkident list =
                     (functype_of_lambdatype typ)
                     lst
                 in
-                ( (type_descriptor_of_perktype typ :: params_t)
+                ( fvs_t
+                  @ (type_descriptor_of_perktype typ :: params_t)
                   @ ret_t @ underlying_deps,
-                  ret_l @ underlying_l )
+                  fvs_l @ ret_l @ underlying_l )
             | Arraytype (t, _) ->
                 dependencies_of_type_aux ~voidize t (typ :: lst)
             | Structtype (_, fields) ->

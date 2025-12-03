@@ -1197,7 +1197,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           | _ ->
               raise_type_error expr
                 "Bitwise shift operators require integral types"))
-  | PreUnop (op, e) ->
+  | PreUnop (op, e, _) ->
       let expr_res, expr_type = typecheck_expr e in
       let res_type =
         match (op, resolve_type expr_type) with
@@ -1209,7 +1209,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                  (show_perktype expr_type))
         | _, t -> t
       in
-      (annot_copy expr (PreUnop (op, expr_res)), res_type)
+      (annot_copy expr (PreUnop (op, expr_res, Some expr_type)), res_type)
   | Lambda (retype, params, body, _, lambda_name) ->
       if !Utils.static_compilation then
         raise_compilation_error expr

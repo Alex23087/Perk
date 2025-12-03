@@ -1136,8 +1136,19 @@ and codegen_expr (e : expr_a) : string =
   | Binop (op, e1, e2) ->
       Printf.sprintf "%s %s %s" (codegen_expr e1) (codegen_binop op)
         (codegen_expr e2)
-  | PreUnop (op, e) ->
-      Printf.sprintf "%s%s" (codegen_preunop op) (codegen_expr e)
+  | PreUnop (_, _, None) -> failwith "should not happen"
+  | PreUnop (op, e, Some typ) -> (
+      match op with
+      | Reference ->
+          let fresh_ide = fresh_var "ref" in
+          let e1_str = codegen_expr e in
+          let e1_decl_string =
+            Printf.sprintf "%s %s = %s;\n" (codegen_type typ) fresh_ide e1_str
+          in
+          generated_freevars := !generated_freevars ^ e1_decl_string;
+
+          Printf.sprintf "%s%s" (codegen_preunop op) fresh_ide
+      | _ -> Printf.sprintf "%s%s" (codegen_preunop op) (codegen_expr e))
   | PostUnop (op, e) -> (
       match op with
       | OptionGet (Some t) ->
@@ -1368,7 +1379,10 @@ and codegen_type_definition (t : perktype) : string =
       | _, Tupletype ts, _ ->
           let type_str = type_descriptor_of_perktype t in
           let compiled =
-            Printf.sprintf "typedef struct %s {%s} %s;" type_str
+            Printf.sprintf
+              "\n// type of tuples (%s)\ntypedef struct %s {%s} %s;"
+              (List.map show_perktype ts |> String.concat ", ")
+              type_str
               (if List.length ts = 0 then ""
                else
                  String.concat "; "
@@ -1388,8 +1402,11 @@ and codegen_type_definition (t : perktype) : string =
       | _, Optiontype u, _ ->
           let u = resolve_type u in
           let compiled =
-            Printf.sprintf "typedef struct %s {int is_some; %s contents;} %s;"
-              key
+            Printf.sprintf
+              "\n\
+               // option(%s) type \n\
+               typedef struct %s {int is_some; %s contents;} %s;"
+              (show_perktype u) key
               (match u with
               | _, Modeltype _, _ -> "void*"
               | _, Pointertype typ, _ ->
@@ -1408,7 +1425,8 @@ and codegen_type_definition (t : perktype) : string =
       | _, Funtype (args, ret), _ ->
           let type_str = type_descriptor_of_perktype t in
           let typedef_str =
-            Printf.sprintf "typedef %s"
+            Printf.sprintf "\n// type of function %s\ntypedef %s"
+              (show_perktype t)
               (codegen_type ret ~expand:true
               ^ " (*" ^ type_str ^ ")("
               ^ String.concat ", "
@@ -1424,10 +1442,18 @@ and codegen_type_definition (t : perktype) : string =
           (* Hashtbl.add function_type_hashmap t (type_str, typedef_str, expanded_str); *)
           typedef_str
       | _, Pointertype t, _ ->
-          Printf.sprintf "typedef %s* %s;" (codegen_type t ~expand:true) key
+          Printf.sprintf "\n// type of %s pointer\ntypedef %s* %s;"
+            (show_perktype t)
+            (codegen_type t ~expand:true)
+            key
       | _, ArchetypeSum archs, _ ->
           let compiled =
-            Printf.sprintf "struct %s {%svoid* self;};\ntypedef struct %s %s;"
+            Printf.sprintf
+              "\n\
+               // type of archetype sum %s\n\
+               struct %s {%svoid* self;};\n\
+               typedef struct %s %s;"
+              (show_perktype t)
               (type_descriptor_of_perktype t)
               (if List.length archs = 0 then ""
                else
@@ -1453,10 +1479,13 @@ and codegen_type_definition (t : perktype) : string =
           let compiled =
             match n with
             | Some n ->
-                Printf.sprintf "typedef %s %s[%d];" (c_type_of_perktype at) key
-                  n
+                Printf.sprintf
+                  "\n// type of %d-len array of %s\ntypedef %s %s[%d];" n
+                  (show_perktype at) (c_type_of_perktype at) key n
             | None ->
-                Printf.sprintf "typedef %s %s[];" (c_type_of_perktype at) key
+                Printf.sprintf
+                  "\n// type of unspec-len array of %s\ntypedef %s %s[];"
+                  (show_perktype at) (c_type_of_perktype at) key
           in
           let (_, _), from =
             if Hashtbl.mem type_symbol_table key then
@@ -1488,7 +1517,11 @@ and codegen_lambda_environment (free_vars : perkvardesc list) :
   | Some _typedef -> (false, environment_type_desc_erased, "")
   | None ->
       let environment_typedef =
-        Printf.sprintf "typedef struct %s {%s;} %s;" environment_type_desc
+        Printf.sprintf
+          "\n// environment with params (%s)\ntypedef struct %s {%s;} %s;"
+          (List.map (fun (t, id) -> id ^ " : " ^ show_perktype t) free_vars
+          |> String.concat ", ")
+          environment_type_desc
           (String.concat "; "
              (List.mapi
                 (fun i (typ, _id) ->
@@ -1526,13 +1559,15 @@ and codegen_lambda_capture (lamtype : perktype) : string =
       | None ->
           let typedef =
             Printf.sprintf
-              "struct %s {\n\
+              "\n\
+               // closure for functions %s\n\
+               struct %s {\n\
               \    void* env;\n\
               \    %s func;\n\
                };\n\
                typedef struct %s* %s"
-              capture_type_desc lambda_type_desc capture_type_desc
-              capture_type_desc
+              (show_perktype lamtype) capture_type_desc lambda_type_desc
+              capture_type_desc capture_type_desc
           in
           let alltogether =
             Printf.sprintf "%s%s"

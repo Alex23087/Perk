@@ -86,7 +86,7 @@ and subst_type_expr (e : expr_a) (placeholder : perktype) (actual : perktype) =
     | Apply (e1, e1l, ret_t) ->
         Apply (subst_e e1, List.map subst_e e1l, Option.map subst_maybe ret_t)
     | Binop (op, e1, e2) -> Binop (op, subst_e e1, subst_e e2)
-    | PreUnop (op, e1) -> PreUnop (op, subst_e e1)
+    | PreUnop (op, e1, typ) -> PreUnop (op, subst_e e1, typ)
     | Lambda (retype, args, body, free_variables, lambda_name) ->
         Lambda
           ( subst_maybe retype,
