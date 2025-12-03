@@ -27,7 +27,7 @@
             ocamlPkgs.cmdliner
             pkgs.opam
             pkgs.gcc
-            pkgs.ctags
+            pkgs.universal-ctags
             pkgs.vsce
             pkgs.nodePackages.typescript
             pkgs.nodejs
