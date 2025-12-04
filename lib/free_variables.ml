@@ -53,10 +53,39 @@ let rec free_variables_command (cmd : command_a) :
         let free, _ = free_variables_expr def in
         (free, [ id ])
     | Continue | Break -> ([], [])
+    | Match (e, l, _) ->
+        let expr_free, expr_bound = free_variables_expr e in
+        let fvl = List.map free_variables_match_entry l in
+        let fvl1, fvl2 = List.split fvl in
+        (expr_free @ List.flatten fvl1, expr_bound @ List.flatten fvl2)
   in
   let out_free, out_bound = free_variables_command_aux cmd in
   ( List.sort_uniq String.compare out_free,
     List.sort_uniq String.compare out_bound )
+
+and free_variables_match_entry (entry : match_entry_a) =
+  match ( $ ) entry with
+  | MatchCase (mc, when_expr, c) ->
+      let wfree, wbound =
+        if Option.is_some when_expr then
+          free_variables_expr (Option.get when_expr)
+        else ([], [])
+      in
+      let cfree, cbound = free_variables_command c in
+      let mcfree, mcbound = free_variables_match_case mc in
+      (list_minus (list_minus wfree wbound @ mcfree @ cfree) mcbound, cbound)
+
+and free_variables_match_case (mc : match_case_a) =
+  match ( $ ) mc with
+  | Matchall -> ([], [])
+  | MatchVar (id, _) -> ([], [ id ])
+  | MatchExpr e -> free_variables_expr e
+  | CompoundCase (_, mcl) ->
+      List.fold_left
+        (fun (acc_free, acc_bound) a ->
+          let free, bound = free_variables_match_case a in
+          (acc_free @ free, acc_bound @ bound))
+        ([], []) mcl
 
 (** Returns pair of lists: FIRST LIST IS FREE VARS, SECOND LIST IS BOUND *)
 and free_variables_expr (e : expr_a) : perkident list * perkident list =
@@ -65,13 +94,14 @@ and free_variables_expr (e : expr_a) : perkident list * perkident list =
       | Nothing _ | Bool _ | Int _ | Float _ | Char _ | String _ -> []
       | Something (e1, _) -> free_variables_expr e1 |> fst
       | Var id -> [ id ]
+      | PolymorphicVar (id, _) -> [ id ]
       | Apply (e1, el, _) ->
           fst (free_variables_expr e1)
           @ List.flatten (List.map (fun x -> free_variables_expr x |> fst) el)
       | Binop (_, e1, e2) ->
           fst (free_variables_expr e1) @ fst (free_variables_expr e2)
-      | PreUnop (_, e1) | PostUnop (_, e1) -> fst (free_variables_expr e1)
-      | Lambda (_, params, body, _) ->
+      | PreUnop (_, e1, _) | PostUnop (_, e1) -> fst (free_variables_expr e1)
+      | Lambda (_, params, body, _, _) ->
           list_minus (fst (free_variables_command body)) (List.map snd params)
       | Parenthesised e1 -> fst (free_variables_expr e1)
       | Subscript (e1, e2) ->
@@ -82,8 +112,9 @@ and free_variables_expr (e : expr_a) : perkident list * perkident list =
       | Access (e1, _id, _, _) -> fst (free_variables_expr e1)
       | Tuple (el, _) | Array el ->
           List.flatten (List.map (fun x -> fst (free_variables_expr x)) el)
-      | As (id, _, _) -> [ id ]
+      | As (expr, _, _) -> free_variables_expr expr |> fst
       | Cast (_, e1) -> fst (free_variables_expr e1)
+      | Sizeof _ -> []
       | IfThenElseExpr (e1, e2, e3) ->
           fst (free_variables_expr e1)
           @ fst (free_variables_expr e2)

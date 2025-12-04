@@ -15,5 +15,5 @@ fun main (): void {
   let user := summon User();
   user.id = "12345"; // This should be allowed
   user.email = "user@example.com"; // This should also be allowed
-  printf(user.getPassword()); // This should be allowed
+  printf("%s", user.getPassword()); // This should be allowed
 }

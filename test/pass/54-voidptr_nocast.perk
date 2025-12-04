@@ -1,0 +1,7 @@
+import "malloc.h"
+import "stdio.h"
+
+fun main () : void {
+    let x : int* = malloc (100);
+    printf("ha funzionated");
+}

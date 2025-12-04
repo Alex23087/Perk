@@ -63,6 +63,7 @@ type perktype_partial =
       * perktype list
       * perkident list
     (* name, archetypes, fields (with access attributes), constructor_params, member functions*)
+  | AlgebraicType of perkident * (perkident * perktype list) list
   | Optiontype of perktype
   | Tupletype of perktype list
   | ArchetypeSum of perktype list
@@ -72,7 +73,7 @@ type perktype_partial =
 
 and perktype =
   perktype_attribute list * perktype_partial * perktype_qualifier list
-[@@deriving show, eq]
+[@@deriving eq]
 
 (* and perktype_annotated = perktype annotated [@@deriving show, eq] *)
 and perkvardesc = perktype * perkident [@@deriving show, eq]
@@ -91,6 +92,8 @@ and binop =
   | Neq
   | Land
   | Lor
+  | ShL
+  | ShR
 (*  ... boolean and bitwise ops and all that  *)
 [@@deriving show, eq]
 
@@ -129,10 +132,16 @@ and expr_t =
   | Char of char
   | String of string
   | Var of perkident
+  | PolymorphicVar of perkident * perktype
   | Apply of expr_a * expr_a list * perktype option
   | Binop of binop * expr_a * expr_a
-  | PreUnop of preunop * expr_a
-  | Lambda of perktype * perkvardesc list * command_a * perkvardesc list
+  | PreUnop of preunop * expr_a * perktype option
+  | Lambda of
+      perktype
+      * perkvardesc list
+      * command_a
+      * perkvardesc list
+      * perkident option
   | PostUnop of postunop * expr_a
   | Parenthesised of expr_a
   | Subscript of expr_a * expr_a
@@ -141,10 +150,10 @@ and expr_t =
   | Make of perkident * (perkident * expr_a) list
   | Access of expr_a * perkident * perktype option * perktype option
   | Tuple of expr_a list * perktype option
-  | As of perkident * perktype list * perktype option
-    (* TODO: This needs to be from expr_a, not from perkident. Issues with side effects, needs to be handled by creating temp vars *)
+  | As of expr_a * perktype list * perktype option
   | Array of expr_a list  (** Cast ((from_type, to_type), expression)*)
   | Cast of (perktype * perktype) * expr_a
+  | Sizeof of perktype
   | IfThenElseExpr of expr_a * expr_a * expr_a
 [@@deriving show, eq]
 
@@ -166,6 +175,17 @@ and command_t =
   | Return of expr_a option
   | Break
   | Continue
+  | Match of expr_a * match_entry_a list * perktype option
+[@@deriving show, eq]
+
+and match_entry_t = MatchCase of match_case_a * expr_a option * command_a
+[@@deriving show, eq]
+
+and match_case_t =
+  | Matchall
+  | MatchVar of perkident * perktype option
+  | MatchExpr of expr_a
+  | CompoundCase of perkident * match_case_a list
 [@@deriving show, eq]
 
 and topleveldef_t =
@@ -174,10 +194,13 @@ and topleveldef_t =
   | Open of string
   | Extern of perkident * perktype
   | Def of perkdef * perktype option
-  | Fundef of perkfundef
+  | Fundef of perkfundef * bool  (** fundef, is public?*)
+  | PolymorphicFundef of perkfundef * perktype
   | Archetype of perkident * declorfun_a list
   | Model of perkident * perkident list * deforfun_a list
   | Struct of perkident * perkdef list
+  | ADT of perkident * (perkident * perktype list) list
+  | TLSkip
 
 and deforfun_t =
   | DefVar of perktype_attribute list * perkdef
@@ -192,6 +215,8 @@ and command_a = command_t annotated [@@deriving show, eq]
 and topleveldef_a = topleveldef_t annotated [@@deriving show, eq]
 and deforfun_a = deforfun_t annotated [@@deriving show, eq]
 and declorfun_a = declorfun_t annotated [@@deriving show, eq]
+and match_entry_a = match_entry_t annotated [@@deriving show, eq]
+and match_case_a = match_case_t annotated [@@deriving show, eq]
 
 let all_vars : (perkident * perktype) list ref = ref []
 
@@ -200,3 +225,35 @@ let filter_var_table () =
     List.fold_left
       (fun l (id, typ) -> if List.mem (id, typ) l then l else (id, typ) :: l)
       [] !all_vars
+
+(** Discards attributes and qualifiers of a type. *)
+and discard_type_aq (typ : perktype) : perktype_partial =
+  let _a, t, _q = typ in
+  t
+
+let rec show_perktype (typ : perktype) : string =
+  match discard_type_aq typ with
+  | Basetype s -> s
+  | Funtype (args, ret) ->
+      Printf.sprintf "(%s) -> %s"
+        (String.concat ", " (List.map show_perktype args))
+        (show_perktype ret)
+  | Vararg -> "..."
+  | Tupletype ts ->
+      Printf.sprintf "(%s)" (String.concat ", " (List.map show_perktype ts))
+  | Arraytype (t, n) ->
+      Printf.sprintf "[%s]"
+        (show_perktype t ^ match n with Some n -> string_of_int n | None -> "")
+  | Lambdatype (params, ret, _free_vars) ->
+      Printf.sprintf "(%s) => %s"
+        (String.concat ", " (List.map show_perktype params))
+        (show_perktype ret)
+  | Pointertype t -> Printf.sprintf "%s*" (show_perktype t)
+  | Infer -> "?"
+  | Modeltype (name, _, _, _, _) -> name
+  | ArcheType (name, _) -> name
+  | Structtype (name, _) -> name
+  | AlgebraicType (name, _) -> name
+  | Optiontype t -> Printf.sprintf "%s?" (show_perktype t)
+  | ArchetypeSum ts ->
+      Printf.sprintf "<%s>" (String.concat " + " (List.map show_perktype ts))

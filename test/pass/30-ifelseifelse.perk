@@ -12,5 +12,7 @@ fun main () : int {
             printf("%d >= 8\n", i);
             i = i + 3;
         }
-    }
+    };
+
+    return 0;
 }

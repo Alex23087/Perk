@@ -2,18 +2,46 @@ open Ast
 open Codegen
 open Errors (*EWWOWS*)
 open Typecheck
+open File_info
 
 let opens_hashmap : (string, unit) Hashtbl.t = Hashtbl.create 16
 
 let add_import (import : string) : bool =
+  let import = Fpath.to_string (Fpath.normalize (Fpath.v import)) in
+  (* Printf.printf "%s" (Printf.sprintf "Adding import to hashmap: %s\n" import); *)
   if Hashtbl.mem opens_hashmap import then false
   else (
     Hashtbl.add opens_hashmap import ();
     true)
 
+let run_and_capture cmd =
+  let tmp = Filename.temp_file "ocaml_cmd" ".txt" in
+  let full_cmd = cmd ^ " > " ^ tmp in
+  let _ = Sys.command full_cmd in
+  let ic = open_in tmp in
+  let len = in_channel_length ic in
+  let result = really_input_string ic len in
+  close_in ic;
+  Sys.remove tmp;
+  result
+
+let gather_numerical_lengths () : unit =
+  let res = run_and_capture "echo | gcc -dM -E - | grep SIZEOF" in
+  res |> String.split_on_char '\n'
+  |> List.filter (fun line -> String.trim line <> "")
+  |> List.iter (fun line ->
+         match String.split_on_char ' ' (String.trim line) with
+         | [ def; macro; value ] when String.starts_with ~prefix:"#define" def
+           ->
+             let key = macro in
+             let value = int_of_string value in
+             Utils.say_here (Printf.sprintf "Added size type: %s %d" key value);
+             Hashtbl.add Utils.numerical_sizes key value
+         | _ as s ->
+             failwith
+               ("Unexpected format in numerical lengths: " ^ String.concat " " s))
+
 let ast_of_filename filename =
-  let old_fnm = !Utils.fnm in
-  Utils.fnm := filename;
   let inchn = open_in filename in
   let ast_of_channel inchn =
     let lexbuf = Sedlexing.Utf8.from_channel inchn in
@@ -49,84 +77,362 @@ let ast_of_filename filename =
   in
   let ast = ast_of_channel inchn in
   close_in inchn;
-  Utils.fnm := old_fnm;
   ast
 
-let rec compile_program ?(dir : string option) (input_file : string)
-    (output_file : string option) =
-  let out_file =
-    if Option.is_some output_file then Option.get output_file
-    else Filename.chop_suffix input_file ".perk" ^ ".c"
-  in
+let singletonamble =
+  if !Utils.static_compilation then ""
+  else
+    "#include <malloc.h>\n#include <string.h>\n#include <stdbool.h>\n"
+    ^ "#ifndef LAMBDUMMY_PERK\n#define LAMBDUMMY_PERK\n"
+    ^ "typedef struct _lambdummy_type {\n\
+      \    void *env;\n\
+      \    void *func;\n\
+       } __lambdummy_type;\n\
+       static __lambdummy_type *__lambdummy;\n\n\
+      \ __lambdummy_type *alloclabmd(int size, void *labmda, void *env)\n\
+       {\n\
+      \    __lambdummy_type *ptr = malloc(sizeof(__lambdummy_type));\n\
+      \    ptr->env = malloc(size);\n\
+      \    memcpy(ptr->env, env, size);\n\
+      \    ptr->func = labmda;\n\
+      \    return ptr;\n\
+       }" ^ "\n\n"
+    ^ "#define CALL_LAMBDA0(l, t) (__lambdummy = (__lambdummy_type *)l, \
+       ((t)(__lambdummy->func))())\n\
+       #define CALL_LAMBDA(l, t, ...) (__lambdummy = (__lambdummy_type \
+       *)l,       ((t)(__lambdummy->func))(__VA_ARGS__))" ^ "\n\n" ^ "#endif\n"
 
+let rec compile_program ?(dir : string option) ?(dry_run = false)
+    ?(json_format = false) (static_compilation : bool) (verbose : bool)
+    (input_file : string) (output_dir : string option) (c_compiler : string)
+    (c_flags : string) =
   (* let out_ast_file = Filename.chop_suffix input_file ".perk" ^ ".ast" in *)
-  try
-    let _ast, compiled =
-      if Option.is_some dir then process_file ?dir input_file
-      else process_file input_file
-    in
+  gather_numerical_lengths ();
 
-    (* let oaf = open_out out_ast_file in
+  Utils.static_compilation := static_compilation;
+  Utils.verbose := verbose;
+  Utils.c_compiler := c_compiler;
+  Utils.c_flags := c_flags;
+
+  Utils.target_dir_name :=
+    if Option.is_some output_dir then Option.get output_dir else "";
+
+  try
+    let _ast, (compiled_preamble, compiled_body) =
+      process_file ?dir input_file true
+    in
+    if not dry_run then (
+      let out_file_c =
+        (* if Option.is_some output_file then Option.get output_file else *)
+        Filename.concat !Utils.target_dir_name
+          (Filename.chop_suffix input_file ".perk" ^ ".c")
+      in
+
+      let out_file_h =
+        (* if Option.is_some output_file then Option.get output_file else *)
+        Filename.concat !Utils.target_dir_name
+          (Filename.chop_suffix input_file ".perk" ^ ".h")
+      in
+      let lambdummy_h =
+        Filename.concat !Utils.target_dir_name
+          (Filename.concat (Filename.dirname input_file) "perklang.h")
+      in
+
+      Utils.create_file_with_dirs out_file_c;
+      Utils.create_file_with_dirs out_file_h;
+      Utils.create_file_with_dirs lambdummy_h;
+
+      (* let oaf = open_out out_ast_file in
     output_string oaf ast; *)
-    let oc = open_out out_file in
-    output_string oc compiled;
-    close_out oc
+      let oc = open_out out_file_c in
+      output_string oc ("#include \"perklang.h\"\n" ^ compiled_body);
+      close_out oc;
+      let oc = open_out out_file_h in
+      output_string oc compiled_preamble;
+      close_out oc;
+      let oc = open_out lambdummy_h in
+      output_string oc singletonamble;
+      close_out oc)
   with
   | Syntax_error ((start_line, start_col), (end_line, end_col), input_file, msg)
     ->
-      Printf.eprintf
-        "\027[31mSyntax error at line %d, column %d: %s, ending at line %d, \
-         column %d in file %s\027[0m\n"
-        start_line start_col msg end_line end_col input_file;
+      if json_format then (
+        Printf.printf
+          "{\"error\": \"syntax\", \"start_line\": %d, \"start_col\": %d, \
+           \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
+           \"%s\"}\n"
+          start_line start_col end_line end_col (String.escaped msg) input_file;
+        exit 0)
+      else
+        Printf.eprintf
+          "\027[31mSyntax error at line %d, column %d: %s, ending at line %d, \
+           column %d in file %s\027[0m\n"
+          start_line start_col msg end_line end_col input_file;
       exit 1
   | Lexing_error ((start_line, start_col), (end_line, end_col), input_file, msg)
     ->
-      Printf.eprintf
-        "\027[31mLexing error at line %d, column %d: %s, ending at line %d, \
-         column %d in file %s\027[0m\n"
-        start_line start_col msg end_line end_col input_file;
+      if json_format then (
+        Printf.printf
+          "{\"error\": \"lexing\", \"start_line\": %d, \"start_col\": %d, \
+           \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
+           \"%s\"}\n"
+          start_line start_col end_line end_col (String.escaped msg) input_file;
+        exit 0)
+      else
+        Printf.eprintf
+          "\027[31mLexing error at line %d, column %d: %s, ending at line %d, \
+           column %d in file %s\027[0m\n"
+          start_line start_col msg end_line end_col input_file;
       exit 1
   | Type_error ((start_line, start_col), (end_line, end_col), input_file, msg)
     ->
-      Printf.eprintf
-        "\027[31mType error at line %d, column %d: %s, ending at line %d, \
-         column %d in file %s\027[0m\n"
-        start_line start_col msg end_line end_col input_file;
+      if json_format then (
+        Printf.printf
+          "{\"error\": \"typecheck\", \"start_line\": %d, \"start_col\": %d, \
+           \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
+           \"%s\"}\n"
+          start_line start_col end_line end_col (String.escaped msg) input_file;
+        exit 0)
+      else
+        Printf.eprintf
+          "\027[31mType error at line %d, column %d: %s, ending at line %d, \
+           column %d in file %s\027[0m\n"
+          start_line start_col msg end_line end_col input_file;
       exit 1
   | Parser.Error ->
-      Printf.eprintf
-        "\027[31mParsing error: unexpected token in file %s\027[0m\n" input_file;
+      if json_format then (
+        Printf.printf
+          "{\"error\": \"parse\", \"message\": \"Unexpected token in file %s\"}\n"
+          !Utils.fnm;
+        exit 0)
+      else
+        Printf.eprintf
+          "\027[31mParsing error: unexpected token in file %s\027[0m\n"
+          input_file;
       exit 1
   | Compilation_error
       ((start_line, start_col), (end_line, end_col), input_file, msg) ->
-      Printf.eprintf
-        "\027[31mCompilation error at line %d, column %d: %s, ending at line \
-         %d, column %d in file %s\027[0m\n"
-        start_line start_col msg end_line end_col input_file;
+      if json_format then (
+        Printf.printf
+          "{\"error\": \"compilation\", \"start_line\": %d, \"start_col\": %d, \
+           \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
+           \"%s\"}\n"
+          start_line start_col end_line end_col (String.escaped msg) input_file;
+        exit 0)
+      else
+        Printf.eprintf
+          "\027[31mCompilation error at line %d, column %d: %s, ending at line \
+           %d, column %d in file %s\027[0m\n"
+          start_line start_col msg end_line end_col input_file;
       exit 1
 
-and process_file ?(dir : string option) (filename : string) : string * string =
+(** Generates the global polyfun definitions that are not local to the current
+    file *)
+and add_polydefs ast =
+  let definitions =
+    List.fold_right
+      (fun (tld, t_actual) acc ->
+        annot_copy tld
+          (match ( $ ) tld with
+          | PolymorphicFundef ((t_res, id, args, body), t_param) ->
+              if not (polyfun_is_already_codegened id t_actual) then (
+                let param_types = List.map fst args in
+                (* the definition is added to the file-local polyfun hashtable *)
+                Hashtbl.add
+                  (File_info.get_file_local_polyfuns ())
+                  id
+                  (param_types, t_res, t_param);
+
+                (* Printf.printf
+                  "function %s<%s> bout to be instantieted in add polydefs\n" id
+                  (show_perktype t_actual); *)
+
+                (* the polyfun instance is set as code-generated so it is not generated again *)
+                set_polyfun_as_codegened id t_actual;
+                let x =
+                  Fundef
+                    ( ( Polymorphism.subst_type t_res t_param t_actual,
+                        id ^ "perk_polym_"
+                        ^ Type_symbol_table.type_descriptor_of_perktype t_actual,
+                        List.map
+                          (fun x ->
+                            Polymorphism.subst_perkvardesc x t_param t_actual)
+                          args,
+                        Polymorphism.subst_type_command body t_param t_actual ),
+                      false )
+                in
+                let t = typecheck_topleveldef (annot_copy tld x) in
+                ( $ ) t)
+              else
+                (* Printf.printf "%s<%s> was already defined\n" id
+                  (show_perktype t_actual); *)
+                TLSkip
+          | _ ->
+              failwith
+                "should not happen - non-polydef was passed to add_polydefs")
+        :: acc)
+      !(get_polyfuns_to_be_defined ())
+      []
+  in
+  definitions @ ast
+
+(** for each polydef, typedefs all of its instances. TODO check if this is
+    necessary *)
+and check_polydefs_pass (ast : topleveldef_a list) =
+  List.map
+    (fun tld ->
+      match ( $ ) tld with
+      | PolymorphicFundef ((t_res, id, args, body), t_param) ->
+          let instances =
+            try Hashtbl.find (File_info.get_polyfun_instances ()) id
+            with Not_found -> []
+          in
+
+          List.map
+            (fun (t_actual, _) ->
+              let fundef =
+                Fundef
+                  ( ( Polymorphism.subst_type t_res t_param t_actual,
+                      id ^ "perk_polym_"
+                      ^ Type_symbol_table.type_descriptor_of_perktype t_actual,
+                      List.map
+                        (fun x ->
+                          Polymorphism.subst_perkvardesc x t_param t_actual)
+                        args,
+                      Polymorphism.subst_type_command body t_param t_actual ),
+                    false )
+              in
+              let t = typecheck_topleveldef (annot_copy tld fundef) in
+              t)
+            instances
+          |> ignore
+      | _ -> ())
+    ast
+  |> ignore
+
+and process_file ?(dir : string option) (filename : string) (is_main : bool) :
+    string * (string * string) =
+  (* creates new file info tables*)
+  set_new_file_info ();
   let filename =
     (* If a directory override is provided, behave as if the file were in that directory *)
-    if Option.is_some dir then
+    if Option.is_some dir && not is_main then
       Filename.concat (Option.get dir) (Filename.basename filename)
     else filename
   in
   let filename_canonical =
     Fpath.to_string (Fpath.normalize (Fpath.v filename))
   in
-  add_import filename_canonical |> ignore;
   let dirname =
     if dir = None then Filename.dirname filename else Option.get dir
   in
+
+  if not (!Utils.target_dir_name = "") then
+    Utils.copy_non_perk_files dirname
+      (Filename.concat !Utils.target_dir_name dirname);
+
+  (* Get base name here because generated .h is in the same directory as the .c *)
+  let header_name =
+    Filename.chop_suffix (Filename.basename filename_canonical) ".perk" ^ ".h"
+  in
+  (* Printf.printf "%s"
+    (Printf.sprintf "Processing file: %s (canonical: %s)\n" filename
+       filename_canonical); *)
+  add_import filename_canonical |> ignore;
+
+  let old_fnm = !Utils.fnm in
+  Utils.fnm := filename;
   let ast = ast_of_filename filename in
-  let ast = expand_opens dirname ast in
+  let ast = opens_to_imports dirname ast in
+  let ast = remove_opens ast in
   let ast = typecheck_program ast in
+  let ast = add_polydefs ast in
+  check_polydefs_pass ast;
   let out =
     ( String.concat "\n" (List.map show_topleveldef_a ast),
-      ast |> codegen_program )
+      ast |> codegen_program header_name is_main )
   in
+  (* Hashtbl.clear Codegen.lambdas_hashmap;
+  Hashtbl.clear Codegen.public_fundecl_symbol_table;
+  Hashtbl.clear Codegen.private_fundecl_symbol_table;
+  import_list := [];
+  (* local polyfuns and polyfun instances are removed - only global polyfuns are preserved *)
+  Hashtbl.clear Polymorphism.polyfun_instances;
+  Hashtbl.clear Polymorphism.file_local_polyfuns;
+  Polymorphism.polyfuns_to_be_defined := []; *)
+
+  if old_fnm <> "" then Utils.fnm := old_fnm;
   out
+
+and opens_to_imports (dir : string) (ast : topleveldef_a list) :
+    topleveldef_a list =
+  let import_paths = process_opens dir ast in
+  let imports =
+    List.map
+      (fun (i, n) ->
+        (* Printf.printf "import file: %s, dir: %s, fnm: %s, adj: %s\n" i dir
+          !Utils.fnm i; *)
+        annot_copy n
+          (Import ("\"" ^ (Filename.chop_suffix i ".perk" (* *) ^ ".h") ^ "\"")))
+      import_paths
+  in
+  imports @ ast
+
+and remove_opens ast : topleveldef_a list =
+  match ast with
+  | { loc = _; node = Open _ } :: rest -> remove_opens rest
+  | x :: rest -> x :: remove_opens rest
+  | [] -> []
+
+(** @return original path as written in the file, and the Open ast node *)
+and process_opens (dir : string) (ast : topleveldef_a list) :
+    (string * topleveldef_a) list =
+  match ast with
+  | ({ loc = _; node = Open i } as node) :: rest ->
+      let open_filename =
+        if Fpath.is_rel (Fpath.v i) then
+          Fpath.(to_string (normalize (v dir // v i)))
+        else Fpath.(to_string (normalize (v i)))
+      in
+      (* let open_filename = i in *)
+      let did_add = add_import open_filename in
+      if not (Sys.file_exists open_filename) then
+        raise_compilation_error node
+          (Printf.sprintf "File %s does not exist" open_filename);
+      if did_add then (
+        let fi = save_file_info () in
+        let _ast, (compiled_preamble, compiled_body) =
+          (* Printf.printf "%s"
+            (Printf.sprintf "Processing open file: %s\n" open_filename); *)
+          process_file open_filename false
+        in
+        restore_file_info fi;
+
+        (* TODO makeshift implementation, does not work for nested opens *)
+        let out_file_c =
+          Filename.concat !Utils.target_dir_name
+            (Filename.chop_suffix open_filename ".perk" ^ ".c")
+        in
+        let out_file_h =
+          Filename.concat !Utils.target_dir_name
+            (Filename.chop_suffix open_filename ".perk" ^ ".h")
+        in
+
+        Utils.create_file_with_dirs out_file_c;
+        Utils.create_file_with_dirs out_file_h;
+
+        let oc = open_out out_file_c in
+        (* Printf.printf "%s" (Printf.sprintf "saving file %s\n" out_file_c); *)
+        output_string oc compiled_body;
+        close_out oc;
+        let oc = open_out out_file_h in
+        (* Printf.printf "%s" (Printf.sprintf "saving file %s\n" out_file_h); *)
+        output_string oc compiled_preamble;
+        close_out oc;
+        [ (i, node) ] @ process_opens dir rest)
+      else process_opens dir rest
+  | _ :: rest -> process_opens dir rest
+  | [] -> []
 
 and expand_opens (dir : string) (ast : topleveldef_a list) : topleveldef_a list
     =
@@ -147,45 +453,22 @@ and expand_opens (dir : string) (ast : topleveldef_a list) : topleveldef_a list
           (ast_of_filename open_filename)
         @ expand_opens dir rest
       else expand_opens dir rest
+  (* | ({ loc = _; node = Import i } as node) :: rest ->
+      if String.starts_with ~prefix:"\"" i then (
+        let i = String.sub i 1 (String.length i - 2) in
+        let import_filename =
+          if Fpath.is_rel (Fpath.v i) then
+            Fpath.(to_string (normalize (v dir // v i)))
+          else Fpath.(to_string (normalize (v i)))
+        in
+        let did_add = add_import import_filename in
+        if not (Sys.file_exists import_filename) then
+          raise_compilation_error node
+            (Printf.sprintf "File %s does not exist" import_filename);
+        if did_add then
+          let import_filename = "\"" ^ import_filename ^ "\"" in
+          annot_copy node (Import import_filename) :: expand_opens dir rest
+        else expand_opens dir rest)
+      else node :: expand_opens dir rest *)
   | x :: rest -> x :: expand_opens dir rest
   | [] -> []
-
-and check_file ?dir (filename : string) : unit =
-  try process_file ?dir filename |> ignore with
-  | Syntax_error ((start_line, start_col), (end_line, end_col), input_file, msg)
-    ->
-      Printf.printf
-        "{\"error\": \"syntax\", \"start_line\": %d, \"start_col\": %d, \
-         \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
-         \"%s\"}\n"
-        start_line start_col end_line end_col (String.escaped msg) input_file;
-      exit 0
-  | Lexing_error ((start_line, start_col), (end_line, end_col), input_file, msg)
-    ->
-      Printf.printf
-        "{\"error\": \"lexing\", \"start_line\": %d, \"start_col\": %d, \
-         \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
-         \"%s\"}\n"
-        start_line start_col end_line end_col (String.escaped msg) input_file;
-      exit 0
-  | Type_error ((start_line, start_col), (end_line, end_col), input_file, msg)
-    ->
-      Printf.printf
-        "{\"error\": \"typecheck\", \"start_line\": %d, \"start_col\": %d, \
-         \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
-         \"%s\"}\n"
-        start_line start_col end_line end_col (String.escaped msg) input_file;
-      exit 0
-  | Parser.Error ->
-      Printf.printf
-        "{\"error\": \"parse\", \"message\": \"Unexpected token in file %s\"}\n"
-        !Utils.fnm;
-      exit 0
-  | Compilation_error
-      ((start_line, start_col), (end_line, end_col), input_file, msg) ->
-      Printf.printf
-        "{\"error\": \"compilation\", \"start_line\": %d, \"start_col\": %d, \
-         \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
-         \"%s\"}\n"
-        start_line start_col end_line end_col (String.escaped msg) input_file;
-      exit 0

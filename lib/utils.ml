@@ -7,13 +7,24 @@ open Errors
 let fnm = ref ""
 
 (** Internal flag to denote whether the current compilation mode is static *)
-let static_compilation : bool = false
+let static_compilation : bool ref = ref false
+
+(** Internal flag to enable verbose compilation *)
+let verbose : bool ref = ref false
+
+let include_paths : string list ref = ref [ "/usr/include" ]
+let c_compiler : string ref = ref "gcc"
+let c_flags : string ref = ref ""
+
+(** Hashtable containing sizes of numerical types - I am the walnut -- goo goo
+    g-joob*)
+let numerical_sizes : (string, int) Hashtbl.t = Hashtbl.create 10
 
 (** Debug function that can be enabled to track function call numbers. *)
 let rec say_here (_msg : string) : unit =
-  (* Printf.printf "%s\n" _msg;
-     flush stdout *)
-  ()
+  if !verbose then (
+    Printf.printf "%s\n" _msg;
+    flush stdout)
 
 (** Utility function to add a parameter (i.e., self) to a type, iff it is a
     functional *)
@@ -48,13 +59,20 @@ and add_parameter_to_func_2 (param_type : perktype) (func_type : perktype) :
       (a, Lambdatype (new_params, ret, free_vars), d)
   | _ -> func_type
 
+and vararg : perktype = ([], Vararg, [])
 and void_type : perktype = ([], Basetype "void", [])
 and int_type : perktype = ([], Basetype "int", [])
 and float_type : perktype = ([], Basetype "float", [])
 and char_type : perktype = ([], Basetype "char", [])
 and bool_type : perktype = ([], Basetype "bool", [])
 and void_pointer : perktype = ([], Pointertype ([], Basetype "void", []), [])
+and pointer_of_type (typ : perktype) : perktype = ([], Pointertype typ, [])
+
+(** Creates a self type for a given name. *)
 and self_type (name : perkident) : perktype = ([], Basetype name, [])
+
+and is_unit_type (typ : perktype) : bool =
+  match discard_type_aq typ with Basetype "void" -> true | _ -> false
 
 (** Transorms a lambda to a function *)
 and func_of_lambda_void (t : perktype) : perktype =
@@ -129,15 +147,10 @@ and lambda_def_of_func_def_ (def : perkdef) : perkdef =
       let new_expr = lambda_expr_of_func_expr expr typ in
       ((new_typ, id), new_expr)
 
-(** Discards attributes and qualifiers of a type. *)
-and discard_type_aq (typ : perktype) : perktype_partial =
-  let _a, t, _q = typ in
-  t
-
 (** Tranforms a function definition to a lambda definition *)
 and lambda_of_func (func : perkfundef) : expr_t =
   let typ, _id, args, body = func in
-  Lambda (typ, args, body, [])
+  Lambda (typ, args, body, [], None)
 
 (** Transform a variable or function definition to a declaration. *)
 and decl_of_deforfun (def : deforfun_a) : perktype_attribute list * perkdecl =
@@ -149,10 +162,10 @@ and decl_of_deforfun (def : deforfun_a) : perktype_attribute list * perkdecl =
   (* If this def is a lambda, make its type a lambda type *)
   | DefVar (attr, ((typ, id), _)) ->
       (* let new_typ =
-        match typ with
-        | a, Funtype (params, ret), d -> (a, Lambdatype (params, ret, []), d)
-        | _ -> typ
-      in *)
+           match typ with
+           | a, Funtype (params, ret), d -> (a, Lambdatype (params, ret, []), d)
+           | _ -> typ
+         in *)
       (attr, (typ, id))
 
 (** Transform a variable or function declaration to a declaration. *)
@@ -172,10 +185,10 @@ and decl_of_declorfun (def : declorfun_a) : perkdecl =
   (* If this def is a lambda, make its type a lambda type *)
   | DeclVar (typ, id) ->
       (* let new_typ =
-        match typ with
-        | a, Funtype (params, ret), d -> (a, Lambdatype (params, ret, []), d)
-        | _ -> typ
-      in *)
+           match typ with
+           | a, Funtype (params, ret), d -> (a, Lambdatype (params, ret, []), d)
+           | _ -> typ
+         in *)
       (typ, id)
 
 (** Given a function definition, returns its function type. *)
@@ -204,3 +217,65 @@ and add_attrs_to_deforfun (attrs : perktype_attribute list) (def : deforfun_a) :
       annot_copy def (DefFun (attrs @ old_attrs, (ret, id, params, body)))
   | DefVar (old_attrs, ((typ, id), expr)) ->
       annot_copy def (DefVar (attrs @ old_attrs, ((typ, id), expr)))
+
+and add_lambda_name (e : expr_a) (name : perkident) : expr_a =
+  match ( $ ) e with
+  | Lambda (typ, params, body, free_vars, _) ->
+      annot_copy e (Lambda (typ, params, body, free_vars, Some name))
+  | _ -> e
+
+(** creates a directory along with all the directories along a path *)
+let rec mkdir_p path =
+  if Sys.file_exists path then
+    if Sys.is_directory path then ()
+    else failwith (path ^ " exists but is not a directory")
+  else
+    let parent = Filename.dirname path in
+    if parent <> path then mkdir_p parent;
+    Sys.mkdir path 0o755
+
+let create_file_with_dirs path =
+  let dir = Filename.dirname path in
+  mkdir_p dir;
+  let oc = open_out path in
+  (* write something if desired *)
+  close_out oc
+
+(** the directory to which the output will be saved *)
+let target_dir_name = ref ""
+
+let copy_file src dst =
+  mkdir_p (Filename.dirname dst);
+  (* Printf.printf "copying file %s %s\n" src dst; *)
+  let buffer_size = 4096 in
+  let buffer = Bytes.create buffer_size in
+  let ic = open_in_bin src in
+  let oc = open_out_bin dst in
+  let rec loop () =
+    match input ic buffer 0 buffer_size with
+    | 0 -> ()
+    | n ->
+        output oc buffer 0 n;
+        loop ()
+  in
+  loop ();
+  close_in ic;
+  close_out oc
+
+(** copies all non source files to a target directory *)
+let rec copy_non_perk_files src_dir dst_dir =
+  let files = Sys.readdir src_dir in
+  Array.iter
+    (fun file ->
+      let src_path = Filename.concat src_dir file in
+      let dst_path = Filename.concat dst_dir file in
+      (* Skip directories -- TODO: SKIPNT *)
+      if not (Sys.is_directory src_path) then (
+        if
+          (* Skip .perk files *)
+          not (Filename.check_suffix file ".perk")
+        then copy_file src_path dst_path)
+      else
+        (* If directory, copy recursively *)
+        copy_non_perk_files src_path dst_path)
+    files

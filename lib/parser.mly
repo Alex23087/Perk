@@ -2,11 +2,13 @@
   open Errors
   open Ast
   open Utils
+  open Parse_lexing_commons
+  open Keyword_tracker
 %}
 
 /* Tokens declarations */
 %token EOF
-%token Plus Eq Neq Lt Leq Gt Geq Minus Star Div Ampersand PlusPlus MinusMinus Dot Ellipsis Question Land Lor
+%token Plus Eq Neq Lt Leq Gt Geq Minus Star Div Ampersand PlusPlus MinusMinus Dot Ellipsis Question Land Lor ShL ShR
 %token Fun Assign If Then Else While Do For
 %token <bool> Boolean
 %token <int> Integer
@@ -21,9 +23,10 @@
 %token Const Volatile Restrict
 %token <string> InlineC
 %token Import ImportLocal Open
-%token Archetype Model Summon Banish Cast
+%token Archetype Model Summon Banish Cast Sizeof
 %token Struct Make
-%token Nothing Something Of
+%token ADT Pipe Match When Matchall Constr Var BTICK
+%token Nothing Something Of Poly
 
 /* Precedence and associativity specification */
 %left Semicolon
@@ -61,6 +64,7 @@
 %type <Ast.perkident list> ident_list
 %type <Ast.perktype list> perktype_list
 %type <Ast.command_a> if_command
+%type <perkident * (Ast.perktype list)> constructor_type
 
 // %on_error_reduce command
 
@@ -74,6 +78,11 @@ program:
   | separated_list(Semicolon, topleveldef) error                                                           { raise (ParseError(!fnm, "unexpected token after program (Perhaps you forgot a ; ?)")) }
   | EOF                                                                                                    { raise (ParseError(!fnm, "empty program")) }
 
+constructor_type:
+  | i = Ident LParen l = separated_list(Comma, perktype) RParen                                            {add_constructor_name i; (i, l) }
+  | i = Ident                                                                                              {add_constructor_name i ; (i, []) }  | i = Ident error                                                                                        { raise (ParseError(!fnm, ("invalid type for constructor" ^ i))) }
+  | error                                                                                                  { raise (ParseError(!fnm, "constructor type expected")) }
+
 topleveldef:
   | Import i = String                                                                                      { annotate_2_code !fnm $loc (Ast.Import ("<" ^ i ^ ">")) }
   | ImportLocal i = String                                                                                 { annotate_2_code !fnm $loc (Ast.Import ("\"" ^ i ^ "\"")) }
@@ -85,7 +94,11 @@ topleveldef:
   | Model i = Ident Colon il = ident_list LBrace l = perkdeforfun_list RBrace                              { annotate_2_code !fnm $loc (Ast.Model (i, il, l)) }
   | Model i = Ident LBrace l = perkdeforfun_list RBrace                                                    { annotate_2_code !fnm $loc (Ast.Model (i, [], l)) }
   | Struct i = Ident LBrace l = separated_list(Comma, perkdef) RBrace                                      { annotate_2_code !fnm $loc (Ast.Struct (i, l)) }
-  | Fun pf = perkfun                                                                                       { annotate_2_code !fnm $loc (Ast.Fundef (pf)) }
+  | Struct Ident LBrace error                                                                              { raise (ParseError(!fnm, "unexpected token in struct definition")) }
+  | ADT i = Ident Assign option(Pipe) l = separated_nonempty_list(Pipe, constructor_type)                  { annotate_2_code !fnm $loc (Ast.ADT (i, l)) }   
+  | ADT Ident error                                                                                        { raise (ParseError(!fnm, "expected a list of constructors after ADT definition")) }           
+  | Fun pf = perkfun                                                                                       { annotate_2_code !fnm $loc (Ast.Fundef (pf, true)) }
+  | Fun Lt t=perktype Gt pf = perkfun                                                                      { annotate_2_code !fnm $loc (Ast.PolymorphicFundef (pf, t)) }
   | error                                                                                                  { raise (ParseError(!fnm, "top-level definition expected")) }
 
 
@@ -112,8 +125,9 @@ command:
   | Banish i = Ident                                                                                       { annotate_2_code !fnm $loc (Banish i) }
   | Continue                                                                                               { annotate_2_code !fnm $loc (Ast.Continue) }
   | Break                                                                                                  { annotate_2_code !fnm $loc (Ast.Break) }
-
-
+  | Match LParen e = expr RParen LBrace l = separated_nonempty_list (Comma, match_entry) RBrace            {annotate_2_code !fnm $loc (Ast.Match(e, l, None))}
+  | Match LParen expr RParen LBrace separated_list (Comma, match_entry) error                              { raise (ParseError(!fnm, "invalid match statement (perhaps you are missing a ',' between cases?)")) }
+  | Match error                                                                                            { raise (ParseError(!fnm, "invalid match scrutinee (perhaps you are missing a '(' ?)")) }
   | error                                                                                                  { raise (ParseError(!fnm, "command expected")) }
   | command error                                                                                          { raise (ParseError(!fnm, "unexpected command (perhaps you are missing a ';'?)")) }
   | expr Assign error                                                                                      { raise (ParseError(!fnm, "expression expected on the right hand side of =")) }
@@ -122,7 +136,21 @@ command:
   | If LParen expr RParen error                                                                            { raise (ParseError(!fnm, "missing braces after if guard"))}
   | While LParen expr RParen error                                                                         { raise (ParseError(!fnm, "missing braces after while guard"))}
   | Do error                                                                                               { raise (ParseError(!fnm, "missing braces after do"))}
-  
+
+match_entry:
+  | m = match_case LBrace c = command RBrace                                                               {annotate_2_code !fnm $loc (Ast.MatchCase(m, None, c))}
+  | m = match_case When e = expr LBrace c = command RBrace                                                 {annotate_2_code !fnm $loc (Ast.MatchCase(m, Some e, c))}
+  | match_case error                                                                                       { raise (ParseError(!fnm, "invalid match case, expected case body")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "match case expected")) }
+
+match_case:
+  | BTICK LBrace e = expr RBrace {annotate_2_code !fnm $loc (Ast.MatchExpr(e))}
+  | Matchall {annotate_2_code !fnm $loc Ast.Matchall}
+  | Var i=Ident {annotate_2_code !fnm $loc (Ast.MatchVar(i, None))}
+  | Var i=Ident Colon t=perktype {annotate_2_code !fnm $loc (Ast.MatchVar(i, Some t))}
+  | i=Ident { annotate_2_code !fnm $loc (Ast.CompoundCase(i, []))}
+  | i=Ident LParen l = separated_nonempty_list(Comma, match_case) RParen { annotate_2_code !fnm $loc (Ast.CompoundCase(i, l))}
+  | error { raise (ParseError(!fnm, "expected match case")) }
 
 deforfun:
   | d = perkdef                                                                                            {annotate_2_code !fnm $loc (Ast.DefVar([], d))}
@@ -131,20 +159,19 @@ deforfun:
 perkdef:
   | Let vd = perkvardesc Assign e = expr                                                                   { (vd, e) }
   | Let perkvardesc error                                                                                  { raise (ParseError(!fnm, "expression expected: value must be initialized")) }
-  | error { raise (ParseError(!fnm, "definition expected (e.g. let banana : int = 5)")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "definition expected (e.g. let banana : int = 5)")) }
 
 perkfun:
   | i = Ident LParen id_list = perkvardesc_list RParen Colon rt = perktype LBrace c = command RBrace       { (rt, i, id_list, c) }
   | i = Ident LParen RParen Colon rt = perktype LBrace c = command RBrace                                  { (rt, i, [], c) }
   | Ident LParen perkvardesc_list RParen error                                                             { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
   | Ident LParen RParen error                                                                              { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
-  
 
 perkvardesc:
   | i = Ident Colon t = perktype                                                                           { (t, i) }
   | i = Ident Colon                                                                                        { (([], Ast.Infer, []), i) }
-  | error { raise (ParseError(!fnm, "variable descriptor expected (e.g. banana : int)")) }
-  | Ident error { raise (ParseError(!fnm, "variable descriptor expected (e.g. banana : int)")) }
+  | Ident error                                                                                            { raise (ParseError(!fnm, "type declaration expected (e.g. banana : int)")) }
+  | error                                                                                                  { match !last_keyword with | Some kw when kw <> "let" -> raise (ParseError(!fnm, "keyword '" ^ kw ^ "' cannot be used as variable identifier")) | _ -> raise (ParseError(!fnm, "variable descriptor expected (e.g. banana : int)")) }
 
 perkfundesc:
   | Fun i = Ident Colon t = perktype                                                                       { (t, i) }
@@ -156,32 +183,35 @@ declorfun:
 expr:
   | e1 = expr LParen args = separated_list(Comma, expr) RParen                                             { annotate_2_code !fnm $loc (Ast.Apply (e1, args, None)) }
   | e1 = expr b = binop e2 = expr                                                                          { annotate_2_code !fnm $loc (Ast.Binop (b, e1, e2)) }
-  | u = preunop e = expr                                                                                   { annotate_2_code !fnm $loc (Ast.PreUnop (u, e)) }
+  | u = preunop e = expr                                                                                   { annotate_2_code !fnm $loc (Ast.PreUnop (u, e, None)) }
   | e = expr u = postunop %prec POSTFIX                                                                    { annotate_2_code !fnm $loc (Ast.PostUnop (u, e)) }
-  | LParen id_list = perkvardesc_list RParen Colon ret = perktype LBrace c = command RBrace                { annotate_2_code !fnm $loc (Ast.Lambda (ret, id_list, c, [])) }
-  | LParen RParen Colon ret = perktype LBrace c = command RBrace                                           { annotate_2_code !fnm $loc (Ast.Lambda (ret, [], c, [])) }
+  | LParen id_list = perkvardesc_list RParen Colon ret = perktype LBrace c = command RBrace                { annotate_2_code !fnm $loc (Ast.Lambda (ret, id_list, c, [], None)) }
+  | LParen RParen Colon ret = perktype LBrace c = command RBrace                                           { annotate_2_code !fnm $loc (Ast.Lambda (ret, [], c, [], None)) }
   | b = Boolean                                                                                            { annotate_2_code !fnm $loc (Ast.Bool (b)) }
   | n = Integer                                                                                            { annotate_2_code !fnm $loc (Ast.Int (n)) }
   | f = Float                                                                                              { annotate_2_code !fnm $loc (Ast.Float (f)) }
   | c = Character                                                                                          { annotate_2_code !fnm $loc (Ast.Char (c)) }
   | s = String                                                                                             { annotate_2_code !fnm $loc (Ast.String (s)) }
   | i = Ident                                                                                              { annotate_2_code !fnm $loc (Ast.Var(i)) }
+  | i = Ident Poly t = perktype                                                                            { annotate_2_code !fnm $loc (Ast.PolymorphicVar(i, t)) }
   | LParen e = expr RParen                                                                                 { annotate_2_code !fnm $loc (Ast.Parenthesised e) }
   | e1 = expr LBracket e2 = expr RBracket                                                                  { annotate_2_code !fnm $loc (Ast.Subscript (e1, e2)) }
   | Summon i = Ident LParen l = expr_list RParen                                                           { annotate_2_code !fnm $loc (Summon (i, l)) }
   | Summon i = Ident LParen RParen                                                                         { annotate_2_code !fnm $loc (Summon (i, [])) }
   | Make i = Ident LParen RParen                                                                           { annotate_2_code !fnm $loc (Ast.Make (i, [])) }
   | Make i = Ident LParen l = initializer_list RParen                                                      { annotate_2_code !fnm $loc (Ast.Make (i, l)) }
+  | Make Ident LParen error                                                                                { raise (ParseError(!fnm, "invalid make expression (perhaps you forgot a closing parenthesis?)")) }
   | e1 = expr Dot i = Ident                                                                                { annotate_2_code !fnm $loc (Ast.Access (e1, i, None, None)) }
   | Nothing                                                                                                { annotate_2_code !fnm $loc (Ast.Nothing ([], Ast.Infer, [])) }
   | Nothing Of t=perktype                                                                                  { annotate_2_code !fnm $loc (Ast.Nothing (t)) }
   | Something e = expr                                                                                     { annotate_2_code !fnm $loc (Ast.Something (e, ([], Ast.Infer, []))) }
   | LParen RParen                                                                                          { annotate_2_code !fnm $loc (Ast.Tuple ([], None)) }
   | LParen e = expr_list RParen                                                                            { annotate_2_code !fnm $loc (Ast.Tuple (e, None)) }
-  | id = Ident As tl = separated_nonempty_list (Plus, perktype)                                            { annotate_2_code !fnm $loc (Ast.As (id, tl, None)) }
+  | e = expr As tl = separated_nonempty_list (Plus, perktype)                                              { annotate_2_code !fnm $loc (Ast.As (e, tl, None)) }
   | LBracket RBracket                                                                                      { annotate_2_code !fnm $loc (Ast.Array [])}
   | LBracket l = separated_nonempty_list (Comma, expr) RBracket                                            { annotate_2_code !fnm $loc (Ast.Array l)}
   | Cast LParen typ = perktype Comma e = expr RParen                                                       { annotate_2_code !fnm $loc (Ast.Cast ((([],Ast.Infer,[]), typ), e)) }
+  | Sizeof LParen t = perktype RParen                                                                      { annotate_2_code !fnm $loc (Ast.Sizeof t) }
   | If guard = expr Then e1 = expr Else e2 = expr                                                          { annotate_2_code !fnm $loc (Ast.IfThenElseExpr (guard, e1, e2)) }
 
   | error                                                                                                  { raise (ParseError(!fnm, "expression expected")) }
@@ -248,6 +278,8 @@ perktype_partial:
   | Neq                                                                                                    { Ast.Neq }
   | Land                                                                                                   { Ast.Land }
   | Lor                                                                                                    { Ast.Lor }
+  | ShL                                                                                                    { Ast.ShL }
+  | ShR                                                                                                    { Ast.ShR }
 
 %inline preunop:
   | Minus                                                                                                  { Ast.Neg }
@@ -306,6 +338,8 @@ perkdeclorfun_list:
 initializer_list:
   | i = Ident Assign e = expr { [(i, e)] }
   | i = Ident Assign e = expr Comma il = initializer_list { (i, e) :: il }
+  | Ident error { raise (ParseError(!fnm, "initializer expected (e.g. field = value)")) }
+  | error { raise (ParseError(!fnm, "initializer expected (e.g. field = value)")) }
 
 spanish_inquisition:
   | error { raise (ParseError(!fnm, "Nobody expects the Spanish Inquisition!")) }

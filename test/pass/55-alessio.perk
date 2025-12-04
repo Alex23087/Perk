@@ -1,0 +1,17 @@
+import "stdio.h"
+
+fun main() : void {
+    let f := &(x: int, y: int) : int { return 0; };
+    let g := (x: int, y: int) : int {
+        if (y <= 0) {
+            return x;
+        } else {
+            return x + (*f)(x, y - 1);
+        }
+    };
+    *f = g;
+
+    let square := (x: int) : int { return g(x, x); };
+
+    printf("%d", square(4));
+}

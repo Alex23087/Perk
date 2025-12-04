@@ -1,0 +1,21 @@
+import "stdio.h"
+
+fun main(): void {
+    let x: int = 42;
+
+    match (true) {
+        `{x < 10} {
+            printf("x is less than 10\n");
+        },
+        `{11 < x && x < 20} {
+            printf("x is between 11 and 20\n");
+        },
+        _ {
+            printf("x is something else\n");
+        },
+        `{x == 42} {
+            // This shouldn't be executed because the default case is before it
+            printf("x is the answer to life, the universe, and everything\n");
+        }
+    }
+}

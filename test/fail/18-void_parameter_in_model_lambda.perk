@@ -1,0 +1,5 @@
+model Test {
+    let f := (a: void): void {
+        skip
+    }
+}

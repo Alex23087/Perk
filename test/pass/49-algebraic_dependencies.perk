@@ -1,0 +1,8 @@
+import "stdio.h"
+
+type Example =
+	| Something ((char*)?)
+
+fun main(): void {
+	return
+}

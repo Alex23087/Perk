@@ -1,0 +1,18 @@
+import "stdio.h"
+
+type List =
+    | Empty
+    | Cons (int, List)
+
+fun main(): void {
+    let l : List = Cons(10, Cons(20, Empty));
+
+    match (l) {
+        Cons(_, Cons(`{20}, `{Empty})) {
+            printf("Banana");
+        },
+        _ {
+            printf("Not Banana");
+        }
+    }
+}

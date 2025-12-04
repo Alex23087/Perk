@@ -22,7 +22,7 @@ clean:
 # Install dependencies
 .PHONY: deps
 deps:
-	opam install -y ppx_deriving sedlex menhir odoc cmdliner
+	opam install -y dune ppx_deriving sedlex menhir odoc cmdliner fpath
 	@if ! command -v gcc >/dev/null 2>&1; then \
 		echo "Warning: gcc is not installed or not in PATH." >&2; \
 	fi
@@ -65,7 +65,7 @@ debug_run: build
 		exit 1; \
 	fi
 	opam exec -- dune build --profile=dev
-	OCAMLRUNPARAM=b ./_build/default/bin/perkc.exe $(FILE)
+	OCAMLRUNPARAM=b ./_build/default/bin/perkc.exe --verbose $(FILE)
 	$(eval OUTFILE := $(basename $(FILE)).out)
 	$(eval SRCFILE := $(basename $(FILE)).c)
 	gcc -o $(OUTFILE) $(SRCFILE)
@@ -89,8 +89,10 @@ extensions:
 		exit 1; \
 	fi
 	cd tools/vscode-extensions/perk-syntax && \
+	npm install && \
 	vsce package --allow-missing-repository
 	cd tools/vscode-extensions/perk-vscode-lsp && \
+	npm install && \
 	npx tsc && \
 	vsce package --allow-missing-repository
 
@@ -184,6 +186,82 @@ test_pass: build
 			fi ;\
 		done ;\
 	fi
+# Test target: run tests on the compiler
+# If FILE is specified, run a single test file; otherwise, run all tests
+.PHONY: test_pass_static
+test_pass_static: build
+	@echo "Testing programs that are expected to pass..."
+	@if [ -n "$(FILE)" ]; then \
+		if [ ! -e test/pass_static/"$(FILE)"*.perk ]; then \
+			echo "File starting with $(FILE) does not exist." >&2; \
+			exit 1; \
+		fi ;\
+		FILE=$$(ls test/pass_static/$(FILE)*.perk | head -n 1) ;\
+		echo "Testing single file: $$FILE"; \
+		BASENAME="$${FILE%.*}"; \
+		EXPECTED="$${BASENAME}.expected"; \
+		CFILE="$${BASENAME}.c"; \
+		RES=$$(_build/default/bin/perkc.exe --static "$$FILE" > /dev/null && gcc -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast "$$CFILE" -o "$$(dirname $$FILE)/a.out" && "$$(dirname $$FILE)/a.out"); \
+		rm -f "$$(dirname $$FILE)/a.out"; \
+		if [ $$? -eq 0 ]; then \
+			if [ -e "$$EXPECTED" ]; then \
+				echo "$$RES" | diff "$$EXPECTED" -; \
+				if [ $$? -eq 0 ]; then \
+					:; \
+				else \
+					echo "Test Failed"; \
+				fi ;\
+			else \
+				echo "$$RES" ;\
+			fi;\
+		else \
+			echo "An error occurred while compiling $(basename $$FILE)" >&2;\
+			echo "$$RES" >&2;\
+		fi ;\
+	else \
+		if [ ! -d "test/pass_static" ]; then \
+			echo "Error: test/pass_static directory does not exist." >&2; \
+			exit 1; \
+		fi ;\
+		if [ ! -n "$$(ls -A test/pass_static/*.perk 2>/dev/null)" ]; then \
+			echo "Error: No .perk files found in test/pass_static directory." >&2; \
+			exit 1; \
+		fi ;\
+		COUNT=$$(ls -1 test/pass_static/*.perk | wc -l) ;\
+		CURRENT=0 ;\
+		IGNORE=() ;\
+		for f in test/pass_static/*.perk ; \
+		do \
+			CURRENT=$$((CURRENT+1)) ;\
+			if printf '%s\n' "$${IGNORE[@]}" | grep -q "^$$CURRENT$$"; then \
+				# echo "[$$CURRENT/$$COUNT] Ignoring $$(basename "$${f%.*}")" ;\
+				continue ;\
+			fi ;\
+			echo "[$$CURRENT/$$COUNT] Testing $$(basename "$${f%.*}")" ; \
+			EXPECTED="$${f%.*}.expected" ;\
+			RES=$$(_build/default/bin/perkc.exe --static "$$f" > /dev/null && gcc -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast "$${f%.*}.c" -o "$$(dirname $$f)/a.out" && "$$(dirname $$f)/a.out") ; \
+			rm -f "$$(dirname $$f)/a.out" ;\
+			if [ $$? -eq 0 ]; then \
+				# echo "$$RES" ;\
+				if [ -e "$$EXPECTED" ]; then \
+					echo "$$RES" | diff "$$EXPECTED" -;\
+					if [ $$? -eq 0 ]; then \
+						# rm -f "$${f%.*}.c" ;\
+						:\
+					else \
+						echo "Test Failed";\
+					fi ;\
+				else \
+					:;\
+					# rm -f "$${f%.*}.c" ;\
+					echo "$$RES" ;\
+				fi;\
+			else \
+				echo "An error occurred while compiling $$(basename $${f%.*})" >&2;\
+				echo "$$RES" >&2;\
+			fi ;\
+		done ;\
+	fi
 
 # Test programs that are expected to fail
 .PHONY: test_fail
@@ -244,12 +322,73 @@ test_fail: build
 		done ;\
 	fi
 
+# Test static programs that are expected to fail
+.PHONY: test_fail_static
+test_fail_static: build
+	@echo "Testing static programs that are expected to fail..."
+	@if [ -n "$(FILE)" ]; then \
+		if [ ! -e test/fail_static/"$(FILE)"*.perk ]; then \
+			echo "File starting with $(FILE) does not exist." >&2; \
+			exit 1; \
+		fi ;\
+		FILE=$$(ls test/fail_static/$(FILE)*.perk | head -n 1) ;\
+		echo "Testing single file: $$FILE"; \
+		BASENAME="$${FILE%.*}"; \
+		CFILE="$${BASENAME}.c"; \
+		RES=$$(_build/default/bin/perkc.exe --static "$$FILE" 2>&1); \
+		EXIT_CODE=$$?; \
+		rm -f "$$(dirname $$FILE)/a.out" "$$CFILE"; \
+		if [ $$EXIT_CODE -ne 0 ]; then \
+			# echo "$$RES" ;\
+			:;\
+		else \
+			echo "Expected failure, but the test passed." >&2;\
+			echo "File: $$FILE" >&2;\
+			echo "Output: $$RES" >&2;\
+			exit 1;\
+		fi ;\
+	else \
+		if [ ! -d "test/fail_static" ]; then \
+			echo "Error: test/fail_static directory does not exist." >&2; \
+			exit 1; \
+		fi ;\
+		if [ ! -n "$$(ls -A test/fail_static/*.perk 2>/dev/null)" ]; then \
+			echo "Error: No .perk files found in test/fail_static directory." >&2; \
+			exit 1; \
+		fi ;\
+		COUNT=$$(ls -1 test/fail_static/*.perk | wc -l) ;\
+		CURRENT=0 ;\
+		IGNORE=() ;\
+		for f in test/fail_static/*.perk ; \
+		do \
+			CURRENT=$$((CURRENT+1)) ;\
+			if printf '%s\n' "$${IGNORE[@]}" | grep -q "^$$CURRENT$$"; then \
+				# echo "[$$CURRENT/$$COUNT] Ignoring $$(basename "$${f%.*}")" ;\
+				continue ;\
+			fi ;\
+			echo "[$$CURRENT/$$COUNT] Testing $$(basename "$${f%.*}")" ; \
+			RES=$$(_build/default/bin/perkc.exe --static "$$f" 2>&1) ; \
+			EXIT_CODE=$$?; \
+			rm -f "$$(dirname $$f)/a.out" "$${f%.*}.c" ;\
+			if [ $$EXIT_CODE -ne 0 ]; then \
+				# echo "$$RES" ;\
+				:;\
+			else \
+				echo "Expected failure, but the test passed." >&2;\
+				echo "File: $$(basename $${f%.*})" >&2;\
+				echo "Output: $$RES" >&2;\
+			fi ;\
+		done ;\
+	fi
+
 # Run all tests (both pass and fail)
 .PHONY: test
 test:
 	@echo "Running all tests..."
 	@$(MAKE) test_pass
 	@$(MAKE) test_fail
+	@$(MAKE) test_pass_static
+	@$(MAKE) test_fail_static
 
 # Generate documentation
 .PHONY: docs

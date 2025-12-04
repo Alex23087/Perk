@@ -1,0 +1,5 @@
+fun main (): void {
+    let f := (a: void): void {
+        skip
+    }
+}

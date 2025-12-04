@@ -1,0 +1,12 @@
+import "stdio.h"
+
+fun <T> thing (a : T) : T {
+    let x : T = 5;
+    return a + x;
+} 
+
+fun main () : void {
+    printf("%d\n", thing @ int (5));
+    printf("%s\n", thing @ char* ("aaa"));
+    return;
+}

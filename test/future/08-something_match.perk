@@ -1,0 +1,23 @@
+import "stdio.h"
+
+type Example =
+	| Something (char*?)
+
+fun print_example(e: Example): void {
+	match (e) {
+		Something (some s) {
+			print("Got a string: " + s);
+		},
+		Something (none) {
+			print("Got nothing");
+		}
+	}
+}
+
+fun main(): void {
+	let e1: Example = Something("");
+	let e2: Example = Something(none);
+
+	print_example(e1);
+	print_example(e2);
+}

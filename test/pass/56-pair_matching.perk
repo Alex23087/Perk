@@ -1,0 +1,56 @@
+import "stdio.h"
+import "string.h"
+
+
+type atom = Atom (char*)
+type literal = Pos (atom) | Neg(atom)
+type clause = True | Disj (literal, clause)
+type formula = False | Conj (clause, formula)
+
+fun clause_forall (prop : literal => bool, c : clause) : bool {
+    match (c) {
+        True {return true},
+        Disj(var l, var c1) {return prop(l) && clause_forall (prop, c1)}
+    }
+}
+
+type literal_pair = LP (literal, literal)
+
+fun streq (a : char* , b : char*) : bool {
+    return strcmp(a, b) == 0 
+}
+
+fun lit_equal (l1 : literal, l2 : literal) : bool {
+    let lp := LP (l1, l2);
+    match (lp) {
+        LP(Pos(Atom(var x1)), Pos(Atom(var x2))) {return streq (x1, x2)},
+        LP(Neg(Atom(var x1)), Neg(Atom(var x2))) {return streq (x1, x2)},
+        _ {return false}
+    }
+}
+
+fun lit_occur_number (l : literal, c : clause) : int {
+    match (c) {
+        True {return 0},
+        Disj(var l1, var c1) {
+            return (if(lit_equal(l, l1)) then 1 else 0) + lit_occur_number (l, c1)
+        }
+    }
+}
+
+fun clause_equal (c1 : clause, c2 : clause) : bool {
+    return (clause_forall(
+        (l : literal) : bool {return lit_occur_number (l, c1) == lit_occur_number (l, c2)},
+        c1
+    )) && (clause_forall(
+        (l : literal) : bool {return lit_occur_number (l, c1) == lit_occur_number (l, c2)},
+        c2
+    ))
+}
+
+
+fun main () : void {
+    let c1 := Disj (Pos(Atom("x1")), Disj(Neg(Atom("x2")), True));
+    let c2 := Disj (Pos(Atom("x1")), Disj(Neg(Atom("x2")), True));
+    printf("%s\n", if clause_equal (c1, c2) then "equal" else "different");
+}

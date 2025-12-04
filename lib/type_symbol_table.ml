@@ -19,11 +19,12 @@ let rem_ptr s =
   if len < 4 then failwith "should not happen" else String.sub s 0 (len - 4)
 (* maybe should check the string is "_ptr" *)
 
-let rec is_builtin_type k (typ, code) =
+let is_builtin_type k (typ, code) =
   match typ with
-  | _, Pointertype typ1, _ ->
-      let k = rem_ptr k in
-      is_builtin_type k (typ1, code)
+  | _, Pointertype _typ1, _ ->
+      (* let k = rem_ptr k in
+      is_builtin_type k (typ1, code) *)
+      false
   | _ -> List.mem (k, (typ, code)) builtin_types
 
 let rec is_builtin_type_unlabeled typ =
@@ -31,14 +32,17 @@ let rec is_builtin_type_unlabeled typ =
   | _, Pointertype typ1, _ -> is_builtin_type_unlabeled typ1
   | _ -> List.mem typ builtin_types_unlabeled
 
-let type_symbol_table : (perkident, perktype * string option) Hashtbl.t =
-  let tbl = Hashtbl.create 10 in
-  List.iter (fun (id, t) -> Hashtbl.add tbl id t) builtin_types;
+let type_symbol_table :
+    (perkident, (perktype * string option) * string) Hashtbl.t =
+  let tbl : (perkident, (perktype * string option) * string) Hashtbl.t =
+    Hashtbl.create 10
+  in
+  List.iter (fun (id, t) -> Hashtbl.add tbl id (t, "")) builtin_types;
   tbl
 
 let lookup_type (id : perkident) : perktype option =
   if Hashtbl.mem type_symbol_table id then
-    let t, _code = Hashtbl.find type_symbol_table id in
+    let (t, _code), _from = Hashtbl.find type_symbol_table id in
     Some t
   else None
 
@@ -113,7 +117,8 @@ let resolve_type (typ : perktype) : perktype =
                     resolve_type_aux ~unfold:(unfold - 1) t lst
                   in
                   ((a, Arraytype (ret_t, n), q), ret_l)
-              | Structtype _ -> (typ, lst)
+              | Structtype _ -> (typ, lst) (* TODO: Fix type resolution *)
+              | AlgebraicType _ -> (typ, lst) (* TODO: Fix type resolution *)
               | ArcheType (name, decls) ->
                   let lst = typ :: lst in
                   let decls_t, decls_l =
@@ -199,6 +204,7 @@ let rec type_descriptor_of_perktype ?(erase_env = true) (t : perktype) : string
   match t with
   | Basetype s -> s
   | Structtype (id, _) -> id
+  | AlgebraicType (id, _) -> id
   | Funtype (args, ret) ->
       let args_str =
         String.concat "__" (List.map type_descriptor_of_perktype args)
@@ -251,16 +257,24 @@ and type_descriptor_of_environment ?(erase_env = false)
 let print_type_symbol_table () =
   Printf.printf "Type Symbol Table:\n";
   Hashtbl.iter
-    (fun id (typ, _code) ->
-      Printf.printf "%s: %s,\n\n" id (type_descriptor_of_perktype typ))
+    (fun id ((typ, _code), _from) ->
+      Printf.printf "%s: %s,\n\n" id (show_perktype typ))
     type_symbol_table
+
+let to_be_unbound : perktype list ref = ref []
+
+let unbind_generic_types () =
+  List.iter
+    (fun x -> Hashtbl.remove type_symbol_table (type_descriptor_of_perktype x))
+    !to_be_unbound
 
 (* Binds a type in the symble table. NOT Throws an exception if the name has already been defined *)
 let bind_type (t : perktype) =
+  if Polymorphism.is_type_generic t then to_be_unbound := t :: !to_be_unbound;
   say_here (Printf.sprintf "bind_type: %s" (show_perktype t));
   let id = type_descriptor_of_perktype t in
   (* if not (Hashtbl.mem type_symbol_table id) then *)
-  Hashtbl.add type_symbol_table id (t, None)
+  Hashtbl.add type_symbol_table id ((t, None), !Utils.fnm)
 (* else
     match t with
     | _, Basetype _, _
@@ -281,7 +295,7 @@ let bind_type (t : perktype) =
 (* Replaces a type in the symbol table. Throws an exception if the name is not bound. Used by typecheck_deferred_function to replace temporary function types *)
 let rebind_type (id : perkident) (t : perktype) =
   if Hashtbl.mem type_symbol_table id then
-    Hashtbl.replace type_symbol_table id (t, None)
+    Hashtbl.replace type_symbol_table id ((t, None), !Utils.fnm)
   else raise (Undeclared ("Type not found in symbol table: " ^ id))
 
 let used_counter, unused_counter, called_counter = (ref 0, ref 0, ref 0)
@@ -295,6 +309,9 @@ let dependencies_of_type (typ : perktype) : perkident list =
 
   (* Auxiliary functions that takes a list as input to avoid circular dependencies *)
   (* The voidize parameters controls whether models have to be erased to void*. This is needed to avoid circular dependencies *)
+  (* Returns:
+  		- List of type descriptors of the dependencies
+		- List of visited types *)
   let rec dependencies_of_type_aux ?(voidize : bool = false) (typ : perktype)
       (lst : perktype list) : perkident list * perktype list =
     let typ = resolve_type typ in
@@ -316,7 +333,11 @@ let dependencies_of_type (typ : perktype) : perkident list =
             let _, typ', _ = typ in
             match typ' with
             | Basetype _ -> ([], typ :: lst)
-            | Pointertype t -> dependencies_of_type_aux ~voidize t (typ :: lst)
+            | Pointertype t ->
+                let deps, visited =
+                  dependencies_of_type_aux ~voidize t (typ :: lst)
+                in
+                (type_descriptor_of_perktype typ :: deps, typ :: visited)
             | Funtype (params, ret) ->
                 let lst = typ :: lst in
                 let params_t, params_l =
@@ -332,7 +353,7 @@ let dependencies_of_type (typ : perktype) : perkident list =
                   dependencies_of_type_aux ~voidize:true ret (ret :: params_l)
                 in
                 ((type_descriptor_of_perktype typ :: params_t) @ ret_t, ret_l)
-            | Lambdatype (params, ret, _free_vars) ->
+            | Lambdatype (params, ret, free_vars) ->
                 let lst = typ :: lst in
                 let params_t, params_l =
                   List.fold_right
@@ -343,6 +364,17 @@ let dependencies_of_type (typ : perktype) : perkident list =
                       (res_t @ acc, res_l))
                     params ([], lst)
                 in
+
+                let fvs_t, fvs_l =
+                  List.fold_right
+                    (fun (t, _) (acc, lst) ->
+                      let res_t, res_l =
+                        dependencies_of_type_aux ~voidize:true t lst
+                      in
+                      (res_t @ acc, res_l))
+                    free_vars ([], lst)
+                in
+
                 let ret_t, ret_l =
                   dependencies_of_type_aux ~voidize:true ret (ret :: params_l)
                 in
@@ -351,14 +383,31 @@ let dependencies_of_type (typ : perktype) : perkident list =
                     (functype_of_lambdatype typ)
                     lst
                 in
-                ( (type_descriptor_of_perktype typ :: params_t)
+                ( fvs_t
+                  @ (type_descriptor_of_perktype typ :: params_t)
                   @ ret_t @ underlying_deps,
-                  ret_l @ underlying_l )
+                  fvs_l @ ret_l @ underlying_l )
             | Arraytype (t, _) ->
-                dependencies_of_type_aux ~voidize t (typ :: lst)
+                let deps, visited =
+                  dependencies_of_type_aux ~voidize t (typ :: lst)
+                in
+                (type_descriptor_of_perktype typ :: deps, visited)
             | Structtype (_, fields) ->
                 let field_types =
                   List.map (fun ((typ, _id), _) -> typ) fields
+                in
+                let lst = typ :: lst in
+                List.fold_left
+                  (fun (acc, lst) field ->
+                    let res_t, res_l =
+                      dependencies_of_type_aux ~voidize field lst
+                    in
+                    (res_t @ acc, res_l))
+                  ([ type_descriptor_of_perktype typ ], lst)
+                  field_types
+            | AlgebraicType (_, constructors) ->
+                let field_types =
+                  List.map (fun (_id, typ) -> typ) constructors |> List.flatten
                 in
                 let lst = typ :: lst in
                 List.fold_left
@@ -375,7 +424,9 @@ let dependencies_of_type (typ : perktype) : perkident list =
                   List.fold_right
                     (fun (param, _ide) (acc, lst) ->
                       let res_t, res_l =
-                        dependencies_of_type_aux ~voidize param lst
+                        dependencies_of_type_aux ~voidize
+                          (add_parameter_to_func_only void_pointer param)
+                          lst
                       in
                       (res_t @ acc, res_l))
                     decls ([], lst)
@@ -493,9 +544,18 @@ let rec bind_type_if_needed (typ : perktype) =
           | _, Structtype (_id, fields), _ ->
               bind_type typ;
               List.iter (fun ((typ, _id), _) -> bind_type_if_needed typ) fields
+          | _, AlgebraicType (_id, constructors), _ ->
+              bind_type typ;
+              List.iter
+                (fun (_id, typs) -> List.iter bind_type_if_needed typs)
+                constructors
           | _, ArcheType (_name, _decls), _ ->
               bind_type typ';
-              List.iter (fun (typ, _id) -> bind_type_if_needed typ) _decls
+              List.iter
+                (fun (typ, _id) ->
+                  bind_type_if_needed
+                    (add_parameter_to_func_only void_pointer typ))
+                _decls
           | _, ArchetypeSum _ts, _ ->
               bind_type typ';
               List.iter bind_type_if_needed _ts
@@ -519,5 +579,5 @@ let rec bind_type_if_needed (typ : perktype) =
 let add_code_to_type_binding (_typ : perktype) (code : string) : unit =
   bind_type_if_needed _typ;
   let key = type_descriptor_of_perktype _typ in
-  let _t, _code = Hashtbl.find type_symbol_table key in
-  Hashtbl.replace type_symbol_table key (_t, Some code)
+  let (_t, _code), from = Hashtbl.find type_symbol_table key in
+  Hashtbl.replace type_symbol_table key ((_t, Some code), from)

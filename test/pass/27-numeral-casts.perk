@@ -1,6 +1,6 @@
 import "stdio.h"
 
-fun main () : int {
+fun main () : void {
     let x := 5;
     let y := 5 + .5;
 
