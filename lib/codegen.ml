@@ -826,7 +826,8 @@ and codegen_match_case (case : match_case_a) (c : command_a)
           indent_string goto_label indent_string,
         "" )
   | CompoundCase (id, inner_cases) ->
-      let rec generate_condition id inner_cases match_var =
+      let rec generate_condition id inner_cases ?(match_var_pointer = false)
+          match_var =
         let res =
           List.mapi
             (fun i case ->
@@ -835,21 +836,33 @@ and codegen_match_case (case : match_case_a) (c : command_a)
               | MatchVar _ -> ("1", "")
               | MatchExpr e ->
                   let expr_cg, lid = codegen_expr_and_letindefs e in
-                  ( Printf.sprintf "(*(*%s).data.%s._%d) == (%s)" match_var id i
-                      expr_cg,
+                  ( Printf.sprintf
+                      "/* matchexpr */ (*(*%s).data.%s._%d) == (%s)" match_var
+                      id i expr_cg,
                     lid )
               | CompoundCase (id1, []) ->
-                  ( Printf.sprintf "%s.data.%s._%d -> tag == __perk_%s_Tag"
-                      match_var id i id1,
+                  ( Printf.sprintf
+                      " /* compound case 1 */ %s.data%s%s._%d -> tag == \
+                       __perk_%s_Tag"
+                      match_var
+                      (if match_var_pointer then "->" else ".")
+                      id i id1,
                     "" )
               | CompoundCase (id1, doubly_inner_cases) ->
                   let cond_1 =
-                    Printf.sprintf "%s.data.%s._%d -> tag == __perk_%s_Tag"
-                      match_var id i id1
+                    Printf.sprintf
+                      "/* compound case 2 */ %s%sdata.%s._%d -> tag == \
+                       __perk_%s_Tag"
+                      match_var
+                      (if match_var_pointer then "->" else ".")
+                      id i id1
                   in
                   let rest =
-                    generate_condition id1 doubly_inner_cases
-                      (Printf.sprintf "%s.data.%s._%d" match_var id i)
+                    generate_condition id1 ~match_var_pointer:true
+                      doubly_inner_cases
+                      (Printf.sprintf "%s%sdata.%s._%d" match_var
+                         (if match_var_pointer then "->" else ".")
+                         id i)
                   in
                   let rest, lid = rest in
                   (Printf.sprintf "(%s) && (%s)" cond_1 rest, lid))
