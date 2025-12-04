@@ -388,7 +388,10 @@ let dependencies_of_type (typ : perktype) : perkident list =
                   @ ret_t @ underlying_deps,
                   fvs_l @ ret_l @ underlying_l )
             | Arraytype (t, _) ->
-                dependencies_of_type_aux ~voidize t (typ :: lst)
+                let deps, visited =
+                  dependencies_of_type_aux ~voidize t (typ :: lst)
+                in
+                (type_descriptor_of_perktype typ :: deps, visited)
             | Structtype (_, fields) ->
                 let field_types =
                   List.map (fun ((typ, _id), _) -> typ) fields
