@@ -264,10 +264,12 @@ fun skip_computation (stack_vp : void*) : (void*){
             return cast(void*, stack)
         };
 
-        failwith("Operation not yet implemented"); 
+        failwith("Operation not yet implemented");
+        return cast(void*, 0)
     };
 
-    failwith ("Skip reached end of stack.")
+    failwith ("Skip reached end of stack.");
+    return cast(void*, 0)
 }
 
 fun execute_computation (stack_vp : void*) : (void* * int){
@@ -414,10 +416,12 @@ fun execute_computation (stack_vp : void*) : (void* * int){
             return (cast(void*, stack), res2[1]);
         };
 
-        failwith("Operation not yet implemented"); 
+        failwith("Operation not yet implemented");
+        return (cast(void*, 0), 0)
     };
 
-    failwith ("Computation reached end of stack.")
+    failwith ("Computation reached end of stack.");
+    return (cast(void*, 0), 0)
 }
 
 fun main () : int {
