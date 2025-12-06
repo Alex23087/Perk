@@ -2,14 +2,14 @@ import "stdio.h"
 
 type List = Nil | Cons(int, List)
 
-fun List.foreach (self: List, pred: (int) => bool): bool {
+fun List.forall (self: List, pred: (int) => bool): bool {
     match (self) {
         Nil {
             return true
         },
         Cons (var hd, var tl) {
             if (pred(hd)) {
-                return tl.foreach(pred)
+                return tl.forall(pred)
             } else {
                 return false
             }
@@ -23,7 +23,7 @@ type_fun List.make_empty(): List {
 
 fun main() : void {
     printf("%s", if 
-        List.make_empty().foreach(
+        List.make_empty().forall(
             (a: int): bool {
                 return false
             }

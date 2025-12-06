@@ -30,8 +30,7 @@ type_fun List.make_decreasing(from: int): List {
 }
 
 fun main() : void {
-    let l := List.make_decreasing(10);
-    l.iter(
+    List.make_decreasing(10).iter(
         (a: int): void {
             printf("%d\n", a)
         }
