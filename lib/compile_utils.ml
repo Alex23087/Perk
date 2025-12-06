@@ -193,6 +193,13 @@ let rec compile_program ?(dir : string option) ?(dry_run = false)
       error_out json_format
         ("compilation", "Compilation")
         start_line start_col end_line end_col msg input_file code
+  | e ->
+      error_out json_format ("internal", "Internal") (-1) (-1) (-1) (-1)
+        (Printf.sprintf
+           "Unhandled exception: \"%s\". If you see this error, please open an \
+            issue at https://github.com/Alex23087/Perk/issues"
+           (Printexc.to_string e))
+        input_file Internal_error
 
 (** Generates the global polyfun definitions that are not local to the current
     file *)

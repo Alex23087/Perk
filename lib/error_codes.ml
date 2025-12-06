@@ -65,4 +65,5 @@ type error_code =
   | Type_expected
   | Invalid_constructor
   | File_not_found
+  | Internal_error
 [@@deriving enum, show { with_path = false }]

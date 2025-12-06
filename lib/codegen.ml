@@ -356,7 +356,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
               with Failure _ ->
                 raise_type_error tldf
                   "constructor has 0 arguments. If you see this error, please \
-                   open an issue at https://github.com/Alex23087/Perk"
+                   open an issue at https://github.com/Alex23087/Perk/issues"
                   Constructor_has_zero_arguments
             in
             let params = List.map fst params in
@@ -1526,7 +1526,8 @@ and codegen_type_definition (t : perktype) : string =
             (annotate_dummy ([], Int (-1), []))
             (Printf.sprintf
                "Unexpected type generation request: got %s. If you see this \
-                error, please file an issue at https://github.com/"
+                error, please file an issue at \
+                https://github.com/Alex23087/Perk/issues"
                (show_perktype t))
             Unexpected_codegen_type)
 
