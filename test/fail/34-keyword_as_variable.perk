@@ -1,0 +1,6 @@
+// Test that using a reserved keyword as a variable name fails
+// Should produce: keyword 'let' cannot be used as variable identifier
+
+fun main() : void {
+    let type : int = 0
+}

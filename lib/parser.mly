@@ -3,7 +3,6 @@
   open Ast
   open Utils
   open Parse_lexing_commons
-  open Keyword_tracker
 %}
 
 /* Tokens declarations */
@@ -45,7 +44,6 @@
                              via %prec POSTFIX in the corresponding rules */
 %left Dot
 
-
 /* Starting symbol */
 %start program
 %type <Ast.topleveldef_a list> program
@@ -70,7 +68,6 @@
 
 %%
 
-
 /* Grammar specification */
 
 program:
@@ -90,13 +87,20 @@ topleveldef:
   | Extern id = Ident Colon t = perktype                                                                   { annotate_2_code !fnm $loc (Ast.Extern (id, t)) }
   | ic = InlineC                                                                                           { annotate_2_code !fnm $loc (Ast.InlineC(ic)) }
   | d = perkdef                                                                                            { annotate_2_code !fnm $loc (Ast.Def (d, None)) }
-  | Archetype i = Ident LBrace l = perkdeclorfun_list RBrace                                               { annotate_2_code !fnm $loc (Ast.Archetype (i, l)) }
-  | Model i = Ident Colon il = ident_list LBrace l = perkdeforfun_list RBrace                              { annotate_2_code !fnm $loc (Ast.Model (i, il, l)) }
-  | Model i = Ident LBrace l = perkdeforfun_list RBrace                                                    { annotate_2_code !fnm $loc (Ast.Model (i, [], l)) }
-  | Struct i = Ident LBrace l = separated_list(Comma, perkdef) RBrace                                      { annotate_2_code !fnm $loc (Ast.Struct (i, l)) }
+  | Archetype i = Ident LBrace l = perkdeclorfun_list RBrace                                               { Keyword_tracker.validate_archetype_identifier i; annotate_2_code !fnm $loc (Ast.Archetype (i, l)) }
+  | Archetype Ident error                                                                                  { Keyword_tracker.raise_keyword_error fnm "archetype" }
+  | Archetype error                                                                                        { Keyword_tracker.raise_keyword_error fnm "archetype" }
+  | Model i = Ident Colon il = ident_list LBrace l = perkdeforfun_list RBrace                              { Keyword_tracker.validate_model_identifier i; annotate_2_code !fnm $loc (Ast.Model (i, il, l)) }
+  | Model i = Ident LBrace l = perkdeforfun_list RBrace                                                    { Keyword_tracker.validate_model_identifier i; annotate_2_code !fnm $loc (Ast.Model (i, [], l)) }
+  | Model Ident error                                                                                      { Keyword_tracker.raise_keyword_error fnm "model" }
+  | Model error                                                                                            { Keyword_tracker.raise_keyword_error fnm "model" }
+  | Struct i = Ident LBrace l = separated_list(Comma, perkdef) RBrace                                      { Keyword_tracker.validate_struct_identifier i; annotate_2_code !fnm $loc (Ast.Struct (i, l)) }
   | Struct Ident LBrace error                                                                              { raise (ParseError(!fnm, "unexpected token in struct definition")) }
-  | ADT i = Ident Assign option(Pipe) l = separated_nonempty_list(Pipe, constructor_type)                  { annotate_2_code !fnm $loc (Ast.ADT (i, l)) }   
-  | ADT Ident error                                                                                        { raise (ParseError(!fnm, "expected a list of constructors after ADT definition")) }           
+  | Struct Ident error                                                                                     { Keyword_tracker.raise_keyword_error fnm "struct" }
+  | Struct error                                                                                           { Keyword_tracker.raise_keyword_error fnm "struct" }
+  | ADT i = Ident Assign option(Pipe) l = separated_nonempty_list(Pipe, constructor_type)                  { Keyword_tracker.validate_type_identifier i; annotate_2_code !fnm $loc (Ast.ADT (i, l)) }   
+  | ADT Ident error                                                                                        { raise (ParseError(!fnm, "expected a list of constructors after ADT definition")) }
+  | ADT error                                                                                              { Keyword_tracker.raise_keyword_error fnm "type" }
   | Fun pf = perkfun                                                                                       { annotate_2_code !fnm $loc (Ast.Fundef (pf, true)) }
   | Fun Lt t=perktype Gt pf = perkfun                                                                      { annotate_2_code !fnm $loc (Ast.PolymorphicFundef (pf, t)) }
   | error                                                                                                  { raise (ParseError(!fnm, "top-level definition expected")) }
@@ -125,7 +129,7 @@ command:
   | Banish i = Ident                                                                                       { annotate_2_code !fnm $loc (Banish i) }
   | Continue                                                                                               { annotate_2_code !fnm $loc (Ast.Continue) }
   | Break                                                                                                  { annotate_2_code !fnm $loc (Ast.Break) }
-  | Match LParen e = expr RParen LBrace l = separated_nonempty_list (Comma, match_entry) RBrace            {annotate_2_code !fnm $loc (Ast.Match(e, l, None))}
+  | Match LParen e = expr RParen LBrace l = separated_nonempty_list (Comma, match_entry) RBrace            { annotate_2_code !fnm $loc (Ast.Match(e, l, None))}
   | Match LParen expr RParen LBrace separated_list (Comma, match_entry) error                              { raise (ParseError(!fnm, "invalid match statement (perhaps you are missing a ',' between cases?)")) }
   | Match error                                                                                            { raise (ParseError(!fnm, "invalid match scrutinee (perhaps you are missing a '(' ?)")) }
   | error                                                                                                  { raise (ParseError(!fnm, "command expected")) }
@@ -138,23 +142,23 @@ command:
   | Do error                                                                                               { raise (ParseError(!fnm, "missing braces after do"))}
 
 match_entry:
-  | m = match_case LBrace c = command RBrace                                                               {annotate_2_code !fnm $loc (Ast.MatchCase(m, None, c))}
-  | m = match_case When e = expr LBrace c = command RBrace                                                 {annotate_2_code !fnm $loc (Ast.MatchCase(m, Some e, c))}
+  | m = match_case LBrace c = command RBrace                                                               { annotate_2_code !fnm $loc (Ast.MatchCase(m, None, c))}
+  | m = match_case When e = expr LBrace c = command RBrace                                                 { annotate_2_code !fnm $loc (Ast.MatchCase(m, Some e, c))}
   | match_case error                                                                                       { raise (ParseError(!fnm, "invalid match case, expected case body")) }
   | error                                                                                                  { raise (ParseError(!fnm, "match case expected")) }
 
 match_case:
-  | BTICK LBrace e = expr RBrace {annotate_2_code !fnm $loc (Ast.MatchExpr(e))}
-  | Matchall {annotate_2_code !fnm $loc Ast.Matchall}
-  | Var i=Ident {annotate_2_code !fnm $loc (Ast.MatchVar(i, None))}
-  | Var i=Ident Colon t=perktype {annotate_2_code !fnm $loc (Ast.MatchVar(i, Some t))}
-  | i=Ident { annotate_2_code !fnm $loc (Ast.CompoundCase(i, []))}
-  | i=Ident LParen l = separated_nonempty_list(Comma, match_case) RParen { annotate_2_code !fnm $loc (Ast.CompoundCase(i, l))}
-  | error { raise (ParseError(!fnm, "expected match case")) }
+  | BTICK LBrace e = expr RBrace                                                                           { annotate_2_code !fnm $loc (Ast.MatchExpr(e))}
+  | Matchall                                                                                               { annotate_2_code !fnm $loc Ast.Matchall}
+  | Var i=Ident                                                                                            { annotate_2_code !fnm $loc (Ast.MatchVar(i, None))}
+  | Var i=Ident Colon t=perktype                                                                           { annotate_2_code !fnm $loc (Ast.MatchVar(i, Some t))}
+  | i=Ident                                                                                                { annotate_2_code !fnm $loc (Ast.CompoundCase(i, []))}
+  | i=Ident LParen l = separated_nonempty_list(Comma, match_case) RParen                                   { annotate_2_code !fnm $loc (Ast.CompoundCase(i, l))}
+  | error                                                                                                  { raise (ParseError(!fnm, "expected match case")) }
 
 deforfun:
-  | d = perkdef                                                                                            {annotate_2_code !fnm $loc (Ast.DefVar([], d))}
-  | Fun d = perkfun                                                                                        {annotate_2_code !fnm $loc (Ast.DefFun([], d))}
+  | d = perkdef                                                                                            { annotate_2_code !fnm $loc (Ast.DefVar([], d))}
+  | Fun d = perkfun                                                                                        { annotate_2_code !fnm $loc (Ast.DefFun([], d))}
 
 perkdef:
   | Let vd = perkvardesc Assign e = expr                                                                   { (vd, e) }
@@ -162,19 +166,21 @@ perkdef:
   | error                                                                                                  { raise (ParseError(!fnm, "definition expected (e.g. let banana : int = 5)")) }
 
 perkfun:
-  | i = Ident LParen id_list = perkvardesc_list RParen Colon rt = perktype LBrace c = command RBrace       { (rt, i, id_list, c) }
-  | i = Ident LParen RParen Colon rt = perktype LBrace c = command RBrace                                  { (rt, i, [], c) }
+  | i = Ident LParen id_list = perkvardesc_list RParen Colon rt = perktype LBrace c = command RBrace       { Keyword_tracker.validate_fun_identifier i; (rt, i, id_list, c) }
+  | i = Ident LParen RParen Colon rt = perktype LBrace c = command RBrace                                  { Keyword_tracker.validate_fun_identifier i; (rt, i, [], c) }
   | Ident LParen perkvardesc_list RParen error                                                             { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
   | Ident LParen RParen error                                                                              { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
+  | error                                                                                                  { Keyword_tracker.raise_keyword_error fnm "function" }
 
 perkvardesc:
-  | i = Ident Colon t = perktype                                                                           { (t, i) }
+  | i = Ident Colon t = perktype                                                                           { Keyword_tracker.validate_var_identifier i; (t, i) }
   | i = Ident Colon                                                                                        { (([], Ast.Infer, []), i) }
   | Ident error                                                                                            { raise (ParseError(!fnm, "type declaration expected (e.g. banana : int)")) }
-  | error                                                                                                  { match !last_keyword with | Some kw when kw <> "let" -> raise (ParseError(!fnm, "keyword '" ^ kw ^ "' cannot be used as variable identifier")) | _ -> raise (ParseError(!fnm, "variable descriptor expected (e.g. banana : int)")) }
+  | error                                                                                                  { Keyword_tracker.raise_keyword_error fnm "variable" }
 
 perkfundesc:
   | Fun i = Ident Colon t = perktype                                                                       { (t, i) }
+  | error                                                                                                  { raise (ParseError(!fnm, "type declaration expected (e.g. banana : int)")) }
 
 declorfun:
   | d = perkvardesc                                                                                        { annotate_2_code !fnm $loc (Ast.DeclVar d) }
@@ -299,48 +305,48 @@ perktype_partial:
 /* New nonterminals for disambiguated lists */
 
 expr_list:
-  | e = expr { [e] }
-  | el = expr_list Comma e = expr { el @ [e] }
-  | error { raise (ParseError(!fnm, "expression expected")) }
+  | e = expr                                                                                               { [e] }
+  | el = expr_list Comma e = expr                                                                          { el @ [e] }
+  | error                                                                                                  { raise (ParseError(!fnm, "expression expected")) }
 
 ident_list:
-  | i = Ident { [i] }
-  | il = ident_list Comma i = Ident { il @ [i] }
-  | error { raise (ParseError(!fnm, "identifier expected")) }
-  | Ident error { raise (ParseError(!fnm, "unexpected identifier")) }
+  | i = Ident                                                                                              { [i] }
+  | il = ident_list Comma i = Ident                                                                        { il @ [i] }
+  | error                                                                                                  { raise (ParseError(!fnm, "identifier expected")) }
+  | Ident error                                                                                            { raise (ParseError(!fnm, "unexpected identifier")) }
 
 perktype_list:
-  | t = perktype { [t] }
-  | tl = perktype Comma t = perktype_list { tl :: t }
-  | error { raise (ParseError(!fnm, "type expected")) }
-  | perktype error { raise (ParseError(!fnm, "unexpected type")) }
+  | t = perktype                                                                                           { [t] }
+  | tl = perktype Comma t = perktype_list                                                                  { tl :: t }
+  | error                                                                                                  { raise (ParseError(!fnm, "type expected")) }
+  | perktype error                                                                                         { raise (ParseError(!fnm, "unexpected type")) }
 
 perkdeforfun_list:
-  | t = deforfun { [t] }
-  | a = nonempty_list(perktype_attribute) t = deforfun { [add_attrs_to_deforfun a t] }
-  | tl = deforfun Comma t = perkdeforfun_list { tl :: t }
-  | a = nonempty_list(perktype_attribute) tl = deforfun Comma t = perkdeforfun_list { (add_attrs_to_deforfun a tl) :: t }
-  | error { raise (ParseError(!fnm, "definition expected")) }
-  | deforfun error { raise (ParseError(!fnm, "unexpected definition")) }
+  | t = deforfun                                                                                           { [t] }
+  | a = nonempty_list(perktype_attribute) t = deforfun                                                     { [add_attrs_to_deforfun a t] }
+  | tl = deforfun Comma t = perkdeforfun_list                                                              { tl :: t }
+  | a = nonempty_list(perktype_attribute) tl = deforfun Comma t = perkdeforfun_list                        { (add_attrs_to_deforfun a tl) :: t }
+  | error                                                                                                  { raise (ParseError(!fnm, "definition expected")) }
+  | deforfun error                                                                                         { raise (ParseError(!fnm, "unexpected definition")) }
 
 perkvardesc_list:
-  | t = perkvardesc { [t] }
-  | tl = perkvardesc Comma t = perkvardesc_list { tl :: t }
-  | error { raise (ParseError(!fnm, "variable descriptor expected")) }
-  | perkvardesc error { raise (ParseError(!fnm, "unexpected variable descriptor")) }
+  | t = perkvardesc                                                                                        { [t] }
+  | tl = perkvardesc Comma t = perkvardesc_list                                                            { tl :: t }
+  | error                                                                                                  { raise (ParseError(!fnm, "variable descriptor expected")) }
+  | perkvardesc error                                                                                      { raise (ParseError(!fnm, "unexpected variable descriptor")) }
 
 perkdeclorfun_list:
-  | t = declorfun { [t] }
-  | tl = declorfun Comma t = perkdeclorfun_list { tl :: t }
-  | error { raise (ParseError(!fnm, "variable descriptor expected")) }
-  | declorfun error { raise (ParseError(!fnm, "unexpected variable descriptor")) }
+  | t = declorfun                                                                                          { [t] }
+  | tl = declorfun Comma t = perkdeclorfun_list                                                            { tl :: t }
+  | error                                                                                                  { raise (ParseError(!fnm, "variable descriptor expected")) }
+  | declorfun error                                                                                        { raise (ParseError(!fnm, "unexpected variable descriptor")) }
 
 initializer_list:
-  | i = Ident Assign e = expr { [(i, e)] }
-  | i = Ident Assign e = expr Comma il = initializer_list { (i, e) :: il }
-  | Ident error { raise (ParseError(!fnm, "initializer expected (e.g. field = value)")) }
-  | error { raise (ParseError(!fnm, "initializer expected (e.g. field = value)")) }
+  | i = Ident Assign e = expr                                                                              { [(i, e)] }
+  | i = Ident Assign e = expr Comma il = initializer_list                                                  { (i, e) :: il }
+  | Ident error                                                                                            { raise (ParseError(!fnm, "initializer expected (e.g. field = value)")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "initializer expected (e.g. field = value)")) }
 
 spanish_inquisition:
-  | error { raise (ParseError(!fnm, "Nobody expects the Spanish Inquisition!")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "Nobody expects the Spanish Inquisition!")) }
 %%

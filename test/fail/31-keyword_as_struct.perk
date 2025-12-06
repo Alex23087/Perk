@@ -1,0 +1,6 @@
+// Test that using a reserved keyword as a struct name fails
+// Should produce: keyword 'for' cannot be used as struct identifier
+
+struct for {
+    let x : int = 0
+}
