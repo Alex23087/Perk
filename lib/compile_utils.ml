@@ -110,7 +110,7 @@ let error_out json_format error_class start_line start_col end_line end_col msg
     Printf.printf
       "{\"error\": \"%s\", \"start_line\": %d, \"start_col\": %d, \
        \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
-       \"%s\", \"error_code\": {\"desc\": \"%s\", \"code\": %d}}\n"
+       \"%s\", \"error_code\": {\"description\": \"%s\", \"code\": %d}}\n"
       (fst error_class) start_line start_col end_line end_col
       (String.escaped msg) file (show_error_code code) (error_code_to_enum code);
     exit 0)

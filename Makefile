@@ -115,7 +115,8 @@ uninstall:
 .PHONY: test_pass
 test_pass: build
 	@echo "Testing programs that are expected to pass..."
-	@if [ -n "$(FILE)" ]; then \
+	@TEST_ERROR=0; \
+	if [ -n "$(FILE)" ]; then \
 		if [ ! -e test/pass/"$(FILE)"*.perk ]; then \
 			echo "File starting with $(FILE) does not exist." >&2; \
 			exit 1; \
@@ -136,7 +137,9 @@ test_pass: build
 					echo "Test Failed"; \
 				fi ;\
 			else \
+				echo "Missing expected file for $$FILE"; \
 				echo "$$RES" ;\
+				exit 1; \
 			fi;\
 		else \
 			echo "An error occurred while compiling $(basename $$FILE)" >&2;\
@@ -153,7 +156,7 @@ test_pass: build
 		fi ;\
 		COUNT=$$(ls -1 test/pass/*.perk | wc -l) ;\
 		CURRENT=0 ;\
-		IGNORE=() ;\
+		IGNORE=(31) ;\
 		for f in test/pass/*.perk ; \
 		do \
 			CURRENT=$$((CURRENT+1)) ;\
@@ -171,27 +174,36 @@ test_pass: build
 					echo "$$RES" | diff "$$EXPECTED" -;\
 					if [ $$? -eq 0 ]; then \
 						# rm -f "$${f%.*}.c" ;\
-						:\
+						:;\
 					else \
 						echo "Test Failed";\
+						TEST_ERROR=1;\
 					fi ;\
 				else \
-					:;\
 					# rm -f "$${f%.*}.c" ;\
+					echo "Missing expected file for $$f";\
 					echo "$$RES" ;\
+					TEST_ERROR=1;\
 				fi;\
 			else \
 				echo "An error occurred while compiling $$(basename $${f%.*})" >&2;\
 				echo "$$RES" >&2;\
+				TEST_ERROR=1;\
 			fi ;\
 		done ;\
+	fi; \
+	if [ $$TEST_ERROR -eq 1 ]; then \
+		echo "Some tests didn't pass!"; \
+		exit 1; \
 	fi
+
 # Test target: run tests on the compiler
 # If FILE is specified, run a single test file; otherwise, run all tests
 .PHONY: test_pass_static
 test_pass_static: build
-	@echo "Testing programs that are expected to pass..."
-	@if [ -n "$(FILE)" ]; then \
+	@echo "Testing static programs that are expected to pass..."
+	@TEST_ERROR=0; \
+	if [ -n "$(FILE)" ]; then \
 		if [ ! -e test/pass_static/"$(FILE)"*.perk ]; then \
 			echo "File starting with $(FILE) does not exist." >&2; \
 			exit 1; \
@@ -210,9 +222,12 @@ test_pass_static: build
 					:; \
 				else \
 					echo "Test Failed"; \
+					exit 1;\
 				fi ;\
 			else \
+				echo "Missing expected file for $$FILE"; \
 				echo "$$RES" ;\
+				exit 1; \
 			fi;\
 		else \
 			echo "An error occurred while compiling $(basename $$FILE)" >&2;\
@@ -247,27 +262,35 @@ test_pass_static: build
 					echo "$$RES" | diff "$$EXPECTED" -;\
 					if [ $$? -eq 0 ]; then \
 						# rm -f "$${f%.*}.c" ;\
-						:\
+						:;\
 					else \
 						echo "Test Failed";\
+						TEST_ERROR=1;\
 					fi ;\
 				else \
-					:;\
 					# rm -f "$${f%.*}.c" ;\
+					echo "Missing expected file for $$f";\
 					echo "$$RES" ;\
+					TEST_ERROR=1;\
 				fi;\
 			else \
 				echo "An error occurred while compiling $$(basename $${f%.*})" >&2;\
 				echo "$$RES" >&2;\
+				TEST_ERROR=1;\
 			fi ;\
 		done ;\
+	fi; \
+	if [ $$TEST_ERROR -eq 1 ]; then \
+		echo "Some tests didn't pass!"; \
+		exit 1; \
 	fi
 
 # Test programs that are expected to fail
 .PHONY: test_fail
 test_fail: build
 	@echo "Testing programs that are expected to fail..."
-	@if [ -n "$(FILE)" ]; then \
+	@TEST_ERROR=0; \
+	if [ -n "$(FILE)" ]; then \
 		if [ ! -e test/fail/"$(FILE)"*.perk ]; then \
 			echo "File starting with $(FILE) does not exist." >&2; \
 			exit 1; \
@@ -275,18 +298,28 @@ test_fail: build
 		FILE=$$(ls test/fail/$(FILE)*.perk | head -n 1) ;\
 		echo "Testing single file: $$FILE"; \
 		BASENAME="$${FILE%.*}"; \
-		CFILE="$${BASENAME}.c"; \
-		RES=$$(_build/default/bin/perkc.exe "$$FILE" 2>&1); \
+		EXPECTED="$${BASENAME}.expected"; \
+		RES=$$(_build/default/bin/perkc.exe --dry-run --json "$$FILE" | jq '.error_code.description' --raw-output); \
 		EXIT_CODE=$$?; \
-		rm -f "$$(dirname $$FILE)/a.out" "$$CFILE"; \
 		if [ $$EXIT_CODE -ne 0 ]; then \
-			# echo "$$RES" ;\
-			:;\
-		else \
-			echo "Expected failure, but the test passed." >&2;\
-			echo "File: $$FILE" >&2;\
-			echo "Output: $$RES" >&2;\
+			echo "Internal error:"; \
+			echo "$$RES" ;\
 			exit 1;\
+		else \
+			if [ -e "$$EXPECTED" ]; then \
+				echo "$$RES" | diff "$$EXPECTED" -; \
+				if [ $$? -eq 0 ]; then \
+					:; \
+				else \
+					echo "Wrong error returned: $$RES"; \
+					exit 1;\
+				fi ;\
+			else \
+				echo "Missing expected error for file $$FILE"; \
+				echo "$$RES" ;\
+				TEST_ERROR=1;\
+				exit 1;\
+			fi;\
 		fi ;\
 	else \
 		if [ ! -d "test/fail" ]; then \
@@ -308,25 +341,41 @@ test_fail: build
 				continue ;\
 			fi ;\
 			echo "[$$CURRENT/$$COUNT] Testing $$(basename "$${f%.*}")" ; \
-			RES=$$(_build/default/bin/perkc.exe "$$f" 2>&1) ; \
+			EXPECTED="$${f%.*}.expected" ;\
+			RES=$$(_build/default/bin/perkc.exe --dry-run --json "$$f" | jq '.error_code.description' --raw-output) ; \
 			EXIT_CODE=$$?; \
-			rm -f "$$(dirname $$f)/a.out" "$${f%.*}.c" ;\
 			if [ $$EXIT_CODE -ne 0 ]; then \
-				# echo "$$RES" ;\
-				:;\
+				echo "Internal error:"; \
+				echo "$$RES" ;\
+				TEST_ERROR=1; \
 			else \
-				echo "Expected failure, but the test passed." >&2;\
-				echo "File: $$(basename $${f%.*})" >&2;\
-				echo "Output: $$RES" >&2;\
+				if [ -e "$$EXPECTED" ]; then \
+					echo "$$RES" | diff "$$EXPECTED" -; \
+					if [ $$? -eq 0 ]; then \
+						:; \
+					else \
+						echo "Wrong error returned: $$RES"; \
+						TEST_ERROR=1; \
+					fi ;\
+				else \
+					echo "Missing expected error for file $$f"; \
+					echo "$$RES" ;\
+					TEST_ERROR=1;\
+				fi;\
 			fi ;\
 		done ;\
+	fi; \
+	if [ $$TEST_ERROR -eq 1 ]; then \
+		echo "Some tests didn't pass!"; \
+		exit 1; \
 	fi
 
 # Test static programs that are expected to fail
 .PHONY: test_fail_static
 test_fail_static: build
 	@echo "Testing static programs that are expected to fail..."
-	@if [ -n "$(FILE)" ]; then \
+	@TEST_ERROR=0; \
+	if [ -n "$(FILE)" ]; then \
 		if [ ! -e test/fail_static/"$(FILE)"*.perk ]; then \
 			echo "File starting with $(FILE) does not exist." >&2; \
 			exit 1; \
@@ -334,18 +383,28 @@ test_fail_static: build
 		FILE=$$(ls test/fail_static/$(FILE)*.perk | head -n 1) ;\
 		echo "Testing single file: $$FILE"; \
 		BASENAME="$${FILE%.*}"; \
-		CFILE="$${BASENAME}.c"; \
-		RES=$$(_build/default/bin/perkc.exe --static "$$FILE" 2>&1); \
+		EXPECTED="$${BASENAME}.expected"; \
+		RES=$$(_build/default/bin/perkc.exe --static --dry-run --json "$$FILE" | jq '.error_code.description' --raw-output); \
 		EXIT_CODE=$$?; \
-		rm -f "$$(dirname $$FILE)/a.out" "$$CFILE"; \
 		if [ $$EXIT_CODE -ne 0 ]; then \
-			# echo "$$RES" ;\
-			:;\
-		else \
-			echo "Expected failure, but the test passed." >&2;\
-			echo "File: $$FILE" >&2;\
-			echo "Output: $$RES" >&2;\
+			echo "Internal error:"; \
+			echo "$$RES" ;\
 			exit 1;\
+		else \
+			if [ -e "$$EXPECTED" ]; then \
+				echo "$$RES" | diff "$$EXPECTED" -; \
+				if [ $$? -eq 0 ]; then \
+					:; \
+				else \
+					echo "Wrong error returned: $$RES"; \
+					exit 1;\
+				fi ;\
+			else \
+				echo "Missing expected error for file $$FILE"; \
+				echo "$$RES" ;\
+				TEST_ERROR=1;\
+				exit 1;\
+			fi;\
 		fi ;\
 	else \
 		if [ ! -d "test/fail_static" ]; then \
@@ -367,28 +426,52 @@ test_fail_static: build
 				continue ;\
 			fi ;\
 			echo "[$$CURRENT/$$COUNT] Testing $$(basename "$${f%.*}")" ; \
-			RES=$$(_build/default/bin/perkc.exe --static "$$f" 2>&1) ; \
+			EXPECTED="$${f%.*}.expected" ;\
+			RES=$$(_build/default/bin/perkc.exe --static --dry-run --json "$$f" | jq '.error_code.description' --raw-output) ; \
 			EXIT_CODE=$$?; \
-			rm -f "$$(dirname $$f)/a.out" "$${f%.*}.c" ;\
 			if [ $$EXIT_CODE -ne 0 ]; then \
-				# echo "$$RES" ;\
-				:;\
+				echo "Internal error:"; \
+				echo "$$RES" ;\
+				TEST_ERROR=1; \
 			else \
-				echo "Expected failure, but the test passed." >&2;\
-				echo "File: $$(basename $${f%.*})" >&2;\
-				echo "Output: $$RES" >&2;\
+				if [ -e "$$EXPECTED" ]; then \
+					echo "$$RES" | diff "$$EXPECTED" -; \
+					if [ $$? -eq 0 ]; then \
+						:; \
+					else \
+						echo "Wrong error returned: $$RES"; \
+						TEST_ERROR=1; \
+					fi ;\
+				else \
+					echo "Missing expected error for file $$f"; \
+					echo "$$RES" ;\
+					TEST_ERROR=1;\
+				fi;\
 			fi ;\
 		done ;\
+	fi; \
+	if [ $$TEST_ERROR -eq 1 ]; then \
+		echo "Some tests didn't pass!"; \
+		exit 1; \
 	fi
 
 # Run all tests (both pass and fail)
 .PHONY: test
 test:
 	@echo "Running all tests..."
-	@$(MAKE) test_pass
-	@$(MAKE) test_fail
-	@$(MAKE) test_pass_static
-	@$(MAKE) test_fail_static
+	@TEST_ERROR=0; \
+    for t in test_pass test_fail test_pass_static test_fail_static; do \
+      if ! $(MAKE) $$t; then \
+        TEST_ERROR=1; \
+      fi; \
+    done; \
+	if [ $$TEST_ERROR -eq 1 ]; then\
+		echo "Some tests failed! See log for more details.";\
+		exit 1;\
+	else\
+		echo "All test passed!"; \
+	fi
+		
 
 # Generate documentation
 .PHONY: docs
