@@ -2,6 +2,7 @@
 
 open Ast
 open Errors
+open Error_codes
 open Utils
 open Type_symbol_table
 open Polymorphism
@@ -325,6 +326,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                 | (_, Funtype (_, _), _), Lambda (_, _, _, _, _) ->
                     raise_type_error expr
                       "impossible: free vars should be empty in funtype"
+                      Function_contains_free_vars
                 | _ -> annot_copy def (DefVar (attrs, ((typ, id), expr)))))
           defs
       in
@@ -338,6 +340,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
             | DefVar (_, ((_, id), expr)) ->
                 if id = "constructor" then
                   raise_type_error expr "Constructor cannot be a lambda"
+                    Constructor_is_lambda
                 else false)
           defs
         |> Option.map ( $ ) (* NDR: remove annotation *)
@@ -354,6 +357,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                 raise_type_error tldf
                   "constructor has 0 arguments. If you see this error, please \
                    open an issue at https://github.com/Alex23087/Perk"
+                  Constructor_has_zero_arguments
             in
             let params = List.map fst params in
             ( String.concat ", "
@@ -368,6 +372,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
             raise_compilation_error tldf
               "Impossible: constructor is not a function. This should not \
                happen"
+              Constructor_is_not_function
       in
 
       (* Discard information about function/not-function definition *)
@@ -466,7 +471,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                        indent_string a id (codegen_type t) id
                  | _a, Lambdatype (_params, _retype, _free_vars), _q ->
                      raise_type_error tldf
-                       "lambdas not yet supported in models 2"
+                       "lambdas not yet supported in models 2" Not_implemented
                  | _ ->
                      Printf.sprintf "%s    self->%s.%s = (%s*) &self->%s"
                        indent_string a id (codegen_type t) id)
@@ -627,6 +632,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
       raise_compilation_error tldf
         "Opens should not reach this point (codegen). If you see this error, \
          please open an issue at https://github.com/Alex23087/Perk/issues"
+        Impossible
 (* with Not_inferred s -> raise_type_error tldf s *)
 
 (** Generates code for perk commands. *)
@@ -1041,6 +1047,7 @@ and codegen_expr (e : expr_a) : string =
       else
         raise_compilation_error e
           (Printf.sprintf "polymorphic variable %s was not found" id)
+          Polymorphic_var_not_found
   | Apply (e, args, _app_type) -> (
       (* Printf.printf "Applying lambda with type %s\n"
          (match _app_type with
@@ -1071,7 +1078,7 @@ and codegen_expr (e : expr_a) : string =
                     args_str (* this is for archetype sums *)
               | None ->
                   raise_compilation_error e
-                    "Impossible: no acctype for access 1"
+                    "Impossible: no acctype for access 1" Impossible
               (* this is for models *))
           | _ -> Printf.sprintf "%s(%s)" expr_str args_str)
       | Some lamtype -> (
@@ -1167,7 +1174,9 @@ and codegen_expr (e : expr_a) : string =
       | OptionGet (Some t) ->
           Printf.sprintf "((%s)%s%s)" (c_type_of_perktype t) (codegen_expr e)
             (codegen_postunop op)
-      | OptionGet None -> raise_type_error e "Option get type was not inferred"
+      | OptionGet None ->
+          raise_type_error e "Option get type was not inferred"
+            Option_not_inferred
       | _ -> Printf.sprintf "%s%s" (codegen_expr e) (codegen_postunop op))
   | Parenthesised e -> Printf.sprintf "(%s)" (codegen_expr e)
   | Lambda _ -> codegen_functional ~is_lambda:true e
@@ -1188,7 +1197,8 @@ and codegen_expr (e : expr_a) : string =
         raise_compilation_error e
           "The type for 'as' expression has not been tagged during typecheck. \
            If this happens, please open an issue at \
-           https://github.com/Alex23087/Perk/issues";
+           https://github.com/Alex23087/Perk/issues"
+          Untagged_as;
       let typ = Option.get typ in
       let sum_type_descr = codegen_type ([], ArchetypeSum typlist, []) in
       let code = codegen_expr expr in
@@ -1215,7 +1225,8 @@ and codegen_expr (e : expr_a) : string =
                   | _ ->
                       raise_compilation_error e
                         "as expression can only be used with models or \
-                         archetypes")
+                         archetypes"
+                        Invalid_type_as)
                 typlist)
            ^ ", ")
         (* If the variable is an archetype sum, the internal self pointer is passed *)
@@ -1224,7 +1235,8 @@ and codegen_expr (e : expr_a) : string =
         | _, ArchetypeSum _, _ -> Printf.sprintf "%s.self" new_id
         | _ ->
             raise_compilation_error e
-              "as expression can only be used with models or archetypes")
+              "as expression can only be used with models or archetypes"
+              Invalid_type_as)
   | Nothing t -> (
       match t with
       | _, Infer, _ ->
@@ -1267,6 +1279,7 @@ and codegen_expr (e : expr_a) : string =
         | _ ->
             raise_type_error e
               (Printf.sprintf "There is no struct with name %s" id)
+              Struct_not_found
       in
       Printf.sprintf "((%s){%s})" id
         (String.concat ", "
@@ -1514,7 +1527,8 @@ and codegen_type_definition (t : perktype) : string =
             (Printf.sprintf
                "Unexpected type generation request: got %s. If you see this \
                 error, please file an issue at https://github.com/"
-               (show_perktype t)))
+               (show_perktype t))
+            Unexpected_codegen_type)
 
 and codegen_lambda_environment (free_vars : perkvardesc list) :
     bool * string * string =

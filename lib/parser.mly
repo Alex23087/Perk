@@ -1,5 +1,6 @@
 %{
   open Errors
+  open Error_codes
   open Ast
   open Utils
   open Parse_lexing_commons
@@ -72,13 +73,13 @@
 
 program:
   | defs = nonempty_list(topleveldef) EOF                                                                  { defs }
-  | separated_list(Semicolon, topleveldef) error                                                           { raise (ParseError(!fnm, "unexpected token after program (Perhaps you forgot a ; ?)")) }
-  | EOF                                                                                                    { raise (ParseError(!fnm, "empty program")) }
+  | separated_list(Semicolon, topleveldef) error                                                           { raise (ParseError(!fnm, "unexpected token after program (Perhaps you forgot a ; ?)", Unexpected_token)) }
+  | EOF                                                                                                    { raise (ParseError(!fnm, "empty program", Empty_program)) }
 
 constructor_type:
   | i = Ident LParen l = separated_list(Comma, perktype) RParen                                            {add_constructor_name i; (i, l) }
-  | i = Ident                                                                                              {add_constructor_name i ; (i, []) }  | i = Ident error                                                                                        { raise (ParseError(!fnm, ("invalid type for constructor" ^ i))) }
-  | error                                                                                                  { raise (ParseError(!fnm, "constructor type expected")) }
+  | i = Ident                                                                                              {add_constructor_name i ; (i, []) }  | i = Ident error                                                                                        { raise (ParseError(!fnm, ("invalid type for constructor" ^ i), Invalid_constructor)) }
+  | error                                                                                                  { raise (ParseError(!fnm, "constructor type expected", Type_expected)) }
 
 topleveldef:
   | Import i = String                                                                                      { annotate_2_code !fnm $loc (Ast.Import ("<" ^ i ^ ">")) }
@@ -95,15 +96,15 @@ topleveldef:
   | Model Ident error                                                                                      { Keyword_tracker.raise_keyword_error fnm "model" }
   | Model error                                                                                            { Keyword_tracker.raise_keyword_error fnm "model" }
   | Struct i = Ident LBrace l = separated_list(Comma, perkdef) RBrace                                      { Keyword_tracker.validate_struct_identifier i; annotate_2_code !fnm $loc (Ast.Struct (i, l)) }
-  | Struct Ident LBrace error                                                                              { raise (ParseError(!fnm, "unexpected token in struct definition")) }
+  | Struct Ident LBrace error                                                                              { raise (ParseError(!fnm, "unexpected token in struct definition", Unexpected_token)) }
   | Struct Ident error                                                                                     { Keyword_tracker.raise_keyword_error fnm "struct" }
   | Struct error                                                                                           { Keyword_tracker.raise_keyword_error fnm "struct" }
   | ADT i = Ident Assign option(Pipe) l = separated_nonempty_list(Pipe, constructor_type)                  { Keyword_tracker.validate_type_identifier i; annotate_2_code !fnm $loc (Ast.ADT (i, l)) }   
-  | ADT Ident error                                                                                        { raise (ParseError(!fnm, "expected a list of constructors after ADT definition")) }
+  | ADT Ident error                                                                                        { raise (ParseError(!fnm, "expected a list of constructors after ADT definition", ADT_Missing_constructors)) }
   | ADT error                                                                                              { Keyword_tracker.raise_keyword_error fnm "type" }
   | Fun pf = perkfun                                                                                       { annotate_2_code !fnm $loc (Ast.Fundef (pf, true)) }
   | Fun Lt t=perktype Gt pf = perkfun                                                                      { annotate_2_code !fnm $loc (Ast.PolymorphicFundef (pf, t)) }
-  | error                                                                                                  { raise (ParseError(!fnm, "top-level definition expected")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "top-level definition expected", Top_level_definition_expected)) }
 
 
 if_command:
@@ -130,22 +131,22 @@ command:
   | Continue                                                                                               { annotate_2_code !fnm $loc (Ast.Continue) }
   | Break                                                                                                  { annotate_2_code !fnm $loc (Ast.Break) }
   | Match LParen e = expr RParen LBrace l = separated_nonempty_list (Comma, match_entry) RBrace            { annotate_2_code !fnm $loc (Ast.Match(e, l, None))}
-  | Match LParen expr RParen LBrace separated_list (Comma, match_entry) error                              { raise (ParseError(!fnm, "invalid match statement (perhaps you are missing a ',' between cases?)")) }
-  | Match error                                                                                            { raise (ParseError(!fnm, "invalid match scrutinee (perhaps you are missing a '(' ?)")) }
-  | error                                                                                                  { raise (ParseError(!fnm, "command expected")) }
-  | command error                                                                                          { raise (ParseError(!fnm, "unexpected command (perhaps you are missing a ';'?)")) }
-  | expr Assign error                                                                                      { raise (ParseError(!fnm, "expression expected on the right hand side of =")) }
-  | For LParen command Semicolon expr Semicolon command RParen error                                       { raise (ParseError(!fnm, "missing braces after for guard"))}
-  | If LParen expr RParen LBrace command RBrace Else error                                                 { raise (ParseError(!fnm, "missing braces after else"))}
-  | If LParen expr RParen error                                                                            { raise (ParseError(!fnm, "missing braces after if guard"))}
-  | While LParen expr RParen error                                                                         { raise (ParseError(!fnm, "missing braces after while guard"))}
-  | Do error                                                                                               { raise (ParseError(!fnm, "missing braces after do"))}
+  | Match LParen expr RParen LBrace separated_list (Comma, match_entry) error                              { raise (ParseError(!fnm, "invalid match statement (perhaps you are missing a ',' between cases?)", Invalid_match)) }
+  | Match error                                                                                            { raise (ParseError(!fnm, "invalid match scrutinee (perhaps you are missing a '(' ?)", Invalid_match)) }
+  | error                                                                                                  { raise (ParseError(!fnm, "command expected", Expected_token)) }
+  | command error                                                                                          { raise (ParseError(!fnm, "unexpected command (perhaps you are missing a ';'?)", Unexpected_token)) }
+  | expr Assign error                                                                                      { raise (ParseError(!fnm, "expression expected on the right hand side of =", Expected_token)) }
+  | For LParen command Semicolon expr Semicolon command RParen error                                       { raise (ParseError(!fnm, "missing braces after for guard", Missing_braces))}
+  | If LParen expr RParen LBrace command RBrace Else error                                                 { raise (ParseError(!fnm, "missing braces after else", Missing_braces))}
+  | If LParen expr RParen error                                                                            { raise (ParseError(!fnm, "missing braces after if guard", Missing_braces))}
+  | While LParen expr RParen error                                                                         { raise (ParseError(!fnm, "missing braces after while guard", Missing_braces))}
+  | Do error                                                                                               { raise (ParseError(!fnm, "missing braces after do", Missing_braces))}
 
 match_entry:
   | m = match_case LBrace c = command RBrace                                                               { annotate_2_code !fnm $loc (Ast.MatchCase(m, None, c))}
   | m = match_case When e = expr LBrace c = command RBrace                                                 { annotate_2_code !fnm $loc (Ast.MatchCase(m, Some e, c))}
-  | match_case error                                                                                       { raise (ParseError(!fnm, "invalid match case, expected case body")) }
-  | error                                                                                                  { raise (ParseError(!fnm, "match case expected")) }
+  | match_case error                                                                                       { raise (ParseError(!fnm, "invalid match case, expected case body", Expected_token)) }
+  | error                                                                                                  { raise (ParseError(!fnm, "match case expected", Expected_token)) }
 
 match_case:
   | BTICK LBrace e = expr RBrace                                                                           { annotate_2_code !fnm $loc (Ast.MatchExpr(e))}
@@ -154,7 +155,7 @@ match_case:
   | Var i=Ident Colon t=perktype                                                                           { annotate_2_code !fnm $loc (Ast.MatchVar(i, Some t))}
   | i=Ident                                                                                                { annotate_2_code !fnm $loc (Ast.CompoundCase(i, []))}
   | i=Ident LParen l = separated_nonempty_list(Comma, match_case) RParen                                   { annotate_2_code !fnm $loc (Ast.CompoundCase(i, l))}
-  | error                                                                                                  { raise (ParseError(!fnm, "expected match case")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "expected match case", Expected_token)) }
 
 deforfun:
   | d = perkdef                                                                                            { annotate_2_code !fnm $loc (Ast.DefVar([], d))}
@@ -162,25 +163,25 @@ deforfun:
 
 perkdef:
   | Let vd = perkvardesc Assign e = expr                                                                   { (vd, e) }
-  | Let perkvardesc error                                                                                  { raise (ParseError(!fnm, "expression expected: value must be initialized")) }
-  | error                                                                                                  { raise (ParseError(!fnm, "definition expected (e.g. let banana : int = 5)")) }
+  | Let perkvardesc error                                                                                  { raise (ParseError(!fnm, "expression expected: value must be initialized", Expected_token)) }
+  | error                                                                                                  { raise (ParseError(!fnm, "definition expected (e.g. let banana : int = 5)", Expected_token)) }
 
 perkfun:
   | i = Ident LParen id_list = perkvardesc_list RParen Colon rt = perktype LBrace c = command RBrace       { Keyword_tracker.validate_fun_identifier i; (rt, i, id_list, c) }
   | i = Ident LParen RParen Colon rt = perktype LBrace c = command RBrace                                  { Keyword_tracker.validate_fun_identifier i; (rt, i, [], c) }
-  | Ident LParen perkvardesc_list RParen error                                                             { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
-  | Ident LParen RParen error                                                                              { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)")) }
+  | Ident LParen perkvardesc_list RParen error                                                             { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)", Invalid_fundef)) }
+  | Ident LParen RParen error                                                                              { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)", Invalid_fundef)) }
   | error                                                                                                  { Keyword_tracker.raise_keyword_error fnm "function" }
 
 perkvardesc:
   | i = Ident Colon t = perktype                                                                           { Keyword_tracker.validate_var_identifier i; (t, i) }
   | i = Ident Colon                                                                                        { (([], Ast.Infer, []), i) }
-  | Ident error                                                                                            { raise (ParseError(!fnm, "type declaration expected (e.g. banana : int)")) }
+  | Ident error                                                                                            { raise (ParseError(!fnm, "type declaration expected (e.g. banana : int)", Expected_token)) }
   | error                                                                                                  { Keyword_tracker.raise_keyword_error fnm "variable" }
 
 perkfundesc:
   | Fun i = Ident Colon t = perktype                                                                       { (t, i) }
-  | error                                                                                                  { raise (ParseError(!fnm, "type declaration expected (e.g. banana : int)")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "type declaration expected (e.g. banana : int)", Expected_token)) }
 
 declorfun:
   | d = perkvardesc                                                                                        { annotate_2_code !fnm $loc (Ast.DeclVar d) }
@@ -206,7 +207,7 @@ expr:
   | Summon i = Ident LParen RParen                                                                         { annotate_2_code !fnm $loc (Summon (i, [])) }
   | Make i = Ident LParen RParen                                                                           { annotate_2_code !fnm $loc (Ast.Make (i, [])) }
   | Make i = Ident LParen l = initializer_list RParen                                                      { annotate_2_code !fnm $loc (Ast.Make (i, l)) }
-  | Make Ident LParen error                                                                                { raise (ParseError(!fnm, "invalid make expression (perhaps you forgot a closing parenthesis?)")) }
+  | Make Ident LParen error                                                                                { raise (ParseError(!fnm, "invalid make expression (perhaps you forgot a closing parenthesis?)", Invalid_make)) }
   | e1 = expr Dot i = Ident                                                                                { annotate_2_code !fnm $loc (Ast.Access (e1, i, None, None)) }
   | Nothing                                                                                                { annotate_2_code !fnm $loc (Ast.Nothing ([], Ast.Infer, [])) }
   | Nothing Of t=perktype                                                                                  { annotate_2_code !fnm $loc (Ast.Nothing (t)) }
@@ -220,12 +221,12 @@ expr:
   | Sizeof LParen t = perktype RParen                                                                      { annotate_2_code !fnm $loc (Ast.Sizeof t) }
   | If guard = expr Then e1 = expr Else e2 = expr                                                          { annotate_2_code !fnm $loc (Ast.IfThenElseExpr (guard, e1, e2)) }
 
-  | error                                                                                                  { raise (ParseError(!fnm, "expression expected")) }
-  | expr error                                                                                             { raise (ParseError(!fnm, "unexpected expression")) }
-  | Ident error                                                                                            { raise (ParseError(!fnm, "unexpected expression. Perhaps you tried to use C-style types?")) }
-  | Summon Ident error                                                                                     { raise (ParseError(!fnm, "error while summoning")) }
-  | LParen perkvardesc_list RParen Colon perktype error                                                    { raise (ParseError(!fnm, "invalid lambda definition (Perhaps you are missing a => )")) }
-  | LParen RParen Colon perktype error                                                                     { raise (ParseError(!fnm, "invalid lambda definition (Perhaps you are missing a => )")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "expression expected", Expected_token)) }
+  | expr error                                                                                             { raise (ParseError(!fnm, "unexpected expression", Unexpected_token)) }
+  | Ident error                                                                                            { raise (ParseError(!fnm, "unexpected expression. Perhaps you tried to use C-style types?", Unexpected_token)) }
+  | Summon Ident error                                                                                     { raise (ParseError(!fnm, "error while summoning", Invalid_summon)) }
+  | LParen perkvardesc_list RParen Colon perktype error                                                    { raise (ParseError(!fnm, "invalid lambda definition (Perhaps you are missing a => )", Invalid_lambda)) }
+  | LParen RParen Colon perktype error                                                                     { raise (ParseError(!fnm, "invalid lambda definition (Perhaps you are missing a => )", Invalid_lambda)) }
 
 %inline perktype_attribute:
   | Public                                                                                                 { Ast.Public }
@@ -256,7 +257,7 @@ perktype:
   | a = nonempty_list(perktype_attribute) t = perklamtype q = list(perktype_qualifier)                     { (a, t, q) }
   | LParen t = perktype RParen                                                                             { t }
   | Ellipsis                                                                                               { ([], Ast.Vararg, []) }
-  | error                                                                                                  { raise (ParseError(!fnm, "type expected")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "type expected", Expected_token)) }
 
 perktype_partial:
   | i = Ident                                                                                              { Ast.Basetype i }
@@ -267,9 +268,9 @@ perktype_partial:
   | t = perktype Star                                                                                      { Ast.Pointertype t }
   | t = perktype Question                                                                                  { Ast.Optiontype t }
   | Lt tys = separated_nonempty_list(Plus, Ident) Gt                                                       { Ast.ArchetypeSum (tys |> List.map (fun x -> ([], Ast.Basetype x, []))) }
-  | error                                                                                                  { raise (ParseError(!fnm, "type expected")) }
-  | Lt error                                                                                               { raise (ParseError(!fnm, "Cannot have empty archetype sum")) }
-  | Lt separated_nonempty_list(Plus, Ident) error                                                          { raise (ParseError(!fnm, "Unterminated archetype sum")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "type expected", Expected_token)) }
+  | Lt error                                                                                               { raise (ParseError(!fnm, "Cannot have empty archetype sum", Invalid_archesum)) }
+  | Lt separated_nonempty_list(Plus, Ident) error                                                          { raise (ParseError(!fnm, "Unterminated archetype sum", Invalid_archesum)) }
 
 %inline binop:
   | Plus                                                                                                   { Ast.Add }
@@ -307,46 +308,46 @@ perktype_partial:
 expr_list:
   | e = expr                                                                                               { [e] }
   | el = expr_list Comma e = expr                                                                          { el @ [e] }
-  | error                                                                                                  { raise (ParseError(!fnm, "expression expected")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "expression expected", Expected_token)) }
 
 ident_list:
   | i = Ident                                                                                              { [i] }
   | il = ident_list Comma i = Ident                                                                        { il @ [i] }
-  | error                                                                                                  { raise (ParseError(!fnm, "identifier expected")) }
-  | Ident error                                                                                            { raise (ParseError(!fnm, "unexpected identifier")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "identifier expected", Expected_token)) }
+  | Ident error                                                                                            { raise (ParseError(!fnm, "unexpected identifier", Unexpected_token)) }
 
 perktype_list:
   | t = perktype                                                                                           { [t] }
   | tl = perktype Comma t = perktype_list                                                                  { tl :: t }
-  | error                                                                                                  { raise (ParseError(!fnm, "type expected")) }
-  | perktype error                                                                                         { raise (ParseError(!fnm, "unexpected type")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "type expected", Expected_token)) }
+  | perktype error                                                                                         { raise (ParseError(!fnm, "unexpected type", Unexpected_token)) }
 
 perkdeforfun_list:
   | t = deforfun                                                                                           { [t] }
   | a = nonempty_list(perktype_attribute) t = deforfun                                                     { [add_attrs_to_deforfun a t] }
   | tl = deforfun Comma t = perkdeforfun_list                                                              { tl :: t }
   | a = nonempty_list(perktype_attribute) tl = deforfun Comma t = perkdeforfun_list                        { (add_attrs_to_deforfun a tl) :: t }
-  | error                                                                                                  { raise (ParseError(!fnm, "definition expected")) }
-  | deforfun error                                                                                         { raise (ParseError(!fnm, "unexpected definition")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "definition expected", Expected_token)) }
+  | deforfun error                                                                                         { raise (ParseError(!fnm, "unexpected definition", Unexpected_token)) }
 
 perkvardesc_list:
   | t = perkvardesc                                                                                        { [t] }
   | tl = perkvardesc Comma t = perkvardesc_list                                                            { tl :: t }
-  | error                                                                                                  { raise (ParseError(!fnm, "variable descriptor expected")) }
-  | perkvardesc error                                                                                      { raise (ParseError(!fnm, "unexpected variable descriptor")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "variable descriptor expected", Expected_token)) }
+  | perkvardesc error                                                                                      { raise (ParseError(!fnm, "unexpected variable descriptor", Unexpected_token)) }
 
 perkdeclorfun_list:
   | t = declorfun                                                                                          { [t] }
   | tl = declorfun Comma t = perkdeclorfun_list                                                            { tl :: t }
-  | error                                                                                                  { raise (ParseError(!fnm, "variable descriptor expected")) }
-  | declorfun error                                                                                        { raise (ParseError(!fnm, "unexpected variable descriptor")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "variable descriptor expected", Expected_token)) }
+  | declorfun error                                                                                        { raise (ParseError(!fnm, "unexpected variable descriptor", Unexpected_token)) }
 
 initializer_list:
   | i = Ident Assign e = expr                                                                              { [(i, e)] }
   | i = Ident Assign e = expr Comma il = initializer_list                                                  { (i, e) :: il }
-  | Ident error                                                                                            { raise (ParseError(!fnm, "initializer expected (e.g. field = value)")) }
-  | error                                                                                                  { raise (ParseError(!fnm, "initializer expected (e.g. field = value)")) }
+  | Ident error                                                                                            { raise (ParseError(!fnm, "initializer expected (e.g. field = value)", Expected_token)) }
+  | error                                                                                                  { raise (ParseError(!fnm, "initializer expected (e.g. field = value)", Expected_token)) }
 
 spanish_inquisition:
-  | error                                                                                                  { raise (ParseError(!fnm, "Nobody expects the Spanish Inquisition!")) }
+  | error                                                                                                  { raise (ParseError(!fnm, "Nobody expects the Spanish Inquisition!", Unexpected_token)) }
 %%

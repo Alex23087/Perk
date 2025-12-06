@@ -1,14 +1,15 @@
 (rule
  (targets keyword_list.ml)
  (deps lexer.ml extract_keywords.ml)
- (action (run ocaml %{dep:extract_keywords.ml} %{dep:lexer.ml} %{targets})))
+ (action
+  (run ocaml %{dep:extract_keywords.ml} %{dep:lexer.ml} %{targets})))
 
 (library
  (name Perk)
  (public_name perk)
  (libraries sedlex menhirLib fpath)
  (preprocess
-  (pps ppx_deriving.show ppx_deriving.eq sedlex.ppx)))
+  (pps ppx_deriving.show ppx_deriving.eq ppx_deriving.enum sedlex.ppx)))
 
 (menhir
  (modules parser c_parser)

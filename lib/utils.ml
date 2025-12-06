@@ -2,6 +2,7 @@
 
 open Ast
 open Errors
+open Error_codes
 
 (** Filename of the current perk file being processed *)
 let fnm = ref ""
@@ -178,6 +179,7 @@ and decl_of_declorfun (def : declorfun_a) : perkdecl =
         | a, Lambdatype (params, ret, free_vars), d ->
             if free_vars <> [] then
               raise_type_error def "function contains free vars"
+                Function_contains_free_vars
             else (a, Funtype (params, ret), d)
         | _ -> typ
       in
@@ -206,9 +208,9 @@ and get_member_functions (defs : deforfun_a list) : perkident list =
       | DefVar (_, ((_, _), _)) -> false)
     defs
   |> List.map (fun f ->
-         match ( $ ) f with
-         | DefFun (_, (_, id, _, _)) -> id
-         | _ -> failwith "impossible: vars have been already filtered away")
+      match ( $ ) f with
+      | DefFun (_, (_, id, _, _)) -> id
+      | _ -> failwith "impossible: vars have been already filtered away")
 
 and add_attrs_to_deforfun (attrs : perktype_attribute list) (def : deforfun_a) :
     deforfun_a =

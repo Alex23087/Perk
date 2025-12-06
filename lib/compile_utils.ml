@@ -1,6 +1,7 @@
 open Ast
 open Codegen
 open Errors (*EWWOWS*)
+open Error_codes
 open Typecheck
 open File_info
 
@@ -30,16 +31,15 @@ let gather_numerical_lengths () : unit =
   res |> String.split_on_char '\n'
   |> List.filter (fun line -> String.trim line <> "")
   |> List.iter (fun line ->
-         match String.split_on_char ' ' (String.trim line) with
-         | [ def; macro; value ] when String.starts_with ~prefix:"#define" def
-           ->
-             let key = macro in
-             let value = int_of_string value in
-             Utils.say_here (Printf.sprintf "Added size type: %s %d" key value);
-             Hashtbl.add Utils.numerical_sizes key value
-         | _ as s ->
-             failwith
-               ("Unexpected format in numerical lengths: " ^ String.concat " " s))
+      match String.split_on_char ' ' (String.trim line) with
+      | [ def; macro; value ] when String.starts_with ~prefix:"#define" def ->
+          let key = macro in
+          let value = int_of_string value in
+          Utils.say_here (Printf.sprintf "Added size type: %s %d" key value);
+          Hashtbl.add Utils.numerical_sizes key value
+      | _ as s ->
+          failwith
+            ("Unexpected format in numerical lengths: " ^ String.concat " " s))
 
 let ast_of_filename filename =
   let inchn = open_in filename in
@@ -51,7 +51,7 @@ let ast_of_filename filename =
       MenhirLib.Convert.Simplified.traditional2revised Parser.program
     in
     try parser lexer with
-    | ParseError (f, e) ->
+    | ParseError (f, e, code) ->
         raise
           (Syntax_error
              ( ( (fst (Sedlexing.lexing_positions lexbuf)).pos_lnum,
@@ -61,7 +61,8 @@ let ast_of_filename filename =
                  (snd (Sedlexing.lexing_positions lexbuf)).pos_cnum
                  - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol ),
                f,
-               e ))
+               e,
+               code ))
     | Parser.Error ->
         raise
           (Syntax_error
@@ -73,7 +74,8 @@ let ast_of_filename filename =
                  - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol ),
                filename,
                "Unhandled parsing error. If this happens to you, please open \
-                an issue on https://github.com/Alex23087/Perk/issues" ))
+                an issue on https://github.com/Alex23087/Perk/issues",
+               Unknown_error ))
   in
   let ast = ast_of_channel inchn in
   close_in inchn;
@@ -101,6 +103,23 @@ let singletonamble =
        ((t)(__lambdummy->func))())\n\
        #define CALL_LAMBDA(l, t, ...) (__lambdummy = (__lambdummy_type \
        *)l,       ((t)(__lambdummy->func))(__VA_ARGS__))" ^ "\n\n" ^ "#endif\n"
+
+let error_out json_format error_class start_line start_col end_line end_col msg
+    file code =
+  if json_format then (
+    Printf.printf
+      "{\"error\": \"%s\", \"start_line\": %d, \"start_col\": %d, \
+       \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
+       \"%s\", \"error_code\": {\"desc\": \"%s\", \"code\": %d}}\n"
+      (fst error_class) start_line start_col end_line end_col
+      (String.escaped msg) file (show_error_code code) (error_code_to_enum code);
+    exit 0)
+  else
+    Printf.eprintf
+      "\027[31m%s error at line %d, column %d: %s, ending at line %d, column \
+       %d in file %s\027[0m\n"
+      (snd error_class) start_line start_col msg end_line end_col file;
+  exit 1
 
 let rec compile_program ?(dir : string option) ?(dry_run = false)
     ?(json_format = false) (static_compilation : bool) (verbose : bool)
@@ -154,77 +173,26 @@ let rec compile_program ?(dir : string option) ?(dry_run = false)
       output_string oc singletonamble;
       close_out oc)
   with
-  | Syntax_error ((start_line, start_col), (end_line, end_col), input_file, msg)
-    ->
-      if json_format then (
-        Printf.printf
-          "{\"error\": \"syntax\", \"start_line\": %d, \"start_col\": %d, \
-           \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
-           \"%s\"}\n"
-          start_line start_col end_line end_col (String.escaped msg) input_file;
-        exit 0)
-      else
-        Printf.eprintf
-          "\027[31mSyntax error at line %d, column %d: %s, ending at line %d, \
-           column %d in file %s\027[0m\n"
-          start_line start_col msg end_line end_col input_file;
-      exit 1
-  | Lexing_error ((start_line, start_col), (end_line, end_col), input_file, msg)
-    ->
-      if json_format then (
-        Printf.printf
-          "{\"error\": \"lexing\", \"start_line\": %d, \"start_col\": %d, \
-           \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
-           \"%s\"}\n"
-          start_line start_col end_line end_col (String.escaped msg) input_file;
-        exit 0)
-      else
-        Printf.eprintf
-          "\027[31mLexing error at line %d, column %d: %s, ending at line %d, \
-           column %d in file %s\027[0m\n"
-          start_line start_col msg end_line end_col input_file;
-      exit 1
-  | Type_error ((start_line, start_col), (end_line, end_col), input_file, msg)
-    ->
-      if json_format then (
-        Printf.printf
-          "{\"error\": \"typecheck\", \"start_line\": %d, \"start_col\": %d, \
-           \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
-           \"%s\"}\n"
-          start_line start_col end_line end_col (String.escaped msg) input_file;
-        exit 0)
-      else
-        Printf.eprintf
-          "\027[31mType error at line %d, column %d: %s, ending at line %d, \
-           column %d in file %s\027[0m\n"
-          start_line start_col msg end_line end_col input_file;
-      exit 1
+  | Syntax_error
+      ((start_line, start_col), (end_line, end_col), input_file, msg, code) ->
+      error_out json_format ("syntax", "Syntax") start_line start_col end_line
+        end_col msg input_file code
+  | Lexing_error
+      ((start_line, start_col), (end_line, end_col), input_file, msg, code) ->
+      error_out json_format ("lexing", "Lexing") start_line start_col end_line
+        end_col msg input_file code
+  | Type_error
+      ((start_line, start_col), (end_line, end_col), input_file, msg, code) ->
+      error_out json_format ("typecheck", "Type") start_line start_col end_line
+        end_col msg input_file code
   | Parser.Error ->
-      if json_format then (
-        Printf.printf
-          "{\"error\": \"parse\", \"message\": \"Unexpected token in file %s\"}\n"
-          !Utils.fnm;
-        exit 0)
-      else
-        Printf.eprintf
-          "\027[31mParsing error: unexpected token in file %s\027[0m\n"
-          input_file;
-      exit 1
+      error_out json_format ("parse", "parsing") (-1) (-1) (-1) (-1)
+        "Unexpected token" input_file Unknown_error
   | Compilation_error
-      ((start_line, start_col), (end_line, end_col), input_file, msg) ->
-      if json_format then (
-        Printf.printf
-          "{\"error\": \"compilation\", \"start_line\": %d, \"start_col\": %d, \
-           \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
-           \"%s\"}\n"
-          start_line start_col end_line end_col (String.escaped msg) input_file;
-        exit 0)
-      else
-        Printf.eprintf
-          "\027[31mCompilation error at line %d, column %d: %s, ending at line \
-           %d, column %d in file %s\027[0m\n"
-          start_line start_col msg end_line end_col input_file;
-      exit 1
+      ((start_line, start_col), (end_line, end_col), input_file, msg, code) ->
+      error_out json_format
+        ("compilation", "Compilation")
+        start_line start_col end_line end_col msg input_file code
 
 (** Generates the global polyfun definitions that are not local to the current
     file *)
@@ -398,7 +366,8 @@ and process_opens (dir : string) (ast : topleveldef_a list) :
       let did_add = add_import open_filename in
       if not (Sys.file_exists open_filename) then
         raise_compilation_error node
-          (Printf.sprintf "File %s does not exist" open_filename);
+          (Printf.sprintf "File %s does not exist" open_filename)
+          File_not_found;
       if did_add then (
         let fi = save_file_info () in
         let _ast, (compiled_preamble, compiled_body) =
@@ -446,7 +415,8 @@ and expand_opens (dir : string) (ast : topleveldef_a list) : topleveldef_a list
       let did_add = add_import open_filename in
       if not (Sys.file_exists open_filename) then
         raise_compilation_error node
-          (Printf.sprintf "File %s does not exist" open_filename);
+          (Printf.sprintf "File %s does not exist" open_filename)
+          File_not_found;
       if did_add then
         expand_opens
           (Filename.dirname open_filename)
