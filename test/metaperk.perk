@@ -167,6 +167,7 @@ fun lex_operator(s : char*) : ((char*) * int) {
     if(eq("while"))     {return ("While", 0)};
     
     failwith("Unrecognized arithmetical operator");
+    return ("DED", 0);
 }
 
 fun parse_int(s : char*) : ((char*) * int) {
