@@ -9,9 +9,14 @@ let opens_hashmap : (string, unit) Hashtbl.t = Hashtbl.create 16
 
 let add_import (import : string) : bool =
   let import = Fpath.to_string (Fpath.normalize (Fpath.v import)) in
-  (* Printf.printf "%s" (Printf.sprintf "Adding import to hashmap: %s\n" import); *)
   if Hashtbl.mem opens_hashmap import then false
   else (
+    if !Utils.verbose then (
+      Utils.say_here (Printf.sprintf "Adding import to hashmap: %s" import);
+      Utils.say_here "Open hashmap entries:";
+      Hashtbl.iter
+        (fun key _ -> Printf.sprintf "%s" key |> Utils.say_here)
+        opens_hashmap);
     Hashtbl.add opens_hashmap import ();
     true)
 
@@ -312,14 +317,16 @@ and process_file ?(dir : string option) (filename : string) (is_main : bool) :
   let header_name =
     Filename.chop_suffix (Filename.basename filename_canonical) ".perk" ^ ".h"
   in
-  (* Printf.printf "%s"
+  Utils.say_here
     (Printf.sprintf "Processing file: %s (canonical: %s)\n" filename
-       filename_canonical); *)
+       filename_canonical);
   add_import filename_canonical |> ignore;
 
   let old_fnm = !Utils.fnm in
   Utils.fnm := filename;
   let ast = ast_of_filename filename in
+  Var_symbol_table.push_symbol_table ();
+  process_C_imports ast;
   let ast = opens_to_imports dirname ast in
   let ast = remove_opens ast in
   let ast = typecheck_program ast in
@@ -329,6 +336,16 @@ and process_file ?(dir : string option) (filename : string) (is_main : bool) :
     ( String.concat "\n" (List.map show_topleveldef_a ast),
       ast |> codegen_program header_name is_main )
   in
+
+  (* Utils.say_here "TYPECHECK IMPORTS:";
+  List.iter
+    (fun path -> Utils.say_here (Printf.sprintf "Import path: %s\n" path))
+    !(File_info.get_import_paths ());
+  Utils.say_here "FILE_INFO IMPORTS:";
+  List.iter
+    (fun path -> Utils.say_here (Printf.sprintf "Import path: %s\n" path))
+    !(File_info.get_import_list ()); *)
+
   (* Hashtbl.clear Codegen.lambdas_hashmap;
   Hashtbl.clear Codegen.public_fundecl_symbol_table;
   Hashtbl.clear Codegen.private_fundecl_symbol_table;
@@ -337,7 +354,6 @@ and process_file ?(dir : string option) (filename : string) (is_main : bool) :
   Hashtbl.clear Polymorphism.polyfun_instances;
   Hashtbl.clear Polymorphism.file_local_polyfuns;
   Polymorphism.polyfuns_to_be_defined := []; *)
-
   if old_fnm <> "" then Utils.fnm := old_fnm;
   out
 
@@ -373,11 +389,11 @@ and process_opens (dir : string) (ast : topleveldef_a list) :
       in
       (* let open_filename = i in *)
       let did_add = add_import open_filename in
-      if not (Sys.file_exists open_filename) then
-        raise_compilation_error node
-          (Printf.sprintf "File %s does not exist" open_filename)
-          File_not_found;
       if did_add then (
+        if not (Sys.file_exists open_filename) then
+          raise_compilation_error node
+            (Printf.sprintf "File %s does not exist" open_filename)
+            File_not_found;
         let fi = save_file_info () in
         let _ast, (compiled_preamble, compiled_body) =
           (* Printf.printf "%s"
@@ -412,42 +428,30 @@ and process_opens (dir : string) (ast : topleveldef_a list) :
   | _ :: rest -> process_opens dir rest
   | [] -> []
 
-and expand_opens (dir : string) (ast : topleveldef_a list) : topleveldef_a list
-    =
-  match ast with
-  | ({ loc = _; node = Open i } as node) :: rest ->
-      let open_filename =
-        if Fpath.is_rel (Fpath.v i) then
-          Fpath.(to_string (normalize (v dir // v i)))
-        else Fpath.(to_string (normalize (v i)))
-      in
-      let did_add = add_import open_filename in
-      if not (Sys.file_exists open_filename) then
-        raise_compilation_error node
-          (Printf.sprintf "File %s does not exist" open_filename)
-          File_not_found;
-      if did_add then
-        expand_opens
-          (Filename.dirname open_filename)
-          (ast_of_filename open_filename)
-        @ expand_opens dir rest
-      else expand_opens dir rest
-  (* | ({ loc = _; node = Import i } as node) :: rest ->
-      if String.starts_with ~prefix:"\"" i then (
-        let i = String.sub i 1 (String.length i - 2) in
-        let import_filename =
-          if Fpath.is_rel (Fpath.v i) then
-            Fpath.(to_string (normalize (v dir // v i)))
-          else Fpath.(to_string (normalize (v i)))
-        in
-        let did_add = add_import import_filename in
-        if not (Sys.file_exists import_filename) then
-          raise_compilation_error node
-            (Printf.sprintf "File %s does not exist" import_filename);
-        if did_add then
-          let import_filename = "\"" ^ import_filename ^ "\"" in
-          annot_copy node (Import import_filename) :: expand_opens dir rest
-        else expand_opens dir rest)
-      else node :: expand_opens dir rest *)
-  | x :: rest -> x :: expand_opens dir rest
-  | [] -> []
+and process_C_imports (ast : topleveldef_a list) =
+  List.iter
+    (fun tldf ->
+      match ( $ ) tldf with
+      | Import s ->
+          File_info.get_import_paths ()
+          := Typecheck.get_lib_path s :: !(File_info.get_import_paths ())
+      | _ -> ())
+    ast;
+  if List.length !(File_info.get_import_paths ()) = 0 then ()
+  else (
+    Parse_tags.generate_tags !(File_info.get_import_paths ());
+    Typecheck.library_functions := Parse_tags.get_prototype_types ();
+    (* for each library function, if it is not already defined define it *)
+    (* TODO solve conditionally compiled definitions *)
+    (* TODO hoist these*)
+    List.iter
+      (fun (id, t) ->
+        Utils.say_here
+          (Printf.sprintf "Adding library function %s of type %s" id
+             (show_perktype t));
+        if Option.is_none (Var_symbol_table.lookup_var id) then
+          Var_symbol_table.bind_var id t
+        else Utils.say_here "Skipping")
+      !Typecheck.library_functions;
+    Parse_tags.remove_tags ();
+    Parse_tags.remove_libs_expanded ())

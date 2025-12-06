@@ -6,17 +6,13 @@ open Utils
 open Type_symbol_table
 open Var_symbol_table
 open Free_variables
-open Parse_tags
 open Parse_lexing_commons
 open Polymorphism
 open File_info
 
 (** List of library functions and their types :
     [(perkident * perktype) list ref]*)
-let library_functions = ref []
-
-(** List of import paths *)
-let import_path_list = ref []
+let library_functions : (perkident * perktype) list ref = ref []
 
 (** gathers the path(s) where libraries are located *)
 let get_lib_path s =
@@ -235,7 +231,6 @@ let rec numerical_rank : perktype -> int = function
 
 (** typechecks a set of toplevel definitions, instancing the inferred types *)
 let rec typecheck_program (ast : topleveldef_a list) : topleveldef_a list =
-  push_symbol_table ();
   let res = List.map typecheck_topleveldef ast in
   let res = List.map typecheck_deferred_function res in
   (* Will it do it in the right order?? *)
@@ -290,24 +285,7 @@ and typecheck_deferred_function (tldf : topleveldef_a) : topleveldef_a =
 and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
   match ( $ ) tldf with
   | TLSkip -> annot_copy tldf TLSkip
-  | Import s ->
-      import_path_list := get_lib_path s :: !import_path_list;
-      generate_tags !import_path_list;
-      library_functions := get_prototype_types ();
-      (* for each library function, if it is not already defined define it *)
-      (* TODO solve conditionally compiled definitions *)
-      (* TODO hoist these*)
-      List.iter
-        (fun (id, t) ->
-          say_here
-            (Printf.sprintf "Adding library function %s of type %s" id
-               (show_perktype t));
-          if Option.is_none (lookup_var id) then bind_var id t
-          else say_here "Skipping")
-        !library_functions;
-      remove_tags ();
-      remove_libs_expanded ();
-      tldf
+  | Import _s -> tldf
   | Open _ ->
       raise_compilation_error tldf
         "Opens should not reach this point (typecheck). If you see this error, \

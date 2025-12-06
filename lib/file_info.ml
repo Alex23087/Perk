@@ -20,6 +20,7 @@ type file_info = {
   public_fundecl_symbol_table : (perkident, perktype) Hashtbl.t;
   private_fundecl_symbol_table : (perkident, perktype) Hashtbl.t;
   import_list : string list ref;
+  import_paths : string list ref;
   polyfun_instances : (string, (perktype * bool) list) Hashtbl.t;
       (** id -> (type, was_codegen'd) list *)
   file_local_polyfuns : (string, perktype list * perktype * perktype) Hashtbl.t;
@@ -34,6 +35,7 @@ let allocate_file_info () =
       public_fundecl_symbol_table = Hashtbl.create 10;
       private_fundecl_symbol_table = Hashtbl.create 10;
       import_list = ref [];
+      import_paths = ref [];
       polyfun_instances = Hashtbl.create 10;
       file_local_polyfuns = Hashtbl.create 10;
       polyfuns_to_be_defined = ref [];
@@ -55,6 +57,7 @@ let get_private_fundecl_symbol_table () =
   !current_file_info.private_fundecl_symbol_table
 
 let get_import_list () = !current_file_info.import_list
+let get_import_paths () = !current_file_info.import_paths
 let get_polyfun_instances () = !current_file_info.polyfun_instances
 let get_file_local_polyfuns () = !current_file_info.file_local_polyfuns
 let get_polyfuns_to_be_defined () = !current_file_info.polyfuns_to_be_defined
