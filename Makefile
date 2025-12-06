@@ -288,6 +288,11 @@ test_pass_static: build
 # Test programs that are expected to fail
 .PHONY: test_fail
 test_fail: build
+	@JQ=$$(which jq 2> /dev/null);\
+	if [ -z "$$JQ" ]; then\
+		echo "jq needs to be installed to run fail tests.";\
+		exit 1;\
+	fi
 	@echo "Testing programs that are expected to fail..."
 	@TEST_ERROR=0; \
 	if [ -n "$(FILE)" ]; then \
@@ -373,6 +378,11 @@ test_fail: build
 # Test static programs that are expected to fail
 .PHONY: test_fail_static
 test_fail_static: build
+	@JQ=$$(which jq 2> /dev/null);\
+	if [ -z "$$JQ" ]; then\
+		echo "jq needs to be installed to run fail tests.";\
+		exit 1;\
+	fi
 	@echo "Testing static programs that are expected to fail..."
 	@TEST_ERROR=0; \
 	if [ -n "$(FILE)" ]; then \
