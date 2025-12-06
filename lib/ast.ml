@@ -115,6 +115,12 @@ and postunop =
 
 and perkdef = perkdecl * expr_a [@@deriving show, eq]
 
+and funkind =
+  | Normal
+  | TypeExt of perkident
+  | TypeMemExt of perkident
+[@@deriving show, eq]
+
 and perkfundef =
   perktype
   * perkident
@@ -194,7 +200,8 @@ and topleveldef_t =
   | Open of string
   | Extern of perkident * perktype
   | Def of perkdef * perktype option
-  | Fundef of perkfundef * bool  (** fundef, is public?*)
+  | Fundef of perkfundef * funkind * bool
+      (** fundef, what kind of function is it? is it public?*)
   | PolymorphicFundef of perkfundef * perktype
   | Archetype of perkident * declorfun_a list
   | Model of perkident * perkident list * deforfun_a list

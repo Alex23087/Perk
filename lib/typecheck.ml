@@ -61,6 +61,30 @@ let get_lib_path s =
 (** Hash table of the defined ADT constructors*)
 let defined_constructors : (perkident, unit) Hashtbl.t = Hashtbl.create 10
 
+(** Hash table of extension functions. Binds a type to a list of (function_name
+    * function_type * is_member_function)*)
+let extension_functions :
+    (perktype_partial, (perkident * perktype * bool) list) Hashtbl.t =
+  Hashtbl.create 10
+
+let lookup_extension_function (typ : perktype) (id : perkident) =
+  Option.bind
+    (Hashtbl.find_opt extension_functions (discard_type_aq typ))
+    (List.find_opt (fun (i, _t, _mem) -> id = i))
+
+let bind_extension_function (typ : perktype) (fundef : perkfundef) (mem : bool)
+    =
+  let _, id, _, _ = fundef in
+  let part_typ = discard_type_aq typ in
+  let exts =
+    match Hashtbl.find_opt extension_functions part_typ with
+    | None -> []
+    | Some e -> e
+  in
+  let funtype = funtype_of_perkfundef fundef in
+  let exts = (id, funtype, mem) :: exts in
+  Hashtbl.replace extension_functions part_typ exts
+
 (* TODO handle type aliases *)
 
 (** check if type is integral *)
@@ -222,7 +246,23 @@ let rec typecheck_program (ast : topleveldef_a list) : topleveldef_a list =
 (** Typechecks functions after everything else *)
 and typecheck_deferred_function (tldf : topleveldef_a) : topleveldef_a =
   match ( $ ) tldf with
-  | Fundef ((ret_type, id, params, body), public) ->
+  | Fundef ((ret_type, id, params, body), _funkind, public) ->
+      let id, _funkind, public =
+        match _funkind with
+        | Normal -> (id, _funkind, public)
+        | TypeExt t ->
+            ( ext_fun_name
+                (* TODO: Check if this type is ok *) ([], Basetype t, [])
+                id,
+              Normal,
+              true )
+        | TypeMemExt t ->
+            ( ext_fun_name
+                (* TODO: Check if this type is ok *) ([], Basetype t, [])
+                id,
+              Normal,
+              true )
+      in
       push_symbol_table ();
       List.iter
         (fun (typ, id) ->
@@ -242,7 +282,8 @@ and typecheck_deferred_function (tldf : topleveldef_a) : topleveldef_a =
       in
       rebind_var id funtype;
       rebind_type (type_descriptor_of_perktype funtype) funtype;
-      annot_copy tldf (Fundef ((ret_type, id, params, body_res), public))
+      annot_copy tldf
+        (Fundef ((ret_type, id, params, body_res), _funkind, public))
   | _ -> tldf
 
 (** Typechecks toplevel definitions *)
@@ -319,7 +360,23 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
         bind_type_if_needed typ'';
         bind_var id typ'';
         annot_copy tldf (Def (((typ'', id), expr_res), deftype))
-  | Fundef ((ret_type, id, params, body), public) ->
+  | Fundef ((ret_type, id, params, body), _funkind, public) ->
+      let id, _funkind, public =
+        match _funkind with
+        | Normal -> (id, _funkind, public)
+        | TypeExt t ->
+            let ext_type =
+              (* TODO: Check if this type is ok *) ([], Basetype t, [])
+            in
+            bind_extension_function ext_type (ret_type, id, params, body) false;
+            (ext_fun_name ext_type id, Normal, true)
+        | TypeMemExt t ->
+            let ext_type =
+              (* TODO: Check if this type is ok *) ([], Basetype t, [])
+            in
+            bind_extension_function ext_type (ret_type, id, params, body) true;
+            (ext_fun_name ext_type id, Normal, true)
+      in
       (* TODO: Possibly this check can be removed, if it can be performed beforehand by the keyword checker *)
       if id = "self" then
         raise_type_error tldf "Identifier self is reserved" Reserved_identifier
@@ -340,7 +397,8 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
         in
         bind_var id funtype;
         bind_type_if_needed funtype;
-        annot_copy tldf (Fundef ((ret_type, id, params, body), public))
+        annot_copy tldf
+          (Fundef ((ret_type, id, params, body), _funkind, public))
         (* |> ignore; typecheck_deferred_function tldf *))
   | PolymorphicFundef ((ret_type, id, params, body), type_param) ->
       (* add the type parameter to the hashtable, setting empty bounds and inferred type*)
@@ -1178,43 +1236,66 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
             ( List.map (fun x -> subst_type x tparam t) param_types,
               subst_type ret_type tparam t ),
           [] ) )
-  | Apply (func, params, _) ->
-      let fun_expr, fun_type =
-        typecheck_expr
-          ~expected_return:(Some ([], Funtype ([], void_type), []))
-            (* TODO: Put correct type here *)
-          func
+  | Apply (func, params, _) -> (
+      let normal_handling (_ : unit) =
+        let fun_expr, fun_type =
+          typecheck_expr
+            ~expected_return:(Some ([], Funtype ([], void_type), []))
+              (* TODO: Put correct type here *)
+            func
+        in
+        (* Check that the function is a function 👍 *)
+        let fun_param_types, fun_ret_type, apptype =
+          match fun_type with
+          | _, Funtype (param_types, ret_type), _ ->
+              (param_types, ret_type, None)
+          | _, Lambdatype (param_types, ret_type, _), _ ->
+              (param_types, ret_type, Some fun_type)
+          | _ -> raise_type_error func "Function type expected" Type_mismatch
+        in
+        let param_rets =
+          try typecheck_expr_list params fun_param_types
+          with Invalid_argument _ ->
+            raise_type_error expr
+              (Printf.sprintf
+                 "Wrong number of parameters passed to function: expected %d, \
+                  got %d"
+                 (List.length fun_param_types)
+                 (List.length params))
+              Wrong_number_parameters
+        in
+        let _param_types =
+          try match_type_list fun_param_types param_rets
+          with Type_match_error msg -> raise_type_error expr msg Type_mismatch
+        in
+        let param_rets =
+          List.map2
+            (fun (e, t1) t2 -> fill_nothing e t1 t2)
+            param_rets _param_types
+        in
+        ( annot_copy expr (Apply (fun_expr, List.map fst param_rets, apptype)),
+          fun_ret_type )
       in
-      (* Check that the function is a function 👍 *)
-      let fun_param_types, fun_ret_type, apptype =
-        match fun_type with
-        | _, Funtype (param_types, ret_type), _ -> (param_types, ret_type, None)
-        | _, Lambdatype (param_types, ret_type, _), _ ->
-            (param_types, ret_type, Some fun_type)
-        | _ -> raise_type_error func "Function type expected" Type_mismatch
-      in
-      let param_rets =
-        try typecheck_expr_list params fun_param_types
-        with Invalid_argument _ ->
-          raise_type_error expr
-            (Printf.sprintf
-               "Wrong number of parameters passed to function: expected %d, \
-                got %d"
-               (List.length fun_param_types)
-               (List.length params))
-            Wrong_number_parameters
-      in
-      let _param_types =
-        try match_type_list fun_param_types param_rets
-        with Type_match_error msg -> raise_type_error expr msg Type_mismatch
-      in
-      let param_rets =
-        List.map2
-          (fun (e, t1) t2 -> fill_nothing e t1 t2)
-          param_rets _param_types
-      in
-      ( annot_copy expr (Apply (fun_expr, List.map fst param_rets, apptype)),
-        fun_ret_type )
+      match ( $ ) func with
+      | Access ({ node = Var e; _ }, _, _, _) when e |> is_type ->
+          normal_handling ()
+      | Access (e, ide, _, _) -> (
+          let exp, exp_t = typecheck_expr e in
+          let exp_t = ([], Basetype (show_perktype exp_t), []) in
+          match lookup_extension_function exp_t ide with
+          | Some _ext_fun ->
+              let synthesized_func =
+                annot_copy exp (Var (ext_fun_name exp_t ide))
+              in
+              let synthesized_expr =
+                Apply (synthesized_func, e :: params, None)
+              in
+              let exp_a, exp_t =
+                typecheck_expr (annot_copy expr synthesized_expr)
+              in
+              (exp_a, exp_t)
+          | None -> normal_handling ())
+      | _ -> normal_handling ())
   | Binop (op, lhs, rhs) -> (
       let cast_priority t1 t2 =
         let r1 = numerical_rank t1 in
@@ -1451,57 +1532,79 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           raise_type_error expr
             (Printf.sprintf "Unknown type: %s" typeid)
             Unknown_identifier)
-  | Access (expr, ide, _, _) ->
-      let expr_res, expr_type = typecheck_expr expr in
-      let ( (res_type : perktype),
-            (access_type : perktype option),
-            (rightype : perktype option) ) =
-        let is_self =
-          match ( $ ) expr_res with Var "self" -> true | _ -> false
-        in
-        let expr_type' = resolve_type expr_type in
-        match expr_type' with
-        | ( _,
-            Modeltype (name, _archetypes, fields, _constr_params, _member_funcs),
-            _ ) -> (
-            let field = List.find_opt (fun (_, (_, id)) -> id = ide) fields in
-            match field with
-            | Some (attrs, (typ, _))
-              when is_self || not (List.mem Private attrs) ->
-                (typ, Some expr_type, Some typ)
-            | Some (_, (_, _)) ->
-                raise_type_error expr
-                  (Printf.sprintf
-                     "Trying to access private field %s of model %s" ide name)
-                  Private_access
-            | None ->
-                raise_type_error expr
-                  (Printf.sprintf "Field %s not found in model %s" ide name)
-                  Unknown_identifier)
-        | _, ArchetypeSum archetypes, _ -> (
-            let archs_with_idents =
-              List.map
-                (fun a ->
-                  match resolve_type a with
-                  | _, ArcheType (_aid, decls), [] ->
-                      List.map (fun (t, id) -> (a, t, id)) decls
-                  | _ ->
-                      failwith
-                        "Impossible: Model is implementing a non-archetype")
-                archetypes
-              |> List.flatten
+  | Access (expr, ide, _, _) -> (
+      match ( $ ) expr with
+      (* Type extension functions *)
+      | Var id when is_type id ->
+          let ext_typ = ([], Basetype id, []) in
+          let ext_fun = lookup_extension_function ext_typ ide in
+          if Option.is_none ext_fun then
+            raise_type_error expr
+              (Printf.sprintf "No definition of function %s for type %s" ide id)
+              Unknown_identifier;
+          let synthesized_expr = Var (ext_fun_name ext_typ ide) in
+          let exp_a, exp_t =
+            typecheck_expr (annot_copy expr synthesized_expr)
+          in
+          (exp_a, exp_t)
+      | _ ->
+          let expr_res, expr_type = typecheck_expr expr in
+          let ( (res_type : perktype),
+                (access_type : perktype option),
+                (rightype : perktype option) ) =
+            let is_self =
+              match ( $ ) expr_res with Var "self" -> true | _ -> false
             in
-            match
-              List.find_opt (fun (_arch, _t, id) -> id = ide) archs_with_idents
-            with
-            | Some (arch, t, _id) -> (t, Some arch, Some t)
-            | None ->
-                raise_type_error expr
-                  (Printf.sprintf
-                     "Field %s not found in archetypes implemented by variable"
-                     ide)
-                  Unknown_identifier)
-        (* | _, ArcheType (_name, decls), _ -> (
+            let expr_type' = resolve_type expr_type in
+            match expr_type' with
+            | ( _,
+                Modeltype
+                  (name, _archetypes, fields, _constr_params, _member_funcs),
+                _ ) -> (
+                let field =
+                  List.find_opt (fun (_, (_, id)) -> id = ide) fields
+                in
+                match field with
+                | Some (attrs, (typ, _))
+                  when is_self || not (List.mem Private attrs) ->
+                    (typ, Some expr_type, Some typ)
+                | Some (_, (_, _)) ->
+                    raise_type_error expr
+                      (Printf.sprintf
+                         "Trying to access private field %s of model %s" ide
+                         name)
+                      Private_access
+                | None ->
+                    raise_type_error expr
+                      (Printf.sprintf "Field %s not found in model %s" ide name)
+                      Unknown_identifier)
+            | _, ArchetypeSum archetypes, _ -> (
+                let archs_with_idents =
+                  List.map
+                    (fun a ->
+                      match resolve_type a with
+                      | _, ArcheType (_aid, decls), [] ->
+                          List.map (fun (t, id) -> (a, t, id)) decls
+                      | _ ->
+                          failwith
+                            "Impossible: Model is implementing a non-archetype")
+                    archetypes
+                  |> List.flatten
+                in
+                match
+                  List.find_opt
+                    (fun (_arch, _t, id) -> id = ide)
+                    archs_with_idents
+                with
+                | Some (arch, t, _id) -> (t, Some arch, Some t)
+                | None ->
+                    raise_type_error expr
+                      (Printf.sprintf
+                         "Field %s not found in archetypes implemented by \
+                          variable"
+                         ide)
+                      Unknown_identifier)
+            (* | _, ArcheType (_name, decls), _ -> (
             match List.find_opt (fun (_t, id) -> id = ide) decls with
             | Some (t, _id) -> (t, Some (resolve_type expr_type))
             | None ->
@@ -1509,27 +1612,30 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                   (Printf.sprintf
                      "Field %s not found in archetypes implemented by variable"
                      ide)) *)
-        | _, Arraytype (_t, Some _n), _ when ide = "length" ->
-            (([], Basetype "int", []), Some expr_type, None)
-        | _, Arraytype (_t, None), _ when ide = "length" ->
-            raise_type_error expr
-              "Cannot access length of an array with unknown size"
-              Invalid_subscript
-        | _, Structtype (name, fields), _ -> (
-            let field = List.find_opt (fun ((_, id), _) -> id = ide) fields in
-            match field with
-            | Some ((typ, _), _) -> (typ, Some expr_type', Some typ)
-            | None ->
+            | _, Arraytype (_t, Some _n), _ when ide = "length" ->
+                (([], Basetype "int", []), Some expr_type, None)
+            | _, Arraytype (_t, None), _ when ide = "length" ->
                 raise_type_error expr
-                  (Printf.sprintf "Field %s not found in struct %s" ide name)
-                  Unknown_identifier)
-        | _ ->
-            raise_type_error expr
-              (Printf.sprintf "Cannot access field %s of non-model type %s" ide
-                 (show_perktype expr_type))
-              Invalid_access
-      in
-      (annot_copy expr (Access (expr_res, ide, access_type, rightype)), res_type)
+                  "Cannot access length of an array with unknown size"
+                  Invalid_subscript
+            | _, Structtype (name, fields), _ -> (
+                let field =
+                  List.find_opt (fun ((_, id), _) -> id = ide) fields
+                in
+                match field with
+                | Some ((typ, _), _) -> (typ, Some expr_type', Some typ)
+                | None ->
+                    raise_type_error expr
+                      (Printf.sprintf "Field %s not found in struct %s" ide name)
+                      Unknown_identifier)
+            | _ ->
+                raise_type_error expr
+                  (Printf.sprintf "Cannot access field %s of non-model type %s"
+                     ide (show_perktype expr_type))
+                  Invalid_access
+          in
+          ( annot_copy expr (Access (expr_res, ide, access_type, rightype)),
+            res_type ))
   | Tuple (exprs, _) ->
       let exprs_res = List.map typecheck_expr exprs in
       let exprs_res = List.map (fun (a, b) -> fill_nothing a b b) exprs_res in

@@ -1,0 +1,7 @@
+import "stdio.h"
+
+type List = Nil | Cons(int, List)
+
+fun main() : void {
+    List.smth()
+}

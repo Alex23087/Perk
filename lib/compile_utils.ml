@@ -234,6 +234,7 @@ and add_polydefs ast =
                             Polymorphism.subst_perkvardesc x t_param t_actual)
                           args,
                         Polymorphism.subst_type_command body t_param t_actual ),
+                      Normal,
                       false )
                 in
                 let t = typecheck_topleveldef (annot_copy tld x) in
@@ -275,6 +276,7 @@ and check_polydefs_pass (ast : topleveldef_a list) =
                           Polymorphism.subst_perkvardesc x t_param t_actual)
                         args,
                       Polymorphism.subst_type_command body t_param t_actual ),
+                    Normal,
                     false )
               in
               let t = typecheck_topleveldef (annot_copy tld fundef) in

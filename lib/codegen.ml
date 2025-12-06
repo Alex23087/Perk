@@ -583,7 +583,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
         constructors;
       ""
   | InlineC s -> s
-  | Fundef ((t, id, args, body), public) ->
+  | Fundef ((t, id, args, body), _, public) ->
       indent_string ^ codegen_fundef ~public t id args body
   | PolymorphicFundef ((t_res, id, args, body), t_param) ->
       if not (Hashtbl.mem (File_info.get_polyfun_instances ()) id) then
@@ -614,6 +614,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                            (fun x -> subst_perkvardesc x t_param t_actual)
                            args,
                          subst_type_command body t_param t_actual ),
+                       Normal,
                        false )))
             instances
         in

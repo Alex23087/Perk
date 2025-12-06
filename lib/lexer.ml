@@ -81,6 +81,7 @@ let rec token lexbuf =
     | "and" | 0x2227 | "&&" -> Land (* ∧ *)
     | "or" | 0x2228 | "||" -> Lor (* ∨ *)
     | "fun" -> Fun
+    | "type_fun" -> TypeFun
     | "=" -> Assign
     | "++" -> PlusPlus
     | "--" -> MinusMinus

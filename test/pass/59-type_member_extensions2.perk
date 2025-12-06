@@ -1,0 +1,39 @@
+import "stdio.h"
+
+type List = Nil | Cons(int, List)
+
+fun List.iter (self: List, func: (int) => void): void {
+    match (self) {
+        Nil {
+            skip
+        },
+        Cons (var hd, var tl) {
+            func(hd);
+            tl.iter(func)
+        }
+    }
+}
+
+type_fun List.make_empty(): List {
+    return Nil;
+}
+
+type_fun List.make_decreasing(from: int): List {
+    match (from) {
+        `{0} {
+            return Nil
+        },
+        _ {
+            return Cons(from, List.make_decreasing(from - 1))
+        }
+    }
+}
+
+fun main() : void {
+    let l := List.make_decreasing(10);
+    l.iter(
+        (a: int): void {
+            printf("%d\n", a)
+        }
+    )
+}

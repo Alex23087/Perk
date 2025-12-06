@@ -9,7 +9,7 @@
 /* Tokens declarations */
 %token EOF
 %token Plus Eq Neq Lt Leq Gt Geq Minus Star Div Ampersand PlusPlus MinusMinus Dot Ellipsis Question Land Lor ShL ShR
-%token Fun Assign If Then Else While Do For
+%token Fun TypeFun Assign If Then Else While Do For
 %token <bool> Boolean
 %token <int> Integer
 %token <float> Float
@@ -102,7 +102,9 @@ topleveldef:
   | ADT i = Ident Assign option(Pipe) l = separated_nonempty_list(Pipe, constructor_type)                  { Keyword_tracker.validate_type_identifier i; annotate_2_code !fnm $loc (Ast.ADT (i, l)) }   
   | ADT Ident error                                                                                        { raise (ParseError(!fnm, "expected a list of constructors after ADT definition", ADT_Missing_constructors)) }
   | ADT error                                                                                              { Keyword_tracker.raise_keyword_error fnm "type" }
-  | Fun pf = perkfun                                                                                       { annotate_2_code !fnm $loc (Ast.Fundef (pf, true)) }
+  | Fun pf = perkfun                                                                                       { annotate_2_code !fnm $loc (Ast.Fundef (pf, Normal, true)) }
+  | Fun i = Ident Dot pf = perkfun                                                                         { annotate_2_code !fnm $loc (Ast.Fundef (pf, TypeMemExt(i), true)) }
+  | TypeFun i = Ident Dot pf = perkfun                                                                     { annotate_2_code !fnm $loc (Ast.Fundef (pf, TypeExt(i), true)) }
   | Fun Lt t=perktype Gt pf = perkfun                                                                      { annotate_2_code !fnm $loc (Ast.PolymorphicFundef (pf, t)) }
   | error                                                                                                  { raise (ParseError(!fnm, "top-level definition expected", Top_level_definition_expected)) }
 

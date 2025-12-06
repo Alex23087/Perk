@@ -581,3 +581,11 @@ let add_code_to_type_binding (_typ : perktype) (code : string) : unit =
   let key = type_descriptor_of_perktype _typ in
   let (_t, _code), from = Hashtbl.find type_symbol_table key in
   Hashtbl.replace type_symbol_table key ((_t, Some code), from)
+
+(** Generate the name of an extension function *)
+let ext_fun_name (typ : perktype) (id : perkident) =
+  Printf.sprintf "__perk_%s_ext_%s" (type_descriptor_of_perktype typ) id
+
+(** Returns true if the identifier identifies a type *)
+let is_type (id : perkident) = lookup_type id |> Option.is_some
+(* TODO: Use for builtin types too *)

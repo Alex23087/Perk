@@ -1,0 +1,15 @@
+import "stdio.h"
+
+type List = Nil | Cons(int, List)
+
+type_fun List.make_empty(): List {
+    return Nil;
+}
+
+type_fun List.ten(): int {
+    return 10
+}
+
+fun main() : void {
+    printf("%d\n", List.ten())
+}
