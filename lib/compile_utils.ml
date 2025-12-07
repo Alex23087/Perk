@@ -408,9 +408,10 @@ and process_opens (dir : string) (ast : topleveldef_a list) :
             File_not_found;
         let fi = save_file_info () in
 
-        (* TODO: store symbol table *)
-        (* let symtable = ref !Var_symbol_table.var_symbol_table in
-        Var_symbol_table.var_symbol_table := []; *)
+        (* Store symbol table: the inner library shouldn't have access to the current symbol table,
+          So we save it and reset it *)
+        let symtable = ref !Var_symbol_table.var_symbol_table in
+        Var_symbol_table.var_symbol_table := [];
 
         (* TODO: Type symbol table should be  *)
         let _ast, (compiled_preamble, compiled_body) =
@@ -419,10 +420,15 @@ and process_opens (dir : string) (ast : topleveldef_a list) :
           process_file open_filename false
         in
 
-        (* TODO: Restore symbol table *)
-        (* Var_symbol_table.append_symbol_table symtable
+        (* Restore symbol table and add all global symbols defined in the opened library.
+          Symbols included via C headers are allowed to be doubly declared. *)
+        (* TODO: instead of blindly allowing C symbols to be doubly declared, there should be a finer check
+          To ensure that they come from the same library as the symbol already declared (ideally checking if
+          said library is also a #pragma once lib...) *)
+        Var_symbol_table.append_symbol_table symtable
+          ~filter:(fun (_, fnm) -> Utils.is_C_file fnm)
           (List.hd !Var_symbol_table.var_symbol_table);
-        Var_symbol_table.var_symbol_table := !symtable; *)
+        Var_symbol_table.var_symbol_table := !symtable;
         restore_file_info fi;
 
         (* TODO makeshift implementation, does not work for nested opens *)
@@ -470,13 +476,14 @@ and process_C_imports (ast : topleveldef_a list) =
     (* for each library function, if it is not already defined define it *)
     (* TODO solve conditionally compiled definitions *)
     (* TODO hoist these*)
+    (* TODO: get filename of definition *)
     List.iter
       (fun (id, t) ->
         Utils.say_here
           (Printf.sprintf "Adding library function %s of type %s" id
              (show_perktype t));
         if Option.is_none (Var_symbol_table.lookup_var id) then
-          Var_symbol_table.bind_var id t
+          Var_symbol_table.bind_var id ~fnm:"C_libs.h" t
         else Utils.say_here "Skipping")
       !Typecheck.library_functions;
     Parse_tags.remove_tags ();

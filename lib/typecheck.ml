@@ -234,8 +234,9 @@ let rec typecheck_program (ast : topleveldef_a list) : topleveldef_a list =
   let res = List.map typecheck_topleveldef ast in
   let res = List.map typecheck_deferred_function res in
   (* Will it do it in the right order?? *)
-  (* print_symbol_table (); *)
-  (* print_type_symbol_table (); *)
+  if !Utils.verbose then (
+    print_symbol_table ();
+    print_type_symbol_table ());
   res
 
 (** Typechecks functions after everything else *)
@@ -942,7 +943,7 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
   | Skip -> (cmd, None, false)
   | Banish id ->
       (* TODO: Let banish unbind the future (unbind banished things after they're banished) *)
-      (match Option.map resolve_type (lookup_var id) with
+      (match lookup_var id |> Option.map fst |> Option.map resolve_type with
       | None ->
           raise_syntax_error cmd
             ("Identifier " ^ id ^ " not found")
@@ -1110,7 +1111,7 @@ and typecheck_match_case (match_type : perktype) case =
         let smart_msg =
           let lvid = lookup_var id in
           if Option.is_some lvid then
-            let t = Option.get lvid in
+            let t = Option.get lvid |> fst in
             Printf.sprintf
               " To access the variable %s : %s use the syntax `{%s}" id
               (show_perktype t) id
@@ -1139,7 +1140,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
   | Char _ -> (expr, ([], Basetype "char", []))
   | String _ -> (expr, ([], Pointertype ([], Basetype "char", []), []))
   | Var id -> (
-      match lookup_var id with
+      match lookup_var id |> Option.map fst with
       | Some (([], Funtype (params, ret), []) as t) -> (
           match Option.map discard_type_aq expected_return with
           | Some (Funtype _) -> (expr, t)
@@ -1375,7 +1376,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       let free_vars =
         List.map
           (fun v ->
-            match lookup_var v with
+            match lookup_var v |> Option.map fst with
             | Some vt -> (vt, v)
             | None ->
                 raise_type_error expr

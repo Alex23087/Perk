@@ -295,3 +295,4 @@ let random_string n =
   String.init n (fun _ -> chars.[Random.int len])
 
 let execution_UUID = random_string 10
+let is_C_file f = String.ends_with ~suffix:".h" f

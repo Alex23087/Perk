@@ -3,7 +3,9 @@
 open Ast
 open Errors
 
-type symtable_t = (perkident, perktype) Hashtbl.t
+type symtable_t = (perkident, perktype * string) Hashtbl.t
+(** Type of the variable symbol table. Key: variable identifier, value:
+    (variable type * file where it was defined)*)
 
 (** List of hash tables, one for each scope. The head of the table is the
     current scope.*)
@@ -23,7 +25,8 @@ let pop_symbol_table_local symbol_table = symbol_table := List.tl !symbol_table
 let pop_symbol_table () = pop_symbol_table_local var_symbol_table
 
 (** Looks up a variable [id] in the symbol table [symbol_table].*)
-let lookup_var_local symbol_table (id : perkident) : perktype option =
+let lookup_var_local symbol_table (id : perkident) : (perktype * string) option
+    =
   let rec lookup_in_tables tables =
     match tables with
     | [] -> None
@@ -37,12 +40,13 @@ let lookup_var_local symbol_table (id : perkident) : perktype option =
 let lookup_var = lookup_var_local var_symbol_table
 
 (** Debug function for printing a symbol table *)
-let print_symbol_table_local symbol_table =
+let print_symbol_table_local (symbol_table : symtable_t list ref) =
   Printf.printf "Symbol Table:\n";
-  let print_table table =
+  let print_table (table : symtable_t) =
     Hashtbl.iter
-      (fun id typ ->
-        Printf.printf "Identifier: %s, Type: %s\n" id (Codegen.codegen_type typ))
+      (fun id (typ, fnm) ->
+        Printf.printf "Identifier: %s, Type: %s, Filename: %s\n" id
+          (Codegen.codegen_type typ) fnm)
       table
   in
   List.iter print_table !symbol_table
@@ -53,14 +57,15 @@ let print_symbol_table () = print_symbol_table_local var_symbol_table
 (** Given a symbol table [symbol_table], and identifier [id] and its type [t],
     it binds [id] in [symbol_table] with type [t] if it is not already defined.
 *)
-let bind_var_local symbol_table (id : perkident) (t : perktype) =
+let bind_var_local (symbol_table : symtable_t list ref) (id : perkident)
+    ?(fnm : string = !Utils.fnm) (t : perktype) =
   match !symbol_table with
   | [] -> failwith "No symbol table available"
   | h :: _ ->
       all_vars := (id, t) :: !all_vars;
       if Hashtbl.mem h id then
         raise (Double_declaration ("Identifier already defined: " ^ id))
-      else Hashtbl.add h id t
+      else Hashtbl.add h id (t, fnm)
 (* ;print_symbol_table () *)
 
 (** Binds a variable in the var symbol table. *)
@@ -69,22 +74,26 @@ let bind_var = bind_var_local var_symbol_table
 (** Given a symbol table [symbol_table], and identifier [id] and its type [t],
     it checks whether [id] is already defined in [symbol_table], and if so
     rebinds it with type [t].*)
-let rebind_var_local symbol_table (id : perkident) (t : perktype) =
+let rebind_var_local (symbol_table : symtable_t list ref) (id : perkident)
+    (t : perktype) =
   match !symbol_table with
   | [] -> failwith "No symbol table available"
-  | h :: _ ->
-      if Hashtbl.mem h id then Hashtbl.replace h id t
-      else raise (Undeclared ("Identifier wasn't defined: " ^ id))
+  | h :: _ -> (
+      match Hashtbl.find_opt h id with
+      | None -> raise (Undeclared ("Identifier wasn't defined: " ^ id))
+      | Some (_, fnm) -> Hashtbl.replace h id (t, fnm))
 
 (** Rebinds a variable in the var_symbol_table *)
 let rebind_var = rebind_var_local var_symbol_table
 
 (** Returns a list of all global identifiers*)
 let get_all_global_identifiers () : string list =
-  let rec get_all_global_identifiers_aux symbol_table =
+  let rec get_all_global_identifiers_aux (symbol_table : symtable_t list) =
     match symbol_table with
     | tbl :: [] ->
-        Hashtbl.fold (fun id (_typ, _code, _deps) acc -> id :: acc) tbl []
+        Hashtbl.fold
+          (fun id ((_typ, _code, _deps), _fnm) acc -> id :: acc)
+          tbl []
     | _tbl :: t -> get_all_global_identifiers_aux t
     | [] -> failwith "No symbol table available"
   in
@@ -92,5 +101,12 @@ let get_all_global_identifiers () : string list =
 
 (** Adds all symbols from a table to another *)
 let append_symbol_table (dst_table : symtable_t list ref)
+    ?(filter : perktype * string -> bool = fun _ -> true)
     (src_table : symtable_t) =
-  Hashtbl.iter (fun id typ -> bind_var_local dst_table id typ) src_table
+  Hashtbl.iter
+    (fun id (typ, fnm) ->
+      if filter (typ, fnm) then
+        try bind_var_local dst_table id ~fnm typ
+        with Double_declaration _ -> ()
+      else bind_var_local dst_table id ~fnm typ)
+    src_table
