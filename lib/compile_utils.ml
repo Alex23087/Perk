@@ -110,7 +110,12 @@ let singletonamble =
        *)l,       ((t)(__lambdummy->func))(__VA_ARGS__))" ^ "\n\n" ^ "#endif\n"
 
 let error_out json_format error_class start_line start_col end_line end_col msg
-    file code =
+    file code exn record_stack_trace =
+  Parse_tags.remove_libs_expanded ();
+  Parse_tags.remove_tags ();
+  if record_stack_trace then
+    Printf.eprintf "Exception: %s\n%s\n" (Printexc.to_string exn)
+      (Printexc.get_backtrace ());
   if json_format then (
     Printf.printf
       "{\"error\": \"%s\", \"start_line\": %d, \"start_col\": %d, \
@@ -128,13 +133,15 @@ let error_out json_format error_class start_line start_col end_line end_col msg
 
 let rec compile_program ?(dir : string option) ?(dry_run = false)
     ?(json_format = false) (static_compilation : bool) (verbose : bool)
-    (input_file : string) (output_dir : string option) (c_compiler : string)
-    (c_flags : string) =
+    (record_stack_trace : bool) (retain_tmp_files : bool) (input_file : string)
+    (output_dir : string option) (c_compiler : string) (c_flags : string) =
   (* let out_ast_file = Filename.chop_suffix input_file ".perk" ^ ".ast" in *)
+  if record_stack_trace then Printexc.record_backtrace true;
   gather_numerical_lengths ();
 
   Utils.static_compilation := static_compilation;
   Utils.verbose := verbose;
+  Utils.retain_tmp_files := retain_tmp_files;
   Utils.c_compiler := c_compiler;
   Utils.c_flags := c_flags;
 
@@ -179,32 +186,37 @@ let rec compile_program ?(dir : string option) ?(dry_run = false)
       close_out oc)
   with
   | Syntax_error
-      ((start_line, start_col), (end_line, end_col), input_file, msg, code) ->
+      ((start_line, start_col), (end_line, end_col), input_file, msg, code) as
+    exn ->
       error_out json_format ("syntax", "Syntax") start_line start_col end_line
-        end_col msg input_file code
+        end_col msg input_file code exn record_stack_trace
   | Lexing_error
-      ((start_line, start_col), (end_line, end_col), input_file, msg, code) ->
+      ((start_line, start_col), (end_line, end_col), input_file, msg, code) as
+    exn ->
       error_out json_format ("lexing", "Lexing") start_line start_col end_line
-        end_col msg input_file code
+        end_col msg input_file code exn record_stack_trace
   | Type_error
-      ((start_line, start_col), (end_line, end_col), input_file, msg, code) ->
+      ((start_line, start_col), (end_line, end_col), input_file, msg, code) as
+    exn ->
       error_out json_format ("typecheck", "Type") start_line start_col end_line
-        end_col msg input_file code
-  | Parser.Error ->
+        end_col msg input_file code exn record_stack_trace
+  | Parser.Error as exn ->
       error_out json_format ("parse", "parsing") (-1) (-1) (-1) (-1)
-        "Unexpected token" input_file Unknown_error
+        "Unexpected token" input_file Unknown_error exn record_stack_trace
   | Compilation_error
-      ((start_line, start_col), (end_line, end_col), input_file, msg, code) ->
+      ((start_line, start_col), (end_line, end_col), input_file, msg, code) as
+    exn ->
       error_out json_format
         ("compilation", "Compilation")
-        start_line start_col end_line end_col msg input_file code
-  | e ->
+        start_line start_col end_line end_col msg input_file code exn
+        record_stack_trace
+  | exn ->
       error_out json_format ("internal", "Internal") (-1) (-1) (-1) (-1)
         (Printf.sprintf
            "Unhandled exception: \"%s\". If you see this error, please open an \
             issue at https://github.com/Alex23087/Perk/issues"
-           (Printexc.to_string e))
-        input_file Internal_error
+           (Printexc.to_string exn))
+        input_file Internal_error exn record_stack_trace
 
 (** Generates the global polyfun definitions that are not local to the current
     file *)
@@ -450,6 +462,9 @@ and process_C_imports (ast : topleveldef_a list) =
     ast;
   if List.length !(File_info.get_import_paths ()) = 0 then ()
   else (
+    (* Printf.printf "%d\n%s\n\n"
+      (List.length !(File_info.get_import_paths ()))
+      (String.concat ":" !(File_info.get_import_paths ())); *)
     Parse_tags.generate_tags !(File_info.get_import_paths ());
     Typecheck.library_functions := Parse_tags.get_prototype_types ();
     (* for each library function, if it is not already defined define it *)

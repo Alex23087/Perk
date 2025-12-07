@@ -13,6 +13,9 @@ let static_compilation : bool ref = ref false
 (** Internal flag to enable verbose compilation *)
 let verbose : bool ref = ref false
 
+(** Retain temporary files generated during compilation *)
+let retain_tmp_files : bool ref = ref false
+
 let include_paths : string list ref = ref [ "/usr/include" ]
 let c_compiler : string ref = ref "gcc"
 let c_flags : string ref = ref ""
@@ -281,3 +284,14 @@ let rec copy_non_perk_files src_dir dst_dir =
         (* If directory, copy recursively *)
         copy_non_perk_files src_path dst_path)
     files
+
+let () = Random.self_init ()
+
+let random_string n =
+  let chars =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+  in
+  let len = String.length chars in
+  String.init n (fun _ -> chars.[Random.int len])
+
+let execution_UUID = random_string 10
