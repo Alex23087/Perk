@@ -395,11 +395,22 @@ and process_opens (dir : string) (ast : topleveldef_a list) :
             (Printf.sprintf "File %s does not exist" open_filename)
             File_not_found;
         let fi = save_file_info () in
+
+        (* TODO: store symbol table *)
+        (* let symtable = ref !Var_symbol_table.var_symbol_table in
+        Var_symbol_table.var_symbol_table := []; *)
+
+        (* TODO: Type symbol table should be  *)
         let _ast, (compiled_preamble, compiled_body) =
           (* Printf.printf "%s"
             (Printf.sprintf "Processing open file: %s\n" open_filename); *)
           process_file open_filename false
         in
+
+        (* TODO: Restore symbol table *)
+        (* Var_symbol_table.append_symbol_table symtable
+          (List.hd !Var_symbol_table.var_symbol_table);
+        Var_symbol_table.var_symbol_table := !symtable; *)
         restore_file_info fi;
 
         (* TODO makeshift implementation, does not work for nested opens *)

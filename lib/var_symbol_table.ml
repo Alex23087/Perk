@@ -3,9 +3,11 @@
 open Ast
 open Errors
 
+type symtable_t = (perkident, perktype) Hashtbl.t
+
 (** List of hash tables, one for each scope. The head of the table is the
     current scope.*)
-let var_symbol_table : (perkident, perktype) Hashtbl.t list ref = ref []
+let var_symbol_table : symtable_t list ref = ref []
 
 (** Adds a symbol to the [symbol_table] symbol table. Used for scoping.*)
 let push_symbol_table_local symbol_table =
@@ -87,3 +89,8 @@ let get_all_global_identifiers () : string list =
     | [] -> failwith "No symbol table available"
   in
   get_all_global_identifiers_aux !var_symbol_table
+
+(** Adds all symbols from a table to another *)
+let append_symbol_table (dst_table : symtable_t list ref)
+    (src_table : symtable_t) =
+  Hashtbl.iter (fun id typ -> bind_var_local dst_table id typ) src_table
