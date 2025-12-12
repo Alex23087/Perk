@@ -98,7 +98,9 @@ extensions:
 
 # Install the Perk compiler
 .PHONY: install
-install: build uninstall
+install:
+	$(MAKE) build
+	$(MAKE) uninstall
 	cd _build/default/ && \
 	sudo mkdir -p $(PREFIX)/ && \
 	sudo cp -r . $(PREFIX)/ && \

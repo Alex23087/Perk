@@ -143,7 +143,7 @@ let rec codegen_functional ~(is_lambda : bool) (e : expr_a) : string =
     Hashtbl.add
       (File_info.get_lambdas_hashmap ())
       e
-      (id, compiled, List.map snd free_variables, type_descriptor);
+      (id, compiled, List.map snd free_variables, type_descriptor, false);
     match free_variables with
     | [] when !static_compilation || not is_lambda -> id
     | _ ->
@@ -223,6 +223,11 @@ and codegen_program (header_name : string) (prog_is_main : bool)
           Printf.sprintf "%s%s;\n" acc (codegen_fundecl id typ))
         (File_info.get_public_fundecl_symbol_table ())
         ""
+    (* ^ Hashtbl.fold
+        (fun _ v acc ->
+          if fth_5 v then Printf.sprintf "%s\n%s\n" acc (snd_5 v) else "")
+        (File_info.get_lambdas_hashmap ())
+        "" *)
     (* Write program code *)
     ^ "\n"
   in
@@ -238,7 +243,7 @@ and codegen_program (header_name : string) (prog_is_main : bool)
     (* Write lambdas *)
     ^ "// lambdas:\n"
     ^ Hashtbl.fold
-        (fun _ v acc -> Printf.sprintf "%s\n%s\n" acc (snd_4 v))
+        (fun _ v acc -> Printf.sprintf "%s\n%s\n" acc (snd_5 v))
         (File_info.get_lambdas_hashmap ())
         ""
   in
@@ -547,6 +552,8 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
 
           Hashtbl.add
             (File_info.get_lambdas_hashmap ())
+            (* Since the constructor is a synthesised function,
+              it does not have a corresponding perk expression *)
             (annotate_dummy (Int 1))
             ( c,
               (match t with
@@ -578,7 +585,8 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                              t)))),
               [],
               type_descriptor_of_perktype
-                ([], Funtype (List.map pointer_of_type t, adt_type), []) )
+                ([], Funtype (List.map pointer_of_type t, adt_type), []),
+              true )
           |> ignore)
         constructors;
       ""
@@ -1352,8 +1360,17 @@ and generate_types () =
     ref
       (Hashtbl.fold
          (fun k ((typ, code), from) acc ->
-           if is_builtin_type k (typ, code) || from != !Utils.fnm then acc
+           if is_builtin_type k (typ, code) || from <> !Utils.fnm then (
+             say_here
+               (Printf.sprintf "skipping type generation %s due to %s" k
+                  (if is_builtin_type k (typ, code) then "builtin"
+                   else "wrong file: " ^ from ^ "!=" ^ !Utils.fnm));
+             acc)
            else (
+             say_here
+               (Printf.sprintf
+                  "Adding type generation %s file = %s defined in %s" k
+                  !Utils.fnm from);
              out := !out ^ generate_forward_declaration typ;
              (k, (typ, code, dependencies_of_type typ)) :: acc))
          type_symbol_table [])

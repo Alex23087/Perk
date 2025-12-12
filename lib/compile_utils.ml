@@ -6,10 +6,12 @@ open Typecheck
 open File_info
 
 let opens_hashmap : (string, unit) Hashtbl.t = Hashtbl.create 16
+let opens_stack : string list ref = ref []
 
 let add_import (import : string) : bool =
   let import = Fpath.to_string (Fpath.normalize (Fpath.v import)) in
-  if Hashtbl.mem opens_hashmap import then false
+  (* if Hashtbl.mem opens_hashmap import then false *)
+  if List.mem import !opens_stack then false
   else (
     if !Utils.verbose then (
       Utils.say_here (Printf.sprintf "Adding import to hashmap: %s" import);
@@ -406,12 +408,15 @@ and process_opens (dir : string) (ast : topleveldef_a list) :
           raise_compilation_error node
             (Printf.sprintf "File %s does not exist" open_filename)
             File_not_found;
+        opens_stack := open_filename :: !opens_stack;
         let fi = save_file_info () in
 
         (* Store symbol table: the inner library shouldn't have access to the current symbol table,
           So we save it and reset it *)
         let symtable = ref !Var_symbol_table.var_symbol_table in
         Var_symbol_table.var_symbol_table := [];
+        let constructor_hashmap = Hashtbl.copy Typecheck.defined_constructors in
+        Hashtbl.clear Typecheck.defined_constructors;
 
         (* TODO: Type symbol table should be  *)
         let _ast, (compiled_preamble, compiled_body) =
@@ -425,11 +430,23 @@ and process_opens (dir : string) (ast : topleveldef_a list) :
         (* TODO: instead of blindly allowing C symbols to be doubly declared, there should be a finer check
           To ensure that they come from the same library as the symbol already declared (ideally checking if
           said library is also a #pragma once lib...) *)
+        let new_constructor_hashmap =
+          Hashtbl.copy Typecheck.defined_constructors
+        in
+        Hashtbl.clear Typecheck.defined_constructors;
+        Hashtbl.iter
+          (fun k v -> Hashtbl.add Typecheck.defined_constructors k v)
+          new_constructor_hashmap;
+        Hashtbl.iter
+          (fun k v -> Hashtbl.add Typecheck.defined_constructors k v)
+          constructor_hashmap;
         Var_symbol_table.append_symbol_table symtable
-          ~filter:(fun (_, fnm) -> Utils.is_C_file fnm)
+          ~filter:(fun (_, _fnm) -> true)
           (List.hd !Var_symbol_table.var_symbol_table);
         Var_symbol_table.var_symbol_table := !symtable;
+
         restore_file_info fi;
+        opens_stack := List.tl !opens_stack;
 
         (* TODO makeshift implementation, does not work for nested opens *)
         let out_file_c =
@@ -453,7 +470,8 @@ and process_opens (dir : string) (ast : topleveldef_a list) :
         output_string oc compiled_preamble;
         close_out oc;
         [ (i, node) ] @ process_opens dir rest)
-      else process_opens dir rest
+      else failwith "Circular import detected!"
+      (* process_opens dir rest *)
   | _ :: rest -> process_opens dir rest
   | [] -> []
 
