@@ -16,7 +16,7 @@ let print_constructor_names () =
 
 let is_constructor_of (name : perkident) (typ : perktype) : bool =
   match typ |> resolve_type |> discard_type_aq with
-  | AlgebraicType (_adt_name, constructors) ->
+  | AlgebraicType (_adt_name, constructors, _) ->
       List.exists (fun (ctor_name, _arg_types) -> ctor_name = name) constructors
   | _ -> false
 

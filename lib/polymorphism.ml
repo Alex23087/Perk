@@ -36,13 +36,15 @@ and subst_type (t : perktype) (placeholder : perktype) (actual : perktype) =
             List.map base_subst tl,
             idl1 ),
         b )
-  | a, AlgebraicType (id, id_and_tl_list), b ->
+  | a, AlgebraicType (id, id_and_tl_list, t_param), b ->
       ( a,
         AlgebraicType
           ( id,
             List.map
               (fun (id, tl) -> (id, List.map base_subst tl))
-              id_and_tl_list ),
+              id_and_tl_list ,
+            Option.map (fun x -> subst_type x placeholder actual) t_param
+            ),
         b )
   | a, Optiontype t, b -> (a, Optiontype (base_subst t), b)
   | a, Tupletype tl, b -> (a, Tupletype (List.map base_subst tl), b)

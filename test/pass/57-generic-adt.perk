@@ -1,0 +1,6 @@
+type <T> list = Empty | Cons(T, list)
+
+fun main () : void {
+
+    return;
+}

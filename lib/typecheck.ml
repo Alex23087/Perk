@@ -663,8 +663,8 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
       in
       bind_type_if_needed ([], Structtype (ident, fields_res), []);
       annot_copy tldf (Struct (ident, fields_res))
-  | ADT (ident, constructors) ->
-      (* TODO: check existence of types *)
+  | ADT (ident, constructors, None) ->
+    (* TODO: check existence of types *)
       List.iter
         (fun (ide, t) ->
           if Hashtbl.mem defined_constructors ide then
@@ -672,10 +672,13 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
               (Printf.sprintf "Constructor %s is already defined" ide);
           Hashtbl.add defined_constructors ide ();
           bind_var ide
-            ([], Funtype (t, ([], AlgebraicType (ident, constructors), [])), []))
+            ([], Funtype (t, ([], AlgebraicType (ident, constructors, None), [])), []))
         constructors;
-      bind_type_if_needed ([], AlgebraicType (ident, constructors), []);
+      bind_type_if_needed ([], AlgebraicType (ident, constructors, None), []);
       tldf
+  | ADT (ident, constructors, Some tparam) ->
+      let declared_table = File_info.get_polyadt_declared () in
+      Hashtbl.add declared_table ident (tparam, constructors); tldf
 
 (** Typechecks commands
     @param retype the expected return type
@@ -984,7 +987,7 @@ and typecheck_match_case (match_type : perktype) case =
         if is_constructor_of id match_type then (
           let parameters =
             match resolve_type match_type with
-            | _, AlgebraicType (_, constructors), _ ->
+            | _, AlgebraicType (_, constructors, _tparam), _ ->
                 List.find (fun (ide, _) -> ide = id) constructors |> snd
             | _ -> failwith "Impossible, is_constructor_of returned true"
           in

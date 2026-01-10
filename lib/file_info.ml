@@ -25,6 +25,9 @@ type file_info = {
   file_local_polyfuns : (string, perktype list * perktype * perktype) Hashtbl.t;
   polyfuns_to_be_defined : (topleveldef_a * perktype) list ref;
   polyfun_bounds : (string, generic_type) Hashtbl.t;
+
+  polyadt_instances : (string, (perktype * bool) list) Hashtbl.t;
+  polyadt_declared : (string, perktype * (perkident * perktype list) list) Hashtbl.t
 }
 
 let allocate_file_info () =
@@ -38,6 +41,8 @@ let allocate_file_info () =
       file_local_polyfuns = Hashtbl.create 10;
       polyfuns_to_be_defined = ref [];
       polyfun_bounds = Hashtbl.create 10;
+      polyadt_instances = Hashtbl.create 10;
+      polyadt_declared = Hashtbl.create 10
     }
 
 let current_file_info = allocate_file_info ()
@@ -59,6 +64,8 @@ let get_polyfun_instances () = !current_file_info.polyfun_instances
 let get_file_local_polyfuns () = !current_file_info.file_local_polyfuns
 let get_polyfuns_to_be_defined () = !current_file_info.polyfuns_to_be_defined
 let get_polyfun_bounds () = !current_file_info.polyfun_bounds
+let get_polyadt_instances () = !current_file_info.polyadt_instances
+let get_polyadt_declared () = !current_file_info.polyadt_declared
 
 let set_polyfun_as_codegened id t =
   let remove_first x lst =
