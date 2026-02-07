@@ -64,6 +64,7 @@ type perktype_partial =
       * perkident list
     (* name, archetypes, fields (with access attributes), constructor_params, member functions*)
   | AlgebraicType of perkident * (perkident * perktype list) list * (perktype option)
+  | PolyADTPlaceholder of perkident * perktype 
   | Optiontype of perktype
   | Tupletype of perktype list
   | ArchetypeSum of perktype list
@@ -255,6 +256,7 @@ let rec show_perktype (typ : perktype) : string =
   | Structtype (name, _) -> name
   | AlgebraicType (name, _, None) -> name
   | AlgebraicType (name, _, Some(t)) -> Printf.sprintf "%s<%s>" name (show_perktype t)
+  | PolyADTPlaceholder (name, t) -> Printf.sprintf "%s<%s> (unresolved)" name (show_perktype t)
   | Optiontype t -> Printf.sprintf "%s?" (show_perktype t)
   | ArchetypeSum ts ->
       Printf.sprintf "<%s>" (String.concat " + " (List.map show_perktype ts))

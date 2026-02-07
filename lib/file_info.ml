@@ -13,6 +13,9 @@ type generic_type = {
 (** Hash table of currently generic types, their bounds and inferred exact type*)
 let generic_types_table : (perktype, generic_type) Hashtbl.t = Hashtbl.create 10
 
+(** Hash table of the defined ADT constructors*)
+let defined_constructors : (perkident, unit) Hashtbl.t = Hashtbl.create 10
+
 type file_info = {
   lambdas_hashmap : (expr_a, string * string * string list * string) Hashtbl.t;
       (** table of lambdas: Lambda expression, identifier, generated code,
@@ -25,9 +28,13 @@ type file_info = {
   file_local_polyfuns : (string, perktype list * perktype * perktype) Hashtbl.t;
   polyfuns_to_be_defined : (topleveldef_a * perktype) list ref;
   polyfun_bounds : (string, generic_type) Hashtbl.t;
-
   polyadt_instances : (string, (perktype * bool) list) Hashtbl.t;
-  polyadt_declared : (string, perktype * (perkident * perktype list) list) Hashtbl.t
+  polyadt_declared :
+    (string, perktype * (perkident * perktype list) list) Hashtbl.t;
+      (** (id -> generic definition of polyadt) *)
+  polyadt_constructors :
+    (string * perktype, (perkident * perktype list) list) Hashtbl.t;
+      (** (id, param) -> constructors *)
 }
 
 let allocate_file_info () =
@@ -41,8 +48,9 @@ let allocate_file_info () =
       file_local_polyfuns = Hashtbl.create 10;
       polyfuns_to_be_defined = ref [];
       polyfun_bounds = Hashtbl.create 10;
+      polyadt_declared = Hashtbl.create 10;
       polyadt_instances = Hashtbl.create 10;
-      polyadt_declared = Hashtbl.create 10
+      polyadt_constructors = Hashtbl.create 10;
     }
 
 let current_file_info = allocate_file_info ()
@@ -66,6 +74,7 @@ let get_polyfuns_to_be_defined () = !current_file_info.polyfuns_to_be_defined
 let get_polyfun_bounds () = !current_file_info.polyfun_bounds
 let get_polyadt_instances () = !current_file_info.polyadt_instances
 let get_polyadt_declared () = !current_file_info.polyadt_declared
+let get_polyadt_constructors () = !current_file_info.polyadt_constructors
 
 let set_polyfun_as_codegened id t =
   let remove_first x lst =

@@ -215,6 +215,7 @@ expr:
   | Sizeof LParen t = perktype RParen                                                                      { annotate_2_code !fnm $loc (Ast.Sizeof t) }
   | If guard = expr Then e1 = expr Else e2 = expr                                                          { annotate_2_code !fnm $loc (Ast.IfThenElseExpr (guard, e1, e2)) }
 
+  | i = Ident Poly t = Ident                                                                               { annotate_2_code !fnm $loc (Ast.Var(i ^ "_" ^ t)) }
   | error                                                                                                  { raise (ParseError(!fnm, "expression expected")) }
   | expr error                                                                                             { raise (ParseError(!fnm, "unexpected expression")) }
   | Ident error                                                                                            { raise (ParseError(!fnm, "unexpected expression. Perhaps you tried to use C-style types?")) }
@@ -262,6 +263,7 @@ perktype_partial:
   | t = perktype Star                                                                                      { Ast.Pointertype t }
   | t = perktype Question                                                                                  { Ast.Optiontype t }
   | Lt tys = separated_nonempty_list(Plus, Ident) Gt                                                       { Ast.ArchetypeSum (tys |> List.map (fun x -> ([], Ast.Basetype x, []))) }
+  | i = Ident Poly t = perktype                                                                            { Ast.PolyADTPlaceholder(i, t) }
   | error                                                                                                  { raise (ParseError(!fnm, "type expected")) }
   | Lt error                                                                                               { raise (ParseError(!fnm, "Cannot have empty archetype sum")) }
   | Lt separated_nonempty_list(Plus, Ident) error                                                          { raise (ParseError(!fnm, "Unterminated archetype sum")) }

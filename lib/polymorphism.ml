@@ -49,6 +49,7 @@ and subst_type (t : perktype) (placeholder : perktype) (actual : perktype) =
   | a, Optiontype t, b -> (a, Optiontype (base_subst t), b)
   | a, Tupletype tl, b -> (a, Tupletype (List.map base_subst tl), b)
   | a, ArchetypeSum tl, b -> (a, ArchetypeSum (List.map base_subst tl), b)
+  | a, PolyADTPlaceholder (i, t), b -> (a, PolyADTPlaceholder(i, base_subst t), b)
   | _, Vararg, _ | _, Infer, _ -> t
 
 and subst_perkdef (pvd, e) (placeholder : perktype) (actual : perktype) :

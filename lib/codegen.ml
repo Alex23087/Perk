@@ -498,7 +498,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
               ^ ";")
            id);
       ""
-    (* TODO for now treating the two cases separately, which results in some code duplication. Should factor out the common code *)
+      (* TODO for now treating the two cases separately, which results in some code duplication. Should factor out the common code *)
   | ADT (id, constructors, None) ->
       let adt_type = ([], AlgebraicType (id, constructors, None), []) in
       let adt_desc = type_descriptor_of_perktype adt_type in
@@ -578,18 +578,27 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
           |> ignore)
         constructors;
       ""
-  | ADT (id, constructors, Some _t) ->
+  | ADT (id, _, Some _t) ->
       let instance_table = File_info.get_polyadt_instances () in
       let instances =
         try Hashtbl.find instance_table id with Not_found -> []
       in
-      say_here (Printf.sprintf "n deps: %d" (List.length instances));
+      say_here (Printf.sprintf "n instances: %d" (List.length instances));
+
+      let constructor_table = File_info.get_polyadt_constructors () in
 
       List.iter
         (fun (t, b) ->
           if not b then (
+            let constructors =
+              (try Hashtbl.find constructor_table (id, t)
+               with Not_found -> failwith "some shite wrong")
+              |> List.map (fun (c, azzo) ->
+                     (c ^ "_" ^ type_descriptor_of_perktype t, azzo))
+            in
             let adt_type = ([], AlgebraicType (id, constructors, Some t), []) in
             let adt_desc = type_descriptor_of_perktype adt_type in
+
             add_code_to_type_binding adt_type
               (Printf.sprintf
                  "\n\
@@ -1077,6 +1086,7 @@ and codegen_type ?(expand : bool = false) (t : perktype) : string =
     | Infer ->
         raise
           (Not_inferred "Impossible: type has not been inferred in codegen_type")
+    | PolyADTPlaceholder _ -> type_descriptor_of_perktype t
     | Optiontype _t -> type_descriptor_of_perktype t
     | Tupletype _ts -> type_descriptor_of_perktype t
   in
@@ -1607,6 +1617,9 @@ and codegen_type_definition (t : perktype) : string =
           Hashtbl.replace type_symbol_table key ((_t, Some compiled), from);
           compiled
       | _, Lambdatype _, _ -> codegen_lambda_capture t
+      | _, AlgebraicType _, _ ->
+          (* TODO figure out why ADTs types are not here in the first place*)
+          ""
       | _ ->
           raise_type_error
             (annotate_dummy ([], Int (-1), []))

@@ -1,6 +1,14 @@
-type <T> list = Empty | Cons(T, list)
+type <T> list = Empty | Cons(T, list @ T)
+
+fun sum_list (l : list @ int) : int {
+    match (l) {
+        Empty_int {return 0},
+        Cons_int (var i, var rest) {return i + sum_list (rest)}
+    }
+}
 
 fun main () : void {
-
+    let banana : list @ int = Empty @ int ();
+    let banana2 := Cons @ int (8, banana);
     return;
 }

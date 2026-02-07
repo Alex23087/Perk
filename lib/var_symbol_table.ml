@@ -63,6 +63,9 @@ let bind_var_local symbol_table (id : perkident) (t : perktype) =
 
 (** Binds a variable in the var symbol table. *)
 let bind_var = bind_var_local var_symbol_table
+;;
+
+Utils.bind_var_ptr := bind_var
 
 (** Given a symbol table [symbol_table], and identifier [id] and its type [t],
     it checks whether [id] is already defined in [symbol_table], and if so

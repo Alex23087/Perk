@@ -3,6 +3,9 @@
 open Ast
 open Errors
 
+(** shite lazy hack *)
+let bind_var_ptr : (perkident -> perktype -> unit) ref = ref (fun _ _ -> ())
+
 (** Filename of the current perk file being processed *)
 let fnm = ref ""
 

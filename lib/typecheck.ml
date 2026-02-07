@@ -57,9 +57,6 @@ let get_lib_path s =
              !Utils.fnm,
              Printf.sprintf "Could not find library %s" path ))
 
-(** Hash table of the defined ADT constructors*)
-let defined_constructors : (perkident, unit) Hashtbl.t = Hashtbl.create 10
-
 (* TODO handle type aliases *)
 
 (** check if type is integral *)
@@ -664,21 +661,27 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
       bind_type_if_needed ([], Structtype (ident, fields_res), []);
       annot_copy tldf (Struct (ident, fields_res))
   | ADT (ident, constructors, None) ->
-    (* TODO: check existence of types *)
+      (* TODO: check existence of types *)
       List.iter
         (fun (ide, t) ->
-          if Hashtbl.mem defined_constructors ide then
+          if Hashtbl.mem File_info.defined_constructors ide then
             raise_type_error tldf
               (Printf.sprintf "Constructor %s is already defined" ide);
-          Hashtbl.add defined_constructors ide ();
+          Hashtbl.add File_info.defined_constructors ide ();
           bind_var ide
-            ([], Funtype (t, ([], AlgebraicType (ident, constructors, None), [])), []))
+            ( [],
+              Funtype (t, ([], AlgebraicType (ident, constructors, None), [])),
+              [] ))
         constructors;
       bind_type_if_needed ([], AlgebraicType (ident, constructors, None), []);
       tldf
   | ADT (ident, constructors, Some tparam) ->
       let declared_table = File_info.get_polyadt_declared () in
-      Hashtbl.add declared_table ident (tparam, constructors); tldf
+      say_here
+        (Printf.sprintf "Declaring polymorphic ADT %s with type parameter %s"
+           ident (show_perktype tparam));
+      Hashtbl.add declared_table ident (tparam, constructors);
+      tldf
 
 (** Typechecks commands
     @param retype the expected return type
@@ -1045,7 +1048,9 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           | Some (Funtype _) -> (expr, t)
           | _ ->
               (* Constructors are automatically applied *)
-              if Hashtbl.mem defined_constructors id && List.length params = 0
+              if
+                Hashtbl.mem File_info.defined_constructors id
+                && List.length params = 0
               then (annot_copy expr (Apply (expr, [], None)), ret)
               else (expr, t))
       | Some t -> (expr, t)
@@ -1109,6 +1114,8 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
               subst_type ret_type tparam t ),
           [] ) )
   | Apply (func, params, _) ->
+      say_here
+        (Printf.sprintf "typechecking funcall diocaml: %s\n" (show_expr_a func));
       let fun_expr, fun_type =
         typecheck_expr
           ~expected_return:(Some ([], Funtype ([], void_type), []))
