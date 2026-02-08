@@ -25,9 +25,8 @@ def compile_perk():
 
         try:
             # Try to compile Perk code with timeout
-            subprocess.run(["perkc", perk_file, "-o", c_file], 
+            subprocess.run(["perkc", perk_file], 
                           check=True, timeout=5)
-
             # Compile the generated C code with timeout
             subprocess.run(["gcc", c_file, "-o", binary_file], 
                           check=True, timeout=5)
@@ -44,7 +43,7 @@ def compile_perk():
             # If compilation fails, run --check to get error message
             try:
                 check_proc = subprocess.run(
-                    ["perkc", "--check", perk_file],
+                    ["perkc", "--json", "--check", perk_file],
                     capture_output=True, text=True, timeout=5
                 )
                 if check_proc.stdout:
