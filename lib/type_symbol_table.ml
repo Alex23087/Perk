@@ -188,24 +188,6 @@ let rec resolve_type (typ : perktype) : perktype =
                   let constructors =
                     try Hashtbl.find polyadt_constructors (i, t)
                     with Not_found ->
-                      (* say_here
-                        (Printf.sprintf "PolyADTPlaceholder: %s, %s" i
-                           (show_perktype t));
-                      say_here
-                        (Printf.sprintf "Available polyadt constructors: %s"
-                           (String.concat ", "
-                              (List.map
-                                 (fun ((id, t), _constrs) ->
-                                   Printf.sprintf "%s with type %s" id
-                                     (show_perktype t))
-                                 (Hashtbl.fold
-                                    (fun k v acc -> (k, v) :: acc)
-                                    polyadt_constructors []))));
-                      failwith
-                        (Printf.sprintf
-                           "Polymorphic type %s not found (TODO turn this into \
-                            proper error by God's grace)"
-                           i) *)
                       let declared_polyadts =
                         File_info.get_polyadt_declared ()
                       in
@@ -218,14 +200,6 @@ let rec resolve_type (typ : perktype) : perktype =
                                 this into proper error by God's grace)"
                                i)
                       in
-                      (* let instances_table =
-                        File_info.get_polyadt_instances ()
-                      in
-                      let instances =
-                        match Hashtbl.find_opt instances_table i with
-                        | None -> []
-                        | Some instances -> instances
-                      in *)
                       let constructor_table =
                         File_info.get_polyadt_constructors ()
                       in
@@ -243,21 +217,31 @@ let rec resolve_type (typ : perktype) : perktype =
                                     t' ))
                               (snd polyadt_declaration)
                           in
+                          say_here
+                            (Printf.sprintf
+                               "Mine balls be damned! resolve_type: %s, %s \
+                                being added to constructor_table"
+                               i (show_perktype t));
                           Hashtbl.add constructor_table (i, t) constructors;
+
                           List.iter
                             (fun (ide, t) ->
+                              let ide =
+                                ide ^ "_" ^ type_descriptor_of_perktype dat_t
+                              in
                               if Hashtbl.mem File_info.defined_constructors ide
                               then
                                 raise
                                   (Type_error
                                      ( (-1, -1),
                                        (-1, -1),
+                                       !Utils.fnm,
                                        Printf.sprintf
-                                         "Constructor %s is already defined" ide,
-                                       "spereperepe" ));
+                                         "Constructor %s is already defined" ide
+                                     ));
                               Hashtbl.add File_info.defined_constructors ide ();
-                              !Utils.bind_var_ptr
-                                (ide ^ "_" ^ type_descriptor_of_perktype dat_t)
+                              !Utils.add_constructor_name_ptr ide;
+                              !Utils.bind_var_ptr ide
                                 ( [],
                                   Funtype
                                     ( t,
@@ -660,7 +644,8 @@ let rec bind_type_if_needed (typ : perktype) =
                  | None -> []
                  | Some instances -> instances
                in
-               Hashtbl.replace instances_table i ((t, false) :: instances));
+               if not (List.exists (fun (t', _) -> t' = t) instances) then
+                 Hashtbl.replace instances_table i ((t, false) :: instances));
 
               bind_type_if_needed t
           | _, ArcheType (_name, _decls), _ ->

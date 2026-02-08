@@ -63,8 +63,9 @@ type perktype_partial =
       * perktype list
       * perkident list
     (* name, archetypes, fields (with access attributes), constructor_params, member functions*)
-  | AlgebraicType of perkident * (perkident * perktype list) list * (perktype option)
-  | PolyADTPlaceholder of perkident * perktype 
+  | AlgebraicType of
+      perkident * (perkident * perktype list) list * perktype option
+  | PolyADTPlaceholder of perkident * perktype
   | Optiontype of perktype
   | Tupletype of perktype list
   | ArchetypeSum of perktype list
@@ -200,7 +201,8 @@ and topleveldef_t =
   | Archetype of perkident * declorfun_a list
   | Model of perkident * perkident list * deforfun_a list
   | Struct of perkident * perkdef list
-  | ADT of perkident * (perkident * perktype list) list * (perktype option) (** name, params, type param *)
+  | ADT of perkident * (perkident * perktype list) list * perktype option
+      (** name, params, type param *)
   | TLSkip
 
 and deforfun_t =
@@ -255,8 +257,10 @@ let rec show_perktype (typ : perktype) : string =
   | ArcheType (name, _) -> name
   | Structtype (name, _) -> name
   | AlgebraicType (name, _, None) -> name
-  | AlgebraicType (name, _, Some(t)) -> Printf.sprintf "%s<%s>" name (show_perktype t)
-  | PolyADTPlaceholder (name, t) -> Printf.sprintf "%s<%s> (unresolved)" name (show_perktype t)
+  | AlgebraicType (name, _, Some t) ->
+      Printf.sprintf "%s<%s>" name (show_perktype t)
+  | PolyADTPlaceholder (name, t) ->
+      Printf.sprintf "%s<%s>(unresolved)" name (show_perktype t)
   | Optiontype t -> Printf.sprintf "%s?" (show_perktype t)
   | ArchetypeSum ts ->
       Printf.sprintf "<%s>" (String.concat " + " (List.map show_perktype ts))

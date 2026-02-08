@@ -847,7 +847,7 @@ and codegen_command (cmd : command_a) (indentation : int) : string =
   | Match (e, l, opt_type) ->
       let t =
         try Option.get opt_type
-        with _ -> failwith "should not happen - was set in the codegen"
+        with _ -> failwith "should not happen - was set in the typecheck"
       in
       let x = fresh_var "switch_var" in
       let label = fresh_var "label" in

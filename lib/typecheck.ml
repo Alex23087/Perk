@@ -957,6 +957,7 @@ and typecheck_match_entry ?(retype : perktype option = None)
         body_returns )
 
 and typecheck_match_case (match_type : perktype) case =
+  let match_type = resolve_type match_type in
   match ( $ ) case with
   | Matchall -> case
   | MatchVar (x, Some typ) -> (
@@ -988,10 +989,13 @@ and typecheck_match_case (match_type : perktype) case =
   | CompoundCase (id, cases) ->
       if is_constructor_name id then
         if is_constructor_of id match_type then (
-          let parameters =
+          let parameters, suffix =
             match resolve_type match_type with
             | _, AlgebraicType (_, constructors, _tparam), _ ->
-                List.find (fun (ide, _) -> ide = id) constructors |> snd
+                ( List.find (fun (ide, _) -> ide = id) constructors |> snd,
+                  Option.fold ~none:""
+                    ~some:(fun t -> "_" ^ type_descriptor_of_perktype t)
+                    _tparam )
             | _ -> failwith "Impossible, is_constructor_of returned true"
           in
           if List.length parameters <> List.length cases then
@@ -1002,7 +1006,7 @@ and typecheck_match_case (match_type : perktype) case =
           (* Typecheck each case *)
           annot_copy case
             (CompoundCase
-               ( id,
+               ( id ^ suffix,
                  List.mapi
                    (fun i c -> typecheck_match_case (List.nth parameters i) c)
                    cases )))
@@ -1022,7 +1026,7 @@ and typecheck_match_case (match_type : perktype) case =
         in
 
         raise_compilation_error case
-          (Printf.sprintf "%s id not a valid constructor.%s" id smart_msg)
+          (Printf.sprintf "%s is not a valid constructor.%s" id smart_msg)
 
 and get_vars_in_case (case : match_case_a) =
   match ( $ ) case with
@@ -1114,8 +1118,8 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
               subst_type ret_type tparam t ),
           [] ) )
   | Apply (func, params, _) ->
-      say_here
-        (Printf.sprintf "typechecking funcall diocaml: %s\n" (show_expr_a func));
+      (* say_here
+        (Printf.sprintf "typechecking funcall diocaml: %s\n" (show_expr_a func)); *)
       let fun_expr, fun_type =
         typecheck_expr
           ~expected_return:(Some ([], Funtype ([], void_type), []))
