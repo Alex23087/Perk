@@ -35,6 +35,8 @@ type file_info = {
   polyadt_constructors :
     (string * perktype, (perkident * perktype list) list) Hashtbl.t;
       (** (id, param) -> constructors *)
+  polyadt_adt_from_constructor : (string, perktype) Hashtbl.t;
+      (** (constructor -> its adt) *)
 }
 
 let allocate_file_info () =
@@ -51,6 +53,7 @@ let allocate_file_info () =
       polyadt_declared = Hashtbl.create 10;
       polyadt_instances = Hashtbl.create 10;
       polyadt_constructors = Hashtbl.create 10;
+      polyadt_adt_from_constructor = Hashtbl.create 10;
     }
 
 let current_file_info = allocate_file_info ()
@@ -75,6 +78,9 @@ let get_polyfun_bounds () = !current_file_info.polyfun_bounds
 let get_polyadt_instances () = !current_file_info.polyadt_instances
 let get_polyadt_declared () = !current_file_info.polyadt_declared
 let get_polyadt_constructors () = !current_file_info.polyadt_constructors
+
+let get_polyadt_adt_from_constructor () =
+  !current_file_info.polyadt_adt_from_constructor
 
 let set_polyfun_as_codegened id t =
   let remove_first x lst =

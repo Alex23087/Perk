@@ -341,7 +341,8 @@ let print_type_symbol_table () =
   Hashtbl.iter
     (fun id ((typ, _code), _from) ->
       Printf.printf "%s: %s,\n\n" id (show_perktype typ))
-    type_symbol_table
+    type_symbol_table;
+  flush stdout
 
 let to_be_unbound : perktype list ref = ref []
 
@@ -647,6 +648,7 @@ let rec bind_type_if_needed (typ : perktype) =
                if not (List.exists (fun (t', _) -> t' = t) instances) then
                  Hashtbl.replace instances_table i ((t, false) :: instances));
 
+              bind_type typ;
               bind_type_if_needed t
           | _, ArcheType (_name, _decls), _ ->
               bind_type typ';
@@ -679,5 +681,10 @@ let rec bind_type_if_needed (typ : perktype) =
 let add_code_to_type_binding (_typ : perktype) (code : string) : unit =
   bind_type_if_needed _typ;
   let key = type_descriptor_of_perktype _typ in
-  let (_t, _code), from = Hashtbl.find type_symbol_table key in
+  let (_t, _code), from =
+    try Hashtbl.find type_symbol_table key
+    with Not_found ->
+      print_type_symbol_table ();
+      failwith (Printf.sprintf "key not found %s" key)
+  in
   Hashtbl.replace type_symbol_table key ((_t, Some code), from)

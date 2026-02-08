@@ -215,7 +215,7 @@ expr:
   | Sizeof LParen t = perktype RParen                                                                      { annotate_2_code !fnm $loc (Ast.Sizeof t) }
   | If guard = expr Then e1 = expr Else e2 = expr                                                          { annotate_2_code !fnm $loc (Ast.IfThenElseExpr (guard, e1, e2)) }
 
-  | i = Ident Poly t = Ident                                                                               { annotate_2_code !fnm $loc (Ast.Var(i ^ "_" ^ t)) }
+  | i = Ident Poly t = perktype                                                                            { annotate_2_code !fnm $loc (Ast.PolymorphicVar(i, t)) }
   | error                                                                                                  { raise (ParseError(!fnm, "expression expected")) }
   | expr error                                                                                             { raise (ParseError(!fnm, "unexpected expression")) }
   | Ident error                                                                                            { raise (ParseError(!fnm, "unexpected expression. Perhaps you tried to use C-style types?")) }

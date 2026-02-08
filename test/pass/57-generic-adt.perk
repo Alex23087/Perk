@@ -1,3 +1,5 @@
+import "stdio.h"
+
 type <T> list = Empty | Cons(T, list @ T)
 
 fun sum_list (l : list @ int) : int {
@@ -7,9 +9,40 @@ fun sum_list (l : list @ int) : int {
     }
 }
 
+type <T> Tree = Leaf (T) | Node (Tree @ T, Tree @ T)
+
+// fun <T> tree_fold (f : (T, T) -> T, acc : T, t : Tree @ T) : T {
+//     match (t) {
+//         Leaf (var x) {return f(x, acc)},
+//         Node (var left, var right) {
+//             let acc1 := tree_fold @ T(f, acc, left);
+//             return tree_fold @ T(f, acc1, right);
+//         }
+//     }
+// }
+
+fun tree_fold (f : (int, int) => int, acc : int, t : Tree @ int) : int {
+    match (t) {
+        Leaf (var x) {return f(x, acc)},
+        Node (var left, var right) {
+            let acc1 := tree_fold(f, acc, left);
+            return tree_fold(f, acc1, right);
+        }
+    }
+}
+
 fun main () : void {
-    let banana : list @ int = Empty @ int;
-    let banana2 := Cons @ int (8, banana);
+    let banana := Empty @ int;
+    let banana2 := Cons @ int (6, Cons @ int (7, Empty @ int));
     let string_banana : list @ char = Empty @ char;
+    let tree := Node @ int (Node @ int (Leaf @ int (1), Leaf @ int (2)), Leaf @ int (3));
+
+    printf("sum of banana: %d\n", sum_list (banana2));
+
+    printf("sum of tree: %d\n", tree_fold((x : int, acc : int) : int {return x + acc}, 0, tree));
     return;
+}
+
+fun <T> id (x : T) : T {
+    return id@T(x);
 }
