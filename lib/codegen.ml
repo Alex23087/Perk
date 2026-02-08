@@ -707,15 +707,19 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                     (show_perktype t_actual)
                 in *)
                 Some
-                  (Fundef
-                     ( ( subst_type t_res t_param t_actual,
-                         id ^ "perk_polym_"
-                         ^ type_descriptor_of_perktype t_actual,
-                         List.map
-                           (fun x -> subst_perkvardesc x t_param t_actual)
-                           args,
-                         subst_type_command body t_param t_actual ),
-                       false )))
+                  (( $ )
+                     (!Utils.typecheck_tldf_ptr
+                        (annot_copy tldf
+                           (Fundef
+                              ( ( subst_type t_res t_param t_actual,
+                                  id ^ "_perk_polym_"
+                                  ^ type_descriptor_of_perktype t_actual,
+                                  List.map
+                                    (fun x ->
+                                      subst_perkvardesc x t_param t_actual)
+                                    args,
+                                  subst_type_command body t_param t_actual ),
+                                false ))))))
             instances
         in
         String.concat "\n\n"
@@ -1141,7 +1145,7 @@ and codegen_expr (e : expr_a) : string =
         (* Printf.printf "Instance of %s found\n" id; *)
         if List.mem param (List.map fst instances) then
           codegen_expr
-            (Var (id ^ "perk_polym_" ^ type_descriptor_of_perktype param)
+            (Var (id ^ "_perk_polym_" ^ type_descriptor_of_perktype param)
             |> annot_copy e)
         else
           failwith

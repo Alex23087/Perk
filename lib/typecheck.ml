@@ -321,17 +321,25 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
         let funtype =
           ([], Funtype (List.map (fun (typ, _) -> typ) params, ret_type), [])
         in
+
         bind_var id funtype;
+
         bind_type_if_needed funtype;
         annot_copy tldf (Fundef ((ret_type, id, params, body), public))
         (* |> ignore; typecheck_deferred_function tldf *))
   | PolymorphicFundef ((ret_type, id, params, body), type_param) ->
+      (* First we add the polyfun to the global polyfun hashtbl with phony body (to allow recursive polyfuns), checcosè? *)
+      Hashtbl.add global_polyfuns id
+        (PolymorphicFundef ((ret_type, id, params, body), type_param)
+        |> annot_copy tldf);
+
       (* add the type parameter to the hashtable, setting empty bounds and inferred type*)
       Hashtbl.add generic_types_table type_param
         { bounds = []; inferred_type = None };
 
+      (* TODO: The body typecheck has been disabled to allow recursion. Please handle this properly *)
       (* typecheck the body *)
-      push_symbol_table ();
+      (* push_symbol_table ();
       List.iter
         (fun (typ, id) ->
           try bind_var id typ
@@ -342,7 +350,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
       in
       if (not body_returns) && not (is_unit_type ret_type) then
         raise_type_error tldf "Not all code paths return a value";
-      pop_symbol_table ();
+      pop_symbol_table (); *)
 
       (* add the generic type (bounds and inferred type) to the polyfun_bounds hashtable *)
       let param_gen_type = Hashtbl.find generic_types_table type_param in
@@ -358,11 +366,13 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
         id
         (param_types, ret_type, type_param);
       (* the definition is added to the global polyfun hashtable, to allow it to be instantiated in other files *)
-      Hashtbl.add global_polyfuns id
-        (PolymorphicFundef ((ret_type, id, params, body_res), type_param)
+      Hashtbl.replace global_polyfuns id
+        (PolymorphicFundef
+           ((ret_type, id, params, body (* Should be body_res *)), type_param)
         |> annot_copy tldf);
       annot_copy tldf
-        (PolymorphicFundef ((ret_type, id, params, body_res), type_param))
+        (PolymorphicFundef
+           ((ret_type, id, params, body (* Should be body_res *)), type_param))
   | Extern (id, typ) ->
       (if id = "self" then raise_type_error tldf "Identifier self is reserved"
        else
@@ -1155,10 +1165,11 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
             Hashtbl.find (File_info.get_polyfun_instances ()) id
           else []
         in
-        Hashtbl.replace
-          (File_info.get_polyfun_instances ())
-          id
-          (current_instances @ [ (t, false) ]);
+        if not (List.exists (fun (t', _) -> t = t') current_instances) then
+          Hashtbl.replace
+            (File_info.get_polyfun_instances ())
+            id
+            (current_instances @ [ (t, false) ]);
 
         let def = Hashtbl.find global_polyfuns id in
 
@@ -1977,3 +1988,7 @@ and autoas (expr : expr_a) (actual : perktype) (expected : perktype) : expr_a =
   | ArchetypeSum a1, ArchetypeSum _ | ArchetypeSum a1, Modeltype _ ->
       annot_copy expr (As (expr, a1, Some actual))
   | _ -> expr
+;;
+
+Utils.typecheck_tldf_ptr :=
+  fun tldf -> tldf |> typecheck_topleveldef |> typecheck_deferred_function

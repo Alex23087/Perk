@@ -46,7 +46,11 @@ let print_symbol_table_local symbol_table =
   List.iter print_table !symbol_table
 
 (** Debug function for printing the var symbol table *)
-let print_symbol_table () = print_symbol_table_local var_symbol_table
+let print_symbol_table () =
+  print_symbol_table_local var_symbol_table;
+  flush stdout
+
+(** List of all variables defined in the program, used for code generation. *)
 
 (** Given a symbol table [symbol_table], and identifier [id] and its type [t],
     it binds [id] in [symbol_table] with type [t] if it is not already defined.
@@ -56,8 +60,9 @@ let bind_var_local symbol_table (id : perkident) (t : perktype) =
   | [] -> failwith "No symbol table available"
   | h :: _ ->
       all_vars := (id, t) :: !all_vars;
-      if Hashtbl.mem h id then
-        raise (Double_declaration ("Identifier already defined: " ^ id))
+      if Hashtbl.mem h id then (
+        print_symbol_table ();
+        raise (Double_declaration ("Identifier already defined: " ^ id)))
       else Hashtbl.add h id t
 (* ;print_symbol_table () *)
 

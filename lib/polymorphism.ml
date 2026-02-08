@@ -144,7 +144,14 @@ and subst_type_command (c : command_a) (placeholder : perktype)
     | Switch (e1, ecl) ->
         Switch (subst_e e1, List.map (fun (e, c) -> (subst_e e, subst_c c)) ecl)
     | Return eo -> Return (Option.map subst_e eo)
-    | Match (e1, mel, t) -> Match (subst_e e1, mel, Option.map subst_maybe t))
+    | Match (e1, mel, t) ->
+        Match
+          ( subst_e e1,
+            List.map
+              (fun me ->
+                annot_copy me (subst_mel (( $ ) me) placeholder actual))
+              mel,
+            Option.map subst_maybe t ))
 
 let rec is_type_generic (t : perktype) : bool =
   match t with

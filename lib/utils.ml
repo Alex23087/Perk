@@ -7,6 +7,7 @@ open Errors
 let bind_var_ptr : (perkident -> perktype -> unit) ref = ref (fun _ _ -> ())
 
 let add_constructor_name_ptr : (perkident -> unit) ref = ref (fun _ -> ())
+let typecheck_tldf_ptr : (topleveldef_a -> topleveldef_a) ref = ref (fun x -> x)
 
 (** Filename of the current perk file being processed *)
 let fnm = ref ""

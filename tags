@@ -1,0 +1,934 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_OUTPUT_EXCMD	mixed	/number, pattern, mixed, or combineV2/
+!_TAG_OUTPUT_FILESEP	slash	/slash or backslash/
+!_TAG_OUTPUT_MODE	u-ctags	/u-ctags or e-ctags/
+!_TAG_PATTERN_LENGTH_LIMIT	96	/0 for no limit/
+!_TAG_PROC_CWD	/home/mrdalliard/Spinach/Projects/Perk/	//
+!_TAG_PROGRAM_AUTHOR	Universal Ctags Team	//
+!_TAG_PROGRAM_NAME	Universal Ctags	/Derived from Exuberant Ctags/
+!_TAG_PROGRAM_URL	https://ctags.io/	/official site/
+!_TAG_PROGRAM_VERSION	5.9.0	//
+BUFSIZ	/tmp/libs_expanded.h	/^#define BUFSIZ /;"	d	line:850
+EOF	/tmp/libs_expanded.h	/^#define EOF /;"	d	line:851
+FILE	/tmp/libs_expanded.h	/^typedef struct _IO_FILE FILE;$/;"	t	line:780	typeref:struct:_IO_FILE
+FILENAME_MAX	/tmp/libs_expanded.h	/^#define FILENAME_MAX /;"	d	line:859
+FOPEN_MAX	/tmp/libs_expanded.h	/^#define FOPEN_MAX /;"	d	line:862
+L_ctermid	/tmp/libs_expanded.h	/^#define L_ctermid /;"	d	line:860
+L_tmpnam	/tmp/libs_expanded.h	/^#define L_tmpnam /;"	d	line:856
+NULL	/tmp/libs_expanded.h	/^#define NULL /;"	d	line:616
+P_tmpdir	/tmp/libs_expanded.h	/^#define P_tmpdir /;"	d	line:855
+SEEK_CUR	/tmp/libs_expanded.h	/^#define SEEK_CUR /;"	d	line:853
+SEEK_END	/tmp/libs_expanded.h	/^#define SEEK_END /;"	d	line:854
+SEEK_SET	/tmp/libs_expanded.h	/^#define SEEK_SET /;"	d	line:852
+TMP_MAX	/tmp/libs_expanded.h	/^#define TMP_MAX /;"	d	line:857
+_ATFILE_SOURCE	/tmp/libs_expanded.h	/^#define _ATFILE_SOURCE /;"	d	line:461
+_BITS_FLOATN_COMMON_H	/tmp/libs_expanded.h	/^#define _BITS_FLOATN_COMMON_H /;"	d	line:949
+_BITS_FLOATN_H	/tmp/libs_expanded.h	/^#define _BITS_FLOATN_H /;"	d	line:942
+_BITS_STDIO_LIM_H	/tmp/libs_expanded.h	/^#define _BITS_STDIO_LIM_H /;"	d	line:858
+_BITS_TIME64_H	/tmp/libs_expanded.h	/^#define _BITS_TIME64_H /;"	d	line:711
+_BITS_TYPESIZES_H	/tmp/libs_expanded.h	/^#define _BITS_TYPESIZES_H /;"	d	line:669
+_BITS_TYPES_H	/tmp/libs_expanded.h	/^#define _BITS_TYPES_H /;"	d	line:622
+_BSD_SIZE_T_	/tmp/libs_expanded.h	/^#define _BSD_SIZE_T_ /;"	d	line:603
+_BSD_SIZE_T_DEFINED_	/tmp/libs_expanded.h	/^#define _BSD_SIZE_T_DEFINED_ /;"	d	line:606
+_DEFAULT_SOURCE	/tmp/libs_expanded.h	/^#define _DEFAULT_SOURCE /;"	d	line:440
+_FEATURES_H	/tmp/libs_expanded.h	/^#define _FEATURES_H /;"	d	line:406
+_GCC_SIZE_T	/tmp/libs_expanded.h	/^#define _GCC_SIZE_T /;"	d	line:610
+_G_fpos64_t	/tmp/libs_expanded.h	/^typedef struct _G_fpos64_t$/;"	s	line:770
+_G_fpos_t	/tmp/libs_expanded.h	/^typedef struct _G_fpos_t$/;"	s	line:764
+_IOFBF	/tmp/libs_expanded.h	/^#define _IOFBF /;"	d	line:847
+_IOLBF	/tmp/libs_expanded.h	/^#define _IOLBF /;"	d	line:848
+_IONBF	/tmp/libs_expanded.h	/^#define _IONBF /;"	d	line:849
+_IO_EOF_SEEN	/tmp/libs_expanded.h	/^#define _IO_EOF_SEEN /;"	d	line:821
+_IO_ERR_SEEN	/tmp/libs_expanded.h	/^#define _IO_ERR_SEEN /;"	d	line:823
+_IO_FILE	/tmp/libs_expanded.h	/^struct _IO_FILE$/;"	s	line:787
+_IO_USER_LOCK	/tmp/libs_expanded.h	/^#define _IO_USER_LOCK /;"	d	line:825
+_IO_backup_base	/tmp/libs_expanded.h	/^  char *_IO_backup_base;$/;"	m	line:799	struct:_IO_FILE	typeref:typename:char *
+_IO_buf_base	/tmp/libs_expanded.h	/^  char *_IO_buf_base;$/;"	m	line:796	struct:_IO_FILE	typeref:typename:char *
+_IO_buf_end	/tmp/libs_expanded.h	/^  char *_IO_buf_end;$/;"	m	line:797	struct:_IO_FILE	typeref:typename:char *
+_IO_cookie_io_functions_t	/tmp/libs_expanded.h	/^typedef struct _IO_cookie_io_functions_t$/;"	s	line:833
+_IO_lock_t	/tmp/libs_expanded.h	/^typedef void _IO_lock_t;$/;"	t	line:786	typeref:typename:void
+_IO_read_base	/tmp/libs_expanded.h	/^  char *_IO_read_base;$/;"	m	line:792	struct:_IO_FILE	typeref:typename:char *
+_IO_read_end	/tmp/libs_expanded.h	/^  char *_IO_read_end;$/;"	m	line:791	struct:_IO_FILE	typeref:typename:char *
+_IO_read_ptr	/tmp/libs_expanded.h	/^  char *_IO_read_ptr;$/;"	m	line:790	struct:_IO_FILE	typeref:typename:char *
+_IO_save_base	/tmp/libs_expanded.h	/^  char *_IO_save_base;$/;"	m	line:798	struct:_IO_FILE	typeref:typename:char *
+_IO_save_end	/tmp/libs_expanded.h	/^  char *_IO_save_end;$/;"	m	line:800	struct:_IO_FILE	typeref:typename:char *
+_IO_write_base	/tmp/libs_expanded.h	/^  char *_IO_write_base;$/;"	m	line:793	struct:_IO_FILE	typeref:typename:char *
+_IO_write_end	/tmp/libs_expanded.h	/^  char *_IO_write_end;$/;"	m	line:795	struct:_IO_FILE	typeref:typename:char *
+_IO_write_ptr	/tmp/libs_expanded.h	/^  char *_IO_write_ptr;$/;"	m	line:794	struct:_IO_FILE	typeref:typename:char *
+_LP64	/tmp/libs_expanded.h	/^#define _LP64 /;"	d	line:21
+_POSIX_C_SOURCE	/tmp/libs_expanded.h	/^#define _POSIX_C_SOURCE /;"	d	line:449
+_POSIX_SOURCE	/tmp/libs_expanded.h	/^#define _POSIX_SOURCE /;"	d	line:447
+_SIZET_	/tmp/libs_expanded.h	/^#define _SIZET_ /;"	d	line:611
+_SIZE_T	/tmp/libs_expanded.h	/^#define _SIZE_T /;"	d	line:597
+_SIZE_T_	/tmp/libs_expanded.h	/^#define _SIZE_T_ /;"	d	line:602
+_SIZE_T_DECLARED	/tmp/libs_expanded.h	/^#define _SIZE_T_DECLARED /;"	d	line:607
+_SIZE_T_DEFINED	/tmp/libs_expanded.h	/^#define _SIZE_T_DEFINED /;"	d	line:605
+_SIZE_T_DEFINED_	/tmp/libs_expanded.h	/^#define _SIZE_T_DEFINED_ /;"	d	line:604
+_STDC_PREDEF_H	/tmp/libs_expanded.h	/^#define _STDC_PREDEF_H /;"	d	line:397
+_STDIO_H	/tmp/libs_expanded.h	/^#define _STDIO_H /;"	d	line:403
+_SYS_CDEFS_H	/tmp/libs_expanded.h	/^#define _SYS_CDEFS_H /;"	d	line:481
+_SYS_SIZE_T_H	/tmp/libs_expanded.h	/^#define _SYS_SIZE_T_H /;"	d	line:598
+_T_SIZE	/tmp/libs_expanded.h	/^#define _T_SIZE /;"	d	line:600
+_T_SIZE_	/tmp/libs_expanded.h	/^#define _T_SIZE_ /;"	d	line:599
+_VA_LIST_DEFINED	/tmp/libs_expanded.h	/^#define _VA_LIST_DEFINED /;"	d	line:841
+__ASMNAME	/tmp/libs_expanded.h	/^#define __ASMNAME(/;"	d	line:513	signature:(cname)
+__ASMNAME2	/tmp/libs_expanded.h	/^#define __ASMNAME2(/;"	d	line:514	signature:(prefix,cname)
+__ATOMIC_ACQUIRE	/tmp/libs_expanded.h	/^#define __ATOMIC_ACQUIRE /;"	d	line:12
+__ATOMIC_ACQ_REL	/tmp/libs_expanded.h	/^#define __ATOMIC_ACQ_REL /;"	d	line:14
+__ATOMIC_CONSUME	/tmp/libs_expanded.h	/^#define __ATOMIC_CONSUME /;"	d	line:15
+__ATOMIC_HLE_ACQUIRE	/tmp/libs_expanded.h	/^#define __ATOMIC_HLE_ACQUIRE /;"	d	line:372
+__ATOMIC_HLE_RELEASE	/tmp/libs_expanded.h	/^#define __ATOMIC_HLE_RELEASE /;"	d	line:373
+__ATOMIC_RELAXED	/tmp/libs_expanded.h	/^#define __ATOMIC_RELAXED /;"	d	line:10
+__ATOMIC_RELEASE	/tmp/libs_expanded.h	/^#define __ATOMIC_RELEASE /;"	d	line:13
+__ATOMIC_SEQ_CST	/tmp/libs_expanded.h	/^#define __ATOMIC_SEQ_CST /;"	d	line:11
+__BEGIN_DECLS	/tmp/libs_expanded.h	/^#define __BEGIN_DECLS /;"	d	line:499
+__BFLT16_DECIMAL_DIG__	/tmp/libs_expanded.h	/^#define __BFLT16_DECIMAL_DIG__ /;"	d	line:306
+__BFLT16_DENORM_MIN__	/tmp/libs_expanded.h	/^#define __BFLT16_DENORM_MIN__ /;"	d	line:311
+__BFLT16_DIG__	/tmp/libs_expanded.h	/^#define __BFLT16_DIG__ /;"	d	line:301
+__BFLT16_EPSILON__	/tmp/libs_expanded.h	/^#define __BFLT16_EPSILON__ /;"	d	line:310
+__BFLT16_HAS_DENORM__	/tmp/libs_expanded.h	/^#define __BFLT16_HAS_DENORM__ /;"	d	line:312
+__BFLT16_HAS_INFINITY__	/tmp/libs_expanded.h	/^#define __BFLT16_HAS_INFINITY__ /;"	d	line:313
+__BFLT16_HAS_QUIET_NAN__	/tmp/libs_expanded.h	/^#define __BFLT16_HAS_QUIET_NAN__ /;"	d	line:314
+__BFLT16_IS_IEC_60559__	/tmp/libs_expanded.h	/^#define __BFLT16_IS_IEC_60559__ /;"	d	line:315
+__BFLT16_MANT_DIG__	/tmp/libs_expanded.h	/^#define __BFLT16_MANT_DIG__ /;"	d	line:300
+__BFLT16_MAX_10_EXP__	/tmp/libs_expanded.h	/^#define __BFLT16_MAX_10_EXP__ /;"	d	line:305
+__BFLT16_MAX_EXP__	/tmp/libs_expanded.h	/^#define __BFLT16_MAX_EXP__ /;"	d	line:304
+__BFLT16_MAX__	/tmp/libs_expanded.h	/^#define __BFLT16_MAX__ /;"	d	line:307
+__BFLT16_MIN_10_EXP__	/tmp/libs_expanded.h	/^#define __BFLT16_MIN_10_EXP__ /;"	d	line:303
+__BFLT16_MIN_EXP__	/tmp/libs_expanded.h	/^#define __BFLT16_MIN_EXP__ /;"	d	line:302
+__BFLT16_MIN__	/tmp/libs_expanded.h	/^#define __BFLT16_MIN__ /;"	d	line:309
+__BFLT16_NORM_MAX__	/tmp/libs_expanded.h	/^#define __BFLT16_NORM_MAX__ /;"	d	line:308
+__BIGGEST_ALIGNMENT__	/tmp/libs_expanded.h	/^#define __BIGGEST_ALIGNMENT__ /;"	d	line:32
+__BITINT_MAXWIDTH__	/tmp/libs_expanded.h	/^#define __BITINT_MAXWIDTH__ /;"	d	line:97
+__BLKCNT64_T_TYPE	/tmp/libs_expanded.h	/^#define __BLKCNT64_T_TYPE /;"	d	line:686
+__BLKCNT_T_TYPE	/tmp/libs_expanded.h	/^#define __BLKCNT_T_TYPE /;"	d	line:685
+__BLKSIZE_T_TYPE	/tmp/libs_expanded.h	/^#define __BLKSIZE_T_TYPE /;"	d	line:701
+__BYTE_ORDER__	/tmp/libs_expanded.h	/^#define __BYTE_ORDER__ /;"	d	line:36
+__CET__	/tmp/libs_expanded.h	/^#define __CET__ /;"	d	line:387
+__CFLOAT128	/tmp/libs_expanded.h	/^#define __CFLOAT128 /;"	d	line:948
+__CFLOAT32	/tmp/libs_expanded.h	/^#define __CFLOAT32 /;"	d	line:968
+__CFLOAT32X	/tmp/libs_expanded.h	/^#define __CFLOAT32X /;"	d	line:970
+__CFLOAT64	/tmp/libs_expanded.h	/^#define __CFLOAT64 /;"	d	line:969
+__CFLOAT64X	/tmp/libs_expanded.h	/^#define __CFLOAT64X /;"	d	line:971
+__CHAR16_TYPE__	/tmp/libs_expanded.h	/^#define __CHAR16_TYPE__ /;"	d	line:47
+__CHAR32_TYPE__	/tmp/libs_expanded.h	/^#define __CHAR32_TYPE__ /;"	d	line:48
+__CHAR_BIT__	/tmp/libs_expanded.h	/^#define __CHAR_BIT__ /;"	d	line:31
+__CLOCKID_T_TYPE	/tmp/libs_expanded.h	/^#define __CLOCKID_T_TYPE /;"	d	line:699
+__CLOCK_T_TYPE	/tmp/libs_expanded.h	/^#define __CLOCK_T_TYPE /;"	d	line:692
+__COLD	/tmp/libs_expanded.h	/^#define __COLD /;"	d	line:493
+__CONCAT	/tmp/libs_expanded.h	/^#define __CONCAT(/;"	d	line:496	signature:(x,y)
+__CPU_MASK_TYPE	/tmp/libs_expanded.h	/^#define __CPU_MASK_TYPE /;"	d	line:704
+__DADDR_T_TYPE	/tmp/libs_expanded.h	/^#define __DADDR_T_TYPE /;"	d	line:697
+__DBL_DECIMAL_DIG__	/tmp/libs_expanded.h	/^#define __DBL_DECIMAL_DIG__ /;"	d	line:177
+__DBL_DENORM_MIN__	/tmp/libs_expanded.h	/^#define __DBL_DENORM_MIN__ /;"	d	line:182
+__DBL_DIG__	/tmp/libs_expanded.h	/^#define __DBL_DIG__ /;"	d	line:172
+__DBL_EPSILON__	/tmp/libs_expanded.h	/^#define __DBL_EPSILON__ /;"	d	line:181
+__DBL_HAS_DENORM__	/tmp/libs_expanded.h	/^#define __DBL_HAS_DENORM__ /;"	d	line:183
+__DBL_HAS_INFINITY__	/tmp/libs_expanded.h	/^#define __DBL_HAS_INFINITY__ /;"	d	line:184
+__DBL_HAS_QUIET_NAN__	/tmp/libs_expanded.h	/^#define __DBL_HAS_QUIET_NAN__ /;"	d	line:185
+__DBL_IS_IEC_60559__	/tmp/libs_expanded.h	/^#define __DBL_IS_IEC_60559__ /;"	d	line:186
+__DBL_MANT_DIG__	/tmp/libs_expanded.h	/^#define __DBL_MANT_DIG__ /;"	d	line:171
+__DBL_MAX_10_EXP__	/tmp/libs_expanded.h	/^#define __DBL_MAX_10_EXP__ /;"	d	line:176
+__DBL_MAX_EXP__	/tmp/libs_expanded.h	/^#define __DBL_MAX_EXP__ /;"	d	line:175
+__DBL_MAX__	/tmp/libs_expanded.h	/^#define __DBL_MAX__ /;"	d	line:178
+__DBL_MIN_10_EXP__	/tmp/libs_expanded.h	/^#define __DBL_MIN_10_EXP__ /;"	d	line:174
+__DBL_MIN_EXP__	/tmp/libs_expanded.h	/^#define __DBL_MIN_EXP__ /;"	d	line:173
+__DBL_MIN__	/tmp/libs_expanded.h	/^#define __DBL_MIN__ /;"	d	line:180
+__DBL_NORM_MAX__	/tmp/libs_expanded.h	/^#define __DBL_NORM_MAX__ /;"	d	line:179
+__DEC128_EPSILON__	/tmp/libs_expanded.h	/^#define __DEC128_EPSILON__ /;"	d	line:335
+__DEC128_MANT_DIG__	/tmp/libs_expanded.h	/^#define __DEC128_MANT_DIG__ /;"	d	line:330
+__DEC128_MAX_EXP__	/tmp/libs_expanded.h	/^#define __DEC128_MAX_EXP__ /;"	d	line:332
+__DEC128_MAX__	/tmp/libs_expanded.h	/^#define __DEC128_MAX__ /;"	d	line:334
+__DEC128_MIN_EXP__	/tmp/libs_expanded.h	/^#define __DEC128_MIN_EXP__ /;"	d	line:331
+__DEC128_MIN__	/tmp/libs_expanded.h	/^#define __DEC128_MIN__ /;"	d	line:333
+__DEC128_SUBNORMAL_MIN__	/tmp/libs_expanded.h	/^#define __DEC128_SUBNORMAL_MIN__ /;"	d	line:336
+__DEC32_EPSILON__	/tmp/libs_expanded.h	/^#define __DEC32_EPSILON__ /;"	d	line:321
+__DEC32_MANT_DIG__	/tmp/libs_expanded.h	/^#define __DEC32_MANT_DIG__ /;"	d	line:316
+__DEC32_MAX_EXP__	/tmp/libs_expanded.h	/^#define __DEC32_MAX_EXP__ /;"	d	line:318
+__DEC32_MAX__	/tmp/libs_expanded.h	/^#define __DEC32_MAX__ /;"	d	line:320
+__DEC32_MIN_EXP__	/tmp/libs_expanded.h	/^#define __DEC32_MIN_EXP__ /;"	d	line:317
+__DEC32_MIN__	/tmp/libs_expanded.h	/^#define __DEC32_MIN__ /;"	d	line:319
+__DEC32_SUBNORMAL_MIN__	/tmp/libs_expanded.h	/^#define __DEC32_SUBNORMAL_MIN__ /;"	d	line:322
+__DEC64_EPSILON__	/tmp/libs_expanded.h	/^#define __DEC64_EPSILON__ /;"	d	line:328
+__DEC64_MANT_DIG__	/tmp/libs_expanded.h	/^#define __DEC64_MANT_DIG__ /;"	d	line:323
+__DEC64_MAX_EXP__	/tmp/libs_expanded.h	/^#define __DEC64_MAX_EXP__ /;"	d	line:325
+__DEC64_MAX__	/tmp/libs_expanded.h	/^#define __DEC64_MAX__ /;"	d	line:327
+__DEC64_MIN_EXP__	/tmp/libs_expanded.h	/^#define __DEC64_MIN_EXP__ /;"	d	line:324
+__DEC64_MIN__	/tmp/libs_expanded.h	/^#define __DEC64_MIN__ /;"	d	line:326
+__DEC64_SUBNORMAL_MIN__	/tmp/libs_expanded.h	/^#define __DEC64_SUBNORMAL_MIN__ /;"	d	line:329
+__DECIMAL_BID_FORMAT__	/tmp/libs_expanded.h	/^#define __DECIMAL_BID_FORMAT__ /;"	d	line:396
+__DECIMAL_DIG__	/tmp/libs_expanded.h	/^#define __DECIMAL_DIG__ /;"	d	line:193
+__DEC_EVAL_METHOD__	/tmp/libs_expanded.h	/^#define __DEC_EVAL_METHOD__ /;"	d	line:153
+__DEFINED_size_t	/tmp/libs_expanded.h	/^#define __DEFINED_size_t /;"	d	line:608
+__DEV_T_TYPE	/tmp/libs_expanded.h	/^#define __DEV_T_TYPE /;"	d	line:672
+__ELF__	/tmp/libs_expanded.h	/^#define __ELF__ /;"	d	line:395
+__END_DECLS	/tmp/libs_expanded.h	/^#define __END_DECLS /;"	d	line:500
+__FD_SETSIZE	/tmp/libs_expanded.h	/^#define __FD_SETSIZE /;"	d	line:710
+__FILE	/tmp/libs_expanded.h	/^typedef struct _IO_FILE __FILE;$/;"	t	line:777	typeref:struct:_IO_FILE
+__FILE_defined	/tmp/libs_expanded.h	/^#define __FILE_defined /;"	d	line:778
+__FINITE_MATH_ONLY__	/tmp/libs_expanded.h	/^#define __FINITE_MATH_ONLY__ /;"	d	line:20
+__FLOAT_WORD_ORDER__	/tmp/libs_expanded.h	/^#define __FLOAT_WORD_ORDER__ /;"	d	line:37
+__FLT128_DECIMAL_DIG__	/tmp/libs_expanded.h	/^#define __FLT128_DECIMAL_DIG__ /;"	d	line:258
+__FLT128_DENORM_MIN__	/tmp/libs_expanded.h	/^#define __FLT128_DENORM_MIN__ /;"	d	line:263
+__FLT128_DIG__	/tmp/libs_expanded.h	/^#define __FLT128_DIG__ /;"	d	line:253
+__FLT128_EPSILON__	/tmp/libs_expanded.h	/^#define __FLT128_EPSILON__ /;"	d	line:262
+__FLT128_HAS_DENORM__	/tmp/libs_expanded.h	/^#define __FLT128_HAS_DENORM__ /;"	d	line:264
+__FLT128_HAS_INFINITY__	/tmp/libs_expanded.h	/^#define __FLT128_HAS_INFINITY__ /;"	d	line:265
+__FLT128_HAS_QUIET_NAN__	/tmp/libs_expanded.h	/^#define __FLT128_HAS_QUIET_NAN__ /;"	d	line:266
+__FLT128_IS_IEC_60559__	/tmp/libs_expanded.h	/^#define __FLT128_IS_IEC_60559__ /;"	d	line:267
+__FLT128_MANT_DIG__	/tmp/libs_expanded.h	/^#define __FLT128_MANT_DIG__ /;"	d	line:252
+__FLT128_MAX_10_EXP__	/tmp/libs_expanded.h	/^#define __FLT128_MAX_10_EXP__ /;"	d	line:257
+__FLT128_MAX_EXP__	/tmp/libs_expanded.h	/^#define __FLT128_MAX_EXP__ /;"	d	line:256
+__FLT128_MAX__	/tmp/libs_expanded.h	/^#define __FLT128_MAX__ /;"	d	line:259
+__FLT128_MIN_10_EXP__	/tmp/libs_expanded.h	/^#define __FLT128_MIN_10_EXP__ /;"	d	line:255
+__FLT128_MIN_EXP__	/tmp/libs_expanded.h	/^#define __FLT128_MIN_EXP__ /;"	d	line:254
+__FLT128_MIN__	/tmp/libs_expanded.h	/^#define __FLT128_MIN__ /;"	d	line:261
+__FLT128_NORM_MAX__	/tmp/libs_expanded.h	/^#define __FLT128_NORM_MAX__ /;"	d	line:260
+__FLT16_DECIMAL_DIG__	/tmp/libs_expanded.h	/^#define __FLT16_DECIMAL_DIG__ /;"	d	line:210
+__FLT16_DENORM_MIN__	/tmp/libs_expanded.h	/^#define __FLT16_DENORM_MIN__ /;"	d	line:215
+__FLT16_DIG__	/tmp/libs_expanded.h	/^#define __FLT16_DIG__ /;"	d	line:205
+__FLT16_EPSILON__	/tmp/libs_expanded.h	/^#define __FLT16_EPSILON__ /;"	d	line:214
+__FLT16_HAS_DENORM__	/tmp/libs_expanded.h	/^#define __FLT16_HAS_DENORM__ /;"	d	line:216
+__FLT16_HAS_INFINITY__	/tmp/libs_expanded.h	/^#define __FLT16_HAS_INFINITY__ /;"	d	line:217
+__FLT16_HAS_QUIET_NAN__	/tmp/libs_expanded.h	/^#define __FLT16_HAS_QUIET_NAN__ /;"	d	line:218
+__FLT16_IS_IEC_60559__	/tmp/libs_expanded.h	/^#define __FLT16_IS_IEC_60559__ /;"	d	line:219
+__FLT16_MANT_DIG__	/tmp/libs_expanded.h	/^#define __FLT16_MANT_DIG__ /;"	d	line:204
+__FLT16_MAX_10_EXP__	/tmp/libs_expanded.h	/^#define __FLT16_MAX_10_EXP__ /;"	d	line:209
+__FLT16_MAX_EXP__	/tmp/libs_expanded.h	/^#define __FLT16_MAX_EXP__ /;"	d	line:208
+__FLT16_MAX__	/tmp/libs_expanded.h	/^#define __FLT16_MAX__ /;"	d	line:211
+__FLT16_MIN_10_EXP__	/tmp/libs_expanded.h	/^#define __FLT16_MIN_10_EXP__ /;"	d	line:207
+__FLT16_MIN_EXP__	/tmp/libs_expanded.h	/^#define __FLT16_MIN_EXP__ /;"	d	line:206
+__FLT16_MIN__	/tmp/libs_expanded.h	/^#define __FLT16_MIN__ /;"	d	line:213
+__FLT16_NORM_MAX__	/tmp/libs_expanded.h	/^#define __FLT16_NORM_MAX__ /;"	d	line:212
+__FLT32X_DECIMAL_DIG__	/tmp/libs_expanded.h	/^#define __FLT32X_DECIMAL_DIG__ /;"	d	line:274
+__FLT32X_DENORM_MIN__	/tmp/libs_expanded.h	/^#define __FLT32X_DENORM_MIN__ /;"	d	line:279
+__FLT32X_DIG__	/tmp/libs_expanded.h	/^#define __FLT32X_DIG__ /;"	d	line:269
+__FLT32X_EPSILON__	/tmp/libs_expanded.h	/^#define __FLT32X_EPSILON__ /;"	d	line:278
+__FLT32X_HAS_DENORM__	/tmp/libs_expanded.h	/^#define __FLT32X_HAS_DENORM__ /;"	d	line:280
+__FLT32X_HAS_INFINITY__	/tmp/libs_expanded.h	/^#define __FLT32X_HAS_INFINITY__ /;"	d	line:281
+__FLT32X_HAS_QUIET_NAN__	/tmp/libs_expanded.h	/^#define __FLT32X_HAS_QUIET_NAN__ /;"	d	line:282
+__FLT32X_IS_IEC_60559__	/tmp/libs_expanded.h	/^#define __FLT32X_IS_IEC_60559__ /;"	d	line:283
+__FLT32X_MANT_DIG__	/tmp/libs_expanded.h	/^#define __FLT32X_MANT_DIG__ /;"	d	line:268
+__FLT32X_MAX_10_EXP__	/tmp/libs_expanded.h	/^#define __FLT32X_MAX_10_EXP__ /;"	d	line:273
+__FLT32X_MAX_EXP__	/tmp/libs_expanded.h	/^#define __FLT32X_MAX_EXP__ /;"	d	line:272
+__FLT32X_MAX__	/tmp/libs_expanded.h	/^#define __FLT32X_MAX__ /;"	d	line:275
+__FLT32X_MIN_10_EXP__	/tmp/libs_expanded.h	/^#define __FLT32X_MIN_10_EXP__ /;"	d	line:271
+__FLT32X_MIN_EXP__	/tmp/libs_expanded.h	/^#define __FLT32X_MIN_EXP__ /;"	d	line:270
+__FLT32X_MIN__	/tmp/libs_expanded.h	/^#define __FLT32X_MIN__ /;"	d	line:277
+__FLT32X_NORM_MAX__	/tmp/libs_expanded.h	/^#define __FLT32X_NORM_MAX__ /;"	d	line:276
+__FLT32_DECIMAL_DIG__	/tmp/libs_expanded.h	/^#define __FLT32_DECIMAL_DIG__ /;"	d	line:226
+__FLT32_DENORM_MIN__	/tmp/libs_expanded.h	/^#define __FLT32_DENORM_MIN__ /;"	d	line:231
+__FLT32_DIG__	/tmp/libs_expanded.h	/^#define __FLT32_DIG__ /;"	d	line:221
+__FLT32_EPSILON__	/tmp/libs_expanded.h	/^#define __FLT32_EPSILON__ /;"	d	line:230
+__FLT32_HAS_DENORM__	/tmp/libs_expanded.h	/^#define __FLT32_HAS_DENORM__ /;"	d	line:232
+__FLT32_HAS_INFINITY__	/tmp/libs_expanded.h	/^#define __FLT32_HAS_INFINITY__ /;"	d	line:233
+__FLT32_HAS_QUIET_NAN__	/tmp/libs_expanded.h	/^#define __FLT32_HAS_QUIET_NAN__ /;"	d	line:234
+__FLT32_IS_IEC_60559__	/tmp/libs_expanded.h	/^#define __FLT32_IS_IEC_60559__ /;"	d	line:235
+__FLT32_MANT_DIG__	/tmp/libs_expanded.h	/^#define __FLT32_MANT_DIG__ /;"	d	line:220
+__FLT32_MAX_10_EXP__	/tmp/libs_expanded.h	/^#define __FLT32_MAX_10_EXP__ /;"	d	line:225
+__FLT32_MAX_EXP__	/tmp/libs_expanded.h	/^#define __FLT32_MAX_EXP__ /;"	d	line:224
+__FLT32_MAX__	/tmp/libs_expanded.h	/^#define __FLT32_MAX__ /;"	d	line:227
+__FLT32_MIN_10_EXP__	/tmp/libs_expanded.h	/^#define __FLT32_MIN_10_EXP__ /;"	d	line:223
+__FLT32_MIN_EXP__	/tmp/libs_expanded.h	/^#define __FLT32_MIN_EXP__ /;"	d	line:222
+__FLT32_MIN__	/tmp/libs_expanded.h	/^#define __FLT32_MIN__ /;"	d	line:229
+__FLT32_NORM_MAX__	/tmp/libs_expanded.h	/^#define __FLT32_NORM_MAX__ /;"	d	line:228
+__FLT64X_DECIMAL_DIG__	/tmp/libs_expanded.h	/^#define __FLT64X_DECIMAL_DIG__ /;"	d	line:290
+__FLT64X_DENORM_MIN__	/tmp/libs_expanded.h	/^#define __FLT64X_DENORM_MIN__ /;"	d	line:295
+__FLT64X_DIG__	/tmp/libs_expanded.h	/^#define __FLT64X_DIG__ /;"	d	line:285
+__FLT64X_EPSILON__	/tmp/libs_expanded.h	/^#define __FLT64X_EPSILON__ /;"	d	line:294
+__FLT64X_HAS_DENORM__	/tmp/libs_expanded.h	/^#define __FLT64X_HAS_DENORM__ /;"	d	line:296
+__FLT64X_HAS_INFINITY__	/tmp/libs_expanded.h	/^#define __FLT64X_HAS_INFINITY__ /;"	d	line:297
+__FLT64X_HAS_QUIET_NAN__	/tmp/libs_expanded.h	/^#define __FLT64X_HAS_QUIET_NAN__ /;"	d	line:298
+__FLT64X_IS_IEC_60559__	/tmp/libs_expanded.h	/^#define __FLT64X_IS_IEC_60559__ /;"	d	line:299
+__FLT64X_MANT_DIG__	/tmp/libs_expanded.h	/^#define __FLT64X_MANT_DIG__ /;"	d	line:284
+__FLT64X_MAX_10_EXP__	/tmp/libs_expanded.h	/^#define __FLT64X_MAX_10_EXP__ /;"	d	line:289
+__FLT64X_MAX_EXP__	/tmp/libs_expanded.h	/^#define __FLT64X_MAX_EXP__ /;"	d	line:288
+__FLT64X_MAX__	/tmp/libs_expanded.h	/^#define __FLT64X_MAX__ /;"	d	line:291
+__FLT64X_MIN_10_EXP__	/tmp/libs_expanded.h	/^#define __FLT64X_MIN_10_EXP__ /;"	d	line:287
+__FLT64X_MIN_EXP__	/tmp/libs_expanded.h	/^#define __FLT64X_MIN_EXP__ /;"	d	line:286
+__FLT64X_MIN__	/tmp/libs_expanded.h	/^#define __FLT64X_MIN__ /;"	d	line:293
+__FLT64X_NORM_MAX__	/tmp/libs_expanded.h	/^#define __FLT64X_NORM_MAX__ /;"	d	line:292
+__FLT64_DECIMAL_DIG__	/tmp/libs_expanded.h	/^#define __FLT64_DECIMAL_DIG__ /;"	d	line:242
+__FLT64_DENORM_MIN__	/tmp/libs_expanded.h	/^#define __FLT64_DENORM_MIN__ /;"	d	line:247
+__FLT64_DIG__	/tmp/libs_expanded.h	/^#define __FLT64_DIG__ /;"	d	line:237
+__FLT64_EPSILON__	/tmp/libs_expanded.h	/^#define __FLT64_EPSILON__ /;"	d	line:246
+__FLT64_HAS_DENORM__	/tmp/libs_expanded.h	/^#define __FLT64_HAS_DENORM__ /;"	d	line:248
+__FLT64_HAS_INFINITY__	/tmp/libs_expanded.h	/^#define __FLT64_HAS_INFINITY__ /;"	d	line:249
+__FLT64_HAS_QUIET_NAN__	/tmp/libs_expanded.h	/^#define __FLT64_HAS_QUIET_NAN__ /;"	d	line:250
+__FLT64_IS_IEC_60559__	/tmp/libs_expanded.h	/^#define __FLT64_IS_IEC_60559__ /;"	d	line:251
+__FLT64_MANT_DIG__	/tmp/libs_expanded.h	/^#define __FLT64_MANT_DIG__ /;"	d	line:236
+__FLT64_MAX_10_EXP__	/tmp/libs_expanded.h	/^#define __FLT64_MAX_10_EXP__ /;"	d	line:241
+__FLT64_MAX_EXP__	/tmp/libs_expanded.h	/^#define __FLT64_MAX_EXP__ /;"	d	line:240
+__FLT64_MAX__	/tmp/libs_expanded.h	/^#define __FLT64_MAX__ /;"	d	line:243
+__FLT64_MIN_10_EXP__	/tmp/libs_expanded.h	/^#define __FLT64_MIN_10_EXP__ /;"	d	line:239
+__FLT64_MIN_EXP__	/tmp/libs_expanded.h	/^#define __FLT64_MIN_EXP__ /;"	d	line:238
+__FLT64_MIN__	/tmp/libs_expanded.h	/^#define __FLT64_MIN__ /;"	d	line:245
+__FLT64_NORM_MAX__	/tmp/libs_expanded.h	/^#define __FLT64_NORM_MAX__ /;"	d	line:244
+__FLT_DECIMAL_DIG__	/tmp/libs_expanded.h	/^#define __FLT_DECIMAL_DIG__ /;"	d	line:161
+__FLT_DENORM_MIN__	/tmp/libs_expanded.h	/^#define __FLT_DENORM_MIN__ /;"	d	line:166
+__FLT_DIG__	/tmp/libs_expanded.h	/^#define __FLT_DIG__ /;"	d	line:156
+__FLT_EPSILON__	/tmp/libs_expanded.h	/^#define __FLT_EPSILON__ /;"	d	line:165
+__FLT_EVAL_METHOD_TS_18661_3__	/tmp/libs_expanded.h	/^#define __FLT_EVAL_METHOD_TS_18661_3__ /;"	d	line:152
+__FLT_EVAL_METHOD__	/tmp/libs_expanded.h	/^#define __FLT_EVAL_METHOD__ /;"	d	line:151
+__FLT_HAS_DENORM__	/tmp/libs_expanded.h	/^#define __FLT_HAS_DENORM__ /;"	d	line:167
+__FLT_HAS_INFINITY__	/tmp/libs_expanded.h	/^#define __FLT_HAS_INFINITY__ /;"	d	line:168
+__FLT_HAS_QUIET_NAN__	/tmp/libs_expanded.h	/^#define __FLT_HAS_QUIET_NAN__ /;"	d	line:169
+__FLT_IS_IEC_60559__	/tmp/libs_expanded.h	/^#define __FLT_IS_IEC_60559__ /;"	d	line:170
+__FLT_MANT_DIG__	/tmp/libs_expanded.h	/^#define __FLT_MANT_DIG__ /;"	d	line:155
+__FLT_MAX_10_EXP__	/tmp/libs_expanded.h	/^#define __FLT_MAX_10_EXP__ /;"	d	line:160
+__FLT_MAX_EXP__	/tmp/libs_expanded.h	/^#define __FLT_MAX_EXP__ /;"	d	line:159
+__FLT_MAX__	/tmp/libs_expanded.h	/^#define __FLT_MAX__ /;"	d	line:162
+__FLT_MIN_10_EXP__	/tmp/libs_expanded.h	/^#define __FLT_MIN_10_EXP__ /;"	d	line:158
+__FLT_MIN_EXP__	/tmp/libs_expanded.h	/^#define __FLT_MIN_EXP__ /;"	d	line:157
+__FLT_MIN__	/tmp/libs_expanded.h	/^#define __FLT_MIN__ /;"	d	line:164
+__FLT_NORM_MAX__	/tmp/libs_expanded.h	/^#define __FLT_NORM_MAX__ /;"	d	line:163
+__FLT_RADIX__	/tmp/libs_expanded.h	/^#define __FLT_RADIX__ /;"	d	line:154
+__FSBLKCNT64_T_TYPE	/tmp/libs_expanded.h	/^#define __FSBLKCNT64_T_TYPE /;"	d	line:688
+__FSBLKCNT_T_TYPE	/tmp/libs_expanded.h	/^#define __FSBLKCNT_T_TYPE /;"	d	line:687
+__FSFILCNT64_T_TYPE	/tmp/libs_expanded.h	/^#define __FSFILCNT64_T_TYPE /;"	d	line:690
+__FSFILCNT_T_TYPE	/tmp/libs_expanded.h	/^#define __FSFILCNT_T_TYPE /;"	d	line:689
+__FSID_T_TYPE	/tmp/libs_expanded.h	/^#define __FSID_T_TYPE /;"	d	line:702
+__FSWORD_T_TYPE	/tmp/libs_expanded.h	/^#define __FSWORD_T_TYPE /;"	d	line:679
+__FXSR__	/tmp/libs_expanded.h	/^#define __FXSR__ /;"	d	line:381
+__GCC_ASM_FLAG_OUTPUTS__	/tmp/libs_expanded.h	/^#define __GCC_ASM_FLAG_OUTPUTS__ /;"	d	line:374
+__GCC_ATOMIC_BOOL_LOCK_FREE	/tmp/libs_expanded.h	/^#define __GCC_ATOMIC_BOOL_LOCK_FREE /;"	d	line:345
+__GCC_ATOMIC_CHAR16_T_LOCK_FREE	/tmp/libs_expanded.h	/^#define __GCC_ATOMIC_CHAR16_T_LOCK_FREE /;"	d	line:347
+__GCC_ATOMIC_CHAR32_T_LOCK_FREE	/tmp/libs_expanded.h	/^#define __GCC_ATOMIC_CHAR32_T_LOCK_FREE /;"	d	line:348
+__GCC_ATOMIC_CHAR_LOCK_FREE	/tmp/libs_expanded.h	/^#define __GCC_ATOMIC_CHAR_LOCK_FREE /;"	d	line:346
+__GCC_ATOMIC_INT_LOCK_FREE	/tmp/libs_expanded.h	/^#define __GCC_ATOMIC_INT_LOCK_FREE /;"	d	line:351
+__GCC_ATOMIC_LLONG_LOCK_FREE	/tmp/libs_expanded.h	/^#define __GCC_ATOMIC_LLONG_LOCK_FREE /;"	d	line:353
+__GCC_ATOMIC_LONG_LOCK_FREE	/tmp/libs_expanded.h	/^#define __GCC_ATOMIC_LONG_LOCK_FREE /;"	d	line:352
+__GCC_ATOMIC_POINTER_LOCK_FREE	/tmp/libs_expanded.h	/^#define __GCC_ATOMIC_POINTER_LOCK_FREE /;"	d	line:357
+__GCC_ATOMIC_SHORT_LOCK_FREE	/tmp/libs_expanded.h	/^#define __GCC_ATOMIC_SHORT_LOCK_FREE /;"	d	line:350
+__GCC_ATOMIC_TEST_AND_SET_TRUEVAL	/tmp/libs_expanded.h	/^#define __GCC_ATOMIC_TEST_AND_SET_TRUEVAL /;"	d	line:354
+__GCC_ATOMIC_WCHAR_T_LOCK_FREE	/tmp/libs_expanded.h	/^#define __GCC_ATOMIC_WCHAR_T_LOCK_FREE /;"	d	line:349
+__GCC_CONSTRUCTIVE_SIZE	/tmp/libs_expanded.h	/^#define __GCC_CONSTRUCTIVE_SIZE /;"	d	line:356
+__GCC_DESTRUCTIVE_SIZE	/tmp/libs_expanded.h	/^#define __GCC_DESTRUCTIVE_SIZE /;"	d	line:355
+__GCC_HAVE_DWARF2_CFI_ASM	/tmp/libs_expanded.h	/^#define __GCC_HAVE_DWARF2_CFI_ASM /;"	d	line:359
+__GCC_HAVE_SYNC_COMPARE_AND_SWAP_1	/tmp/libs_expanded.h	/^#define __GCC_HAVE_SYNC_COMPARE_AND_SWAP_1 /;"	d	line:341
+__GCC_HAVE_SYNC_COMPARE_AND_SWAP_2	/tmp/libs_expanded.h	/^#define __GCC_HAVE_SYNC_COMPARE_AND_SWAP_2 /;"	d	line:342
+__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4	/tmp/libs_expanded.h	/^#define __GCC_HAVE_SYNC_COMPARE_AND_SWAP_4 /;"	d	line:343
+__GCC_HAVE_SYNC_COMPARE_AND_SWAP_8	/tmp/libs_expanded.h	/^#define __GCC_HAVE_SYNC_COMPARE_AND_SWAP_8 /;"	d	line:344
+__GCC_IEC_559	/tmp/libs_expanded.h	/^#define __GCC_IEC_559 /;"	d	line:149
+__GCC_IEC_559_COMPLEX	/tmp/libs_expanded.h	/^#define __GCC_IEC_559_COMPLEX /;"	d	line:150
+__GID_T_TYPE	/tmp/libs_expanded.h	/^#define __GID_T_TYPE /;"	d	line:674
+__GLIBC_INTERNAL_STARTING_HEADER_IMPLEMENTATION	/tmp/libs_expanded.h	/^#define __GLIBC_INTERNAL_STARTING_HEADER_IMPLEMENTATION /;"	d	line:404
+__GLIBC_MINOR__	/tmp/libs_expanded.h	/^#define __GLIBC_MINOR__ /;"	d	line:479
+__GLIBC_PREREQ	/tmp/libs_expanded.h	/^#define __GLIBC_PREREQ(/;"	d	line:480	signature:(maj,min)
+__GLIBC_USE	/tmp/libs_expanded.h	/^#define __GLIBC_USE(/;"	d	line:438	signature:(F)
+__GLIBC_USE_C23_STRTOL	/tmp/libs_expanded.h	/^#define __GLIBC_USE_C23_STRTOL /;"	d	line:475
+__GLIBC_USE_DEPRECATED_GETS	/tmp/libs_expanded.h	/^#define __GLIBC_USE_DEPRECATED_GETS /;"	d	line:473
+__GLIBC_USE_DEPRECATED_SCANF	/tmp/libs_expanded.h	/^#define __GLIBC_USE_DEPRECATED_SCANF /;"	d	line:474
+__GLIBC_USE_IEC_60559_BFP_EXT	/tmp/libs_expanded.h	/^#define __GLIBC_USE_IEC_60559_BFP_EXT /;"	d	line:581
+__GLIBC_USE_IEC_60559_BFP_EXT_C23	/tmp/libs_expanded.h	/^#define __GLIBC_USE_IEC_60559_BFP_EXT_C23 /;"	d	line:583
+__GLIBC_USE_IEC_60559_EXT	/tmp/libs_expanded.h	/^#define __GLIBC_USE_IEC_60559_EXT /;"	d	line:585
+__GLIBC_USE_IEC_60559_FUNCS_EXT	/tmp/libs_expanded.h	/^#define __GLIBC_USE_IEC_60559_FUNCS_EXT /;"	d	line:587
+__GLIBC_USE_IEC_60559_FUNCS_EXT_C23	/tmp/libs_expanded.h	/^#define __GLIBC_USE_IEC_60559_FUNCS_EXT_C23 /;"	d	line:589
+__GLIBC_USE_IEC_60559_TYPES_EXT	/tmp/libs_expanded.h	/^#define __GLIBC_USE_IEC_60559_TYPES_EXT /;"	d	line:591
+__GLIBC_USE_ISOC23	/tmp/libs_expanded.h	/^#define __GLIBC_USE_ISOC23 /;"	d	line:441
+__GLIBC_USE_LIB_EXT2	/tmp/libs_expanded.h	/^#define __GLIBC_USE_LIB_EXT2 /;"	d	line:579
+__GLIBC__	/tmp/libs_expanded.h	/^#define __GLIBC__ /;"	d	line:478
+__GNUC_EXECUTION_CHARSET_NAME	/tmp/libs_expanded.h	/^#define __GNUC_EXECUTION_CHARSET_NAME /;"	d	line:39
+__GNUC_MINOR__	/tmp/libs_expanded.h	/^#define __GNUC_MINOR__ /;"	d	line:7
+__GNUC_PATCHLEVEL__	/tmp/libs_expanded.h	/^#define __GNUC_PATCHLEVEL__ /;"	d	line:8
+__GNUC_PREREQ	/tmp/libs_expanded.h	/^#define __GNUC_PREREQ(/;"	d	line:436	signature:(maj,min)
+__GNUC_STDC_INLINE__	/tmp/libs_expanded.h	/^#define __GNUC_STDC_INLINE__ /;"	d	line:339
+__GNUC_VA_LIST	/tmp/libs_expanded.h	/^#define __GNUC_VA_LIST /;"	d	line:620
+__GNUC_WIDE_EXECUTION_CHARSET_NAME	/tmp/libs_expanded.h	/^#define __GNUC_WIDE_EXECUTION_CHARSET_NAME /;"	d	line:40
+__GNUC__	/tmp/libs_expanded.h	/^#define __GNUC__ /;"	d	line:6
+__GNU_LIBRARY__	/tmp/libs_expanded.h	/^#define __GNU_LIBRARY__ /;"	d	line:477
+__GXX_ABI_VERSION	/tmp/libs_expanded.h	/^#define __GXX_ABI_VERSION /;"	d	line:76
+__HAVE_DISTINCT_FLOAT128	/tmp/libs_expanded.h	/^#define __HAVE_DISTINCT_FLOAT128 /;"	d	line:944
+__HAVE_DISTINCT_FLOAT128X	/tmp/libs_expanded.h	/^#define __HAVE_DISTINCT_FLOAT128X /;"	d	line:961
+__HAVE_DISTINCT_FLOAT16	/tmp/libs_expanded.h	/^#define __HAVE_DISTINCT_FLOAT16 /;"	d	line:956
+__HAVE_DISTINCT_FLOAT32	/tmp/libs_expanded.h	/^#define __HAVE_DISTINCT_FLOAT32 /;"	d	line:957
+__HAVE_DISTINCT_FLOAT32X	/tmp/libs_expanded.h	/^#define __HAVE_DISTINCT_FLOAT32X /;"	d	line:959
+__HAVE_DISTINCT_FLOAT64	/tmp/libs_expanded.h	/^#define __HAVE_DISTINCT_FLOAT64 /;"	d	line:958
+__HAVE_DISTINCT_FLOAT64X	/tmp/libs_expanded.h	/^#define __HAVE_DISTINCT_FLOAT64X /;"	d	line:960
+__HAVE_FLOAT128	/tmp/libs_expanded.h	/^#define __HAVE_FLOAT128 /;"	d	line:943
+__HAVE_FLOAT128X	/tmp/libs_expanded.h	/^#define __HAVE_FLOAT128X /;"	d	line:955
+__HAVE_FLOAT128_UNLIKE_LDBL	/tmp/libs_expanded.h	/^#define __HAVE_FLOAT128_UNLIKE_LDBL /;"	d	line:962
+__HAVE_FLOAT16	/tmp/libs_expanded.h	/^#define __HAVE_FLOAT16 /;"	d	line:951
+__HAVE_FLOAT32	/tmp/libs_expanded.h	/^#define __HAVE_FLOAT32 /;"	d	line:952
+__HAVE_FLOAT32X	/tmp/libs_expanded.h	/^#define __HAVE_FLOAT32X /;"	d	line:954
+__HAVE_FLOAT64	/tmp/libs_expanded.h	/^#define __HAVE_FLOAT64 /;"	d	line:953
+__HAVE_FLOAT64X	/tmp/libs_expanded.h	/^#define __HAVE_FLOAT64X /;"	d	line:945
+__HAVE_FLOAT64X_LONG_DOUBLE	/tmp/libs_expanded.h	/^#define __HAVE_FLOAT64X_LONG_DOUBLE /;"	d	line:946
+__HAVE_FLOATN_NOT_TYPEDEF	/tmp/libs_expanded.h	/^#define __HAVE_FLOATN_NOT_TYPEDEF /;"	d	line:963
+__HAVE_GENERIC_SELECTION	/tmp/libs_expanded.h	/^#define __HAVE_GENERIC_SELECTION /;"	d	line:562
+__HAVE_SPECULATION_SAFE_VALUE	/tmp/libs_expanded.h	/^#define __HAVE_SPECULATION_SAFE_VALUE /;"	d	line:358
+__ID_T_TYPE	/tmp/libs_expanded.h	/^#define __ID_T_TYPE /;"	d	line:691
+__INO64_T_TYPE	/tmp/libs_expanded.h	/^#define __INO64_T_TYPE /;"	d	line:676
+__INO_T_MATCHES_INO64_T	/tmp/libs_expanded.h	/^#define __INO_T_MATCHES_INO64_T /;"	d	line:706
+__INO_T_TYPE	/tmp/libs_expanded.h	/^#define __INO_T_TYPE /;"	d	line:675
+__INT16_C	/tmp/libs_expanded.h	/^#define __INT16_C(/;"	d	line:118	signature:(c)
+__INT16_MAX__	/tmp/libs_expanded.h	/^#define __INT16_MAX__ /;"	d	line:107
+__INT16_TYPE__	/tmp/libs_expanded.h	/^#define __INT16_TYPE__ /;"	d	line:51
+__INT32_C	/tmp/libs_expanded.h	/^#define __INT32_C(/;"	d	line:121	signature:(c)
+__INT32_MAX__	/tmp/libs_expanded.h	/^#define __INT32_MAX__ /;"	d	line:108
+__INT32_TYPE__	/tmp/libs_expanded.h	/^#define __INT32_TYPE__ /;"	d	line:52
+__INT64_C	/tmp/libs_expanded.h	/^#define __INT64_C(/;"	d	line:124	signature:(c)
+__INT64_MAX__	/tmp/libs_expanded.h	/^#define __INT64_MAX__ /;"	d	line:109
+__INT64_TYPE__	/tmp/libs_expanded.h	/^#define __INT64_TYPE__ /;"	d	line:53
+__INT8_C	/tmp/libs_expanded.h	/^#define __INT8_C(/;"	d	line:115	signature:(c)
+__INT8_MAX__	/tmp/libs_expanded.h	/^#define __INT8_MAX__ /;"	d	line:106
+__INT8_TYPE__	/tmp/libs_expanded.h	/^#define __INT8_TYPE__ /;"	d	line:50
+__INTMAX_C	/tmp/libs_expanded.h	/^#define __INTMAX_C(/;"	d	line:99	signature:(c)
+__INTMAX_MAX__	/tmp/libs_expanded.h	/^#define __INTMAX_MAX__ /;"	d	line:98
+__INTMAX_TYPE__	/tmp/libs_expanded.h	/^#define __INTMAX_TYPE__ /;"	d	line:45
+__INTMAX_WIDTH__	/tmp/libs_expanded.h	/^#define __INTMAX_WIDTH__ /;"	d	line:102
+__INTPTR_MAX__	/tmp/libs_expanded.h	/^#define __INTPTR_MAX__ /;"	d	line:146
+__INTPTR_TYPE__	/tmp/libs_expanded.h	/^#define __INTPTR_TYPE__ /;"	d	line:74
+__INTPTR_WIDTH__	/tmp/libs_expanded.h	/^#define __INTPTR_WIDTH__ /;"	d	line:147
+__INT_FAST16_MAX__	/tmp/libs_expanded.h	/^#define __INT_FAST16_MAX__ /;"	d	line:136
+__INT_FAST16_TYPE__	/tmp/libs_expanded.h	/^#define __INT_FAST16_TYPE__ /;"	d	line:67
+__INT_FAST16_WIDTH__	/tmp/libs_expanded.h	/^#define __INT_FAST16_WIDTH__ /;"	d	line:137
+__INT_FAST32_MAX__	/tmp/libs_expanded.h	/^#define __INT_FAST32_MAX__ /;"	d	line:138
+__INT_FAST32_TYPE__	/tmp/libs_expanded.h	/^#define __INT_FAST32_TYPE__ /;"	d	line:68
+__INT_FAST32_WIDTH__	/tmp/libs_expanded.h	/^#define __INT_FAST32_WIDTH__ /;"	d	line:139
+__INT_FAST64_MAX__	/tmp/libs_expanded.h	/^#define __INT_FAST64_MAX__ /;"	d	line:140
+__INT_FAST64_TYPE__	/tmp/libs_expanded.h	/^#define __INT_FAST64_TYPE__ /;"	d	line:69
+__INT_FAST64_WIDTH__	/tmp/libs_expanded.h	/^#define __INT_FAST64_WIDTH__ /;"	d	line:141
+__INT_FAST8_MAX__	/tmp/libs_expanded.h	/^#define __INT_FAST8_MAX__ /;"	d	line:134
+__INT_FAST8_TYPE__	/tmp/libs_expanded.h	/^#define __INT_FAST8_TYPE__ /;"	d	line:66
+__INT_FAST8_WIDTH__	/tmp/libs_expanded.h	/^#define __INT_FAST8_WIDTH__ /;"	d	line:135
+__INT_LEAST16_MAX__	/tmp/libs_expanded.h	/^#define __INT_LEAST16_MAX__ /;"	d	line:117
+__INT_LEAST16_TYPE__	/tmp/libs_expanded.h	/^#define __INT_LEAST16_TYPE__ /;"	d	line:59
+__INT_LEAST16_WIDTH__	/tmp/libs_expanded.h	/^#define __INT_LEAST16_WIDTH__ /;"	d	line:119
+__INT_LEAST32_MAX__	/tmp/libs_expanded.h	/^#define __INT_LEAST32_MAX__ /;"	d	line:120
+__INT_LEAST32_TYPE__	/tmp/libs_expanded.h	/^#define __INT_LEAST32_TYPE__ /;"	d	line:60
+__INT_LEAST32_WIDTH__	/tmp/libs_expanded.h	/^#define __INT_LEAST32_WIDTH__ /;"	d	line:122
+__INT_LEAST64_MAX__	/tmp/libs_expanded.h	/^#define __INT_LEAST64_MAX__ /;"	d	line:123
+__INT_LEAST64_TYPE__	/tmp/libs_expanded.h	/^#define __INT_LEAST64_TYPE__ /;"	d	line:61
+__INT_LEAST64_WIDTH__	/tmp/libs_expanded.h	/^#define __INT_LEAST64_WIDTH__ /;"	d	line:125
+__INT_LEAST8_MAX__	/tmp/libs_expanded.h	/^#define __INT_LEAST8_MAX__ /;"	d	line:114
+__INT_LEAST8_TYPE__	/tmp/libs_expanded.h	/^#define __INT_LEAST8_TYPE__ /;"	d	line:58
+__INT_LEAST8_WIDTH__	/tmp/libs_expanded.h	/^#define __INT_LEAST8_WIDTH__ /;"	d	line:116
+__INT_MAX__	/tmp/libs_expanded.h	/^#define __INT_MAX__ /;"	d	line:79
+__INT_WIDTH__	/tmp/libs_expanded.h	/^#define __INT_WIDTH__ /;"	d	line:90
+__KERNEL_OLD_TIMEVAL_MATCHES_TIMEVAL64	/tmp/libs_expanded.h	/^#define __KERNEL_OLD_TIMEVAL_MATCHES_TIMEVAL64 /;"	d	line:709
+__KERNEL_STRICT_NAMES	/tmp/libs_expanded.h	/^#define __KERNEL_STRICT_NAMES /;"	d	line:435
+__KEY_T_TYPE	/tmp/libs_expanded.h	/^#define __KEY_T_TYPE /;"	d	line:698
+__LDBL_DECIMAL_DIG__	/tmp/libs_expanded.h	/^#define __LDBL_DECIMAL_DIG__ /;"	d	line:194
+__LDBL_DENORM_MIN__	/tmp/libs_expanded.h	/^#define __LDBL_DENORM_MIN__ /;"	d	line:199
+__LDBL_DIG__	/tmp/libs_expanded.h	/^#define __LDBL_DIG__ /;"	d	line:188
+__LDBL_EPSILON__	/tmp/libs_expanded.h	/^#define __LDBL_EPSILON__ /;"	d	line:198
+__LDBL_HAS_DENORM__	/tmp/libs_expanded.h	/^#define __LDBL_HAS_DENORM__ /;"	d	line:200
+__LDBL_HAS_INFINITY__	/tmp/libs_expanded.h	/^#define __LDBL_HAS_INFINITY__ /;"	d	line:201
+__LDBL_HAS_QUIET_NAN__	/tmp/libs_expanded.h	/^#define __LDBL_HAS_QUIET_NAN__ /;"	d	line:202
+__LDBL_IS_IEC_60559__	/tmp/libs_expanded.h	/^#define __LDBL_IS_IEC_60559__ /;"	d	line:203
+__LDBL_MANT_DIG__	/tmp/libs_expanded.h	/^#define __LDBL_MANT_DIG__ /;"	d	line:187
+__LDBL_MAX_10_EXP__	/tmp/libs_expanded.h	/^#define __LDBL_MAX_10_EXP__ /;"	d	line:192
+__LDBL_MAX_EXP__	/tmp/libs_expanded.h	/^#define __LDBL_MAX_EXP__ /;"	d	line:191
+__LDBL_MAX__	/tmp/libs_expanded.h	/^#define __LDBL_MAX__ /;"	d	line:195
+__LDBL_MIN_10_EXP__	/tmp/libs_expanded.h	/^#define __LDBL_MIN_10_EXP__ /;"	d	line:190
+__LDBL_MIN_EXP__	/tmp/libs_expanded.h	/^#define __LDBL_MIN_EXP__ /;"	d	line:189
+__LDBL_MIN__	/tmp/libs_expanded.h	/^#define __LDBL_MIN__ /;"	d	line:197
+__LDBL_NORM_MAX__	/tmp/libs_expanded.h	/^#define __LDBL_NORM_MAX__ /;"	d	line:196
+__LDBL_REDIR	/tmp/libs_expanded.h	/^#define __LDBL_REDIR(/;"	d	line:553	signature:(name,proto)
+__LDBL_REDIR1	/tmp/libs_expanded.h	/^#define __LDBL_REDIR1(/;"	d	line:552	signature:(name,proto,alias)
+__LDBL_REDIR1_NTH	/tmp/libs_expanded.h	/^#define __LDBL_REDIR1_NTH(/;"	d	line:554	signature:(name,proto,alias)
+__LDBL_REDIR2_DECL	/tmp/libs_expanded.h	/^#define __LDBL_REDIR2_DECL(/;"	d	line:556	signature:(name)
+__LDBL_REDIR_DECL	/tmp/libs_expanded.h	/^#define __LDBL_REDIR_DECL(/;"	d	line:557	signature:(name)
+__LDBL_REDIR_NTH	/tmp/libs_expanded.h	/^#define __LDBL_REDIR_NTH(/;"	d	line:555	signature:(name,proto)
+__LDOUBLE_REDIRECTS_TO_FLOAT128_ABI	/tmp/libs_expanded.h	/^#define __LDOUBLE_REDIRECTS_TO_FLOAT128_ABI /;"	d	line:551
+__LDOUBLE_REDIRECTS_TO_FLOAT128_ABI	/tmp/libs_expanded.h	/^#define __LDOUBLE_REDIRECTS_TO_FLOAT128_ABI /;"	d	line:950
+__LEAF	/tmp/libs_expanded.h	/^#define __LEAF /;"	d	line:487
+__LEAF_ATTR	/tmp/libs_expanded.h	/^#define __LEAF_ATTR /;"	d	line:488
+__LONG_LONG_MAX__	/tmp/libs_expanded.h	/^#define __LONG_LONG_MAX__ /;"	d	line:81
+__LONG_LONG_WIDTH__	/tmp/libs_expanded.h	/^#define __LONG_LONG_WIDTH__ /;"	d	line:92
+__LONG_MAX__	/tmp/libs_expanded.h	/^#define __LONG_MAX__ /;"	d	line:80
+__LONG_WIDTH__	/tmp/libs_expanded.h	/^#define __LONG_WIDTH__ /;"	d	line:91
+__LP64__	/tmp/libs_expanded.h	/^#define __LP64__ /;"	d	line:22
+__MMX_WITH_SSE__	/tmp/libs_expanded.h	/^#define __MMX_WITH_SSE__ /;"	d	line:384
+__MMX__	/tmp/libs_expanded.h	/^#define __MMX__ /;"	d	line:378
+__MODE_T_TYPE	/tmp/libs_expanded.h	/^#define __MODE_T_TYPE /;"	d	line:677
+__NLINK_T_TYPE	/tmp/libs_expanded.h	/^#define __NLINK_T_TYPE /;"	d	line:678
+__NO_INLINE__	/tmp/libs_expanded.h	/^#define __NO_INLINE__ /;"	d	line:340
+__NTH	/tmp/libs_expanded.h	/^#define __NTH(/;"	d	line:491	signature:(fct)
+__NTHNL	/tmp/libs_expanded.h	/^#define __NTHNL(/;"	d	line:492	signature:(fct)
+__OFF64_T_TYPE	/tmp/libs_expanded.h	/^#define __OFF64_T_TYPE /;"	d	line:681
+__OFF_T_MATCHES_OFF64_T	/tmp/libs_expanded.h	/^#define __OFF_T_MATCHES_OFF64_T /;"	d	line:705
+__OFF_T_TYPE	/tmp/libs_expanded.h	/^#define __OFF_T_TYPE /;"	d	line:680
+__ORDER_BIG_ENDIAN__	/tmp/libs_expanded.h	/^#define __ORDER_BIG_ENDIAN__ /;"	d	line:34
+__ORDER_LITTLE_ENDIAN__	/tmp/libs_expanded.h	/^#define __ORDER_LITTLE_ENDIAN__ /;"	d	line:33
+__ORDER_PDP_ENDIAN__	/tmp/libs_expanded.h	/^#define __ORDER_PDP_ENDIAN__ /;"	d	line:35
+__P	/tmp/libs_expanded.h	/^#define __P(/;"	d	line:494	signature:(args)
+__PIC__	/tmp/libs_expanded.h	/^#define __PIC__ /;"	d	line:17
+__PID_T_TYPE	/tmp/libs_expanded.h	/^#define __PID_T_TYPE /;"	d	line:682
+__PIE__	/tmp/libs_expanded.h	/^#define __PIE__ /;"	d	line:19
+__PMT	/tmp/libs_expanded.h	/^#define __PMT(/;"	d	line:495	signature:(args)
+__PRAGMA_REDEFINE_EXTNAME	/tmp/libs_expanded.h	/^#define __PRAGMA_REDEFINE_EXTNAME /;"	d	line:360
+__PTRDIFF_MAX__	/tmp/libs_expanded.h	/^#define __PTRDIFF_MAX__ /;"	d	line:86
+__PTRDIFF_TYPE__	/tmp/libs_expanded.h	/^#define __PTRDIFF_TYPE__ /;"	d	line:42
+__PTRDIFF_WIDTH__	/tmp/libs_expanded.h	/^#define __PTRDIFF_WIDTH__ /;"	d	line:95
+__REDIRECT	/tmp/libs_expanded.h	/^#define __REDIRECT(/;"	d	line:510	signature:(name,proto,alias)
+__REDIRECT_FORTIFY	/tmp/libs_expanded.h	/^#define __REDIRECT_FORTIFY /;"	d	line:515
+__REDIRECT_FORTIFY_NTH	/tmp/libs_expanded.h	/^#define __REDIRECT_FORTIFY_NTH /;"	d	line:516
+__REDIRECT_LDBL	/tmp/libs_expanded.h	/^#define __REDIRECT_LDBL(/;"	d	line:558	signature:(name,proto,alias)
+__REDIRECT_NTH	/tmp/libs_expanded.h	/^#define __REDIRECT_NTH(/;"	d	line:511	signature:(name,proto,alias)
+__REDIRECT_NTHNL	/tmp/libs_expanded.h	/^#define __REDIRECT_NTHNL(/;"	d	line:512	signature:(name,proto,alias)
+__REDIRECT_NTH_LDBL	/tmp/libs_expanded.h	/^#define __REDIRECT_NTH_LDBL(/;"	d	line:559	signature:(name,proto,alias)
+__REGISTER_PREFIX__	/tmp/libs_expanded.h	/^#define __REGISTER_PREFIX__ /;"	d	line:337
+__RLIM64_T_TYPE	/tmp/libs_expanded.h	/^#define __RLIM64_T_TYPE /;"	d	line:684
+__RLIM_T_MATCHES_RLIM64_T	/tmp/libs_expanded.h	/^#define __RLIM_T_MATCHES_RLIM64_T /;"	d	line:707
+__RLIM_T_TYPE	/tmp/libs_expanded.h	/^#define __RLIM_T_TYPE /;"	d	line:683
+__S16_TYPE	/tmp/libs_expanded.h	/^#define __S16_TYPE /;"	d	line:654
+__S32_TYPE	/tmp/libs_expanded.h	/^#define __S32_TYPE /;"	d	line:656
+__S64_TYPE	/tmp/libs_expanded.h	/^#define __S64_TYPE /;"	d	line:666
+__SCHAR_MAX__	/tmp/libs_expanded.h	/^#define __SCHAR_MAX__ /;"	d	line:77
+__SCHAR_WIDTH__	/tmp/libs_expanded.h	/^#define __SCHAR_WIDTH__ /;"	d	line:88
+__SEG_FS	/tmp/libs_expanded.h	/^#define __SEG_FS /;"	d	line:385
+__SEG_GS	/tmp/libs_expanded.h	/^#define __SEG_GS /;"	d	line:386
+__SHRT_MAX__	/tmp/libs_expanded.h	/^#define __SHRT_MAX__ /;"	d	line:78
+__SHRT_WIDTH__	/tmp/libs_expanded.h	/^#define __SHRT_WIDTH__ /;"	d	line:89
+__SIG_ATOMIC_MAX__	/tmp/libs_expanded.h	/^#define __SIG_ATOMIC_MAX__ /;"	d	line:103
+__SIG_ATOMIC_MIN__	/tmp/libs_expanded.h	/^#define __SIG_ATOMIC_MIN__ /;"	d	line:104
+__SIG_ATOMIC_TYPE__	/tmp/libs_expanded.h	/^#define __SIG_ATOMIC_TYPE__ /;"	d	line:49
+__SIG_ATOMIC_WIDTH__	/tmp/libs_expanded.h	/^#define __SIG_ATOMIC_WIDTH__ /;"	d	line:105
+__SIZEOF_DOUBLE__	/tmp/libs_expanded.h	/^#define __SIZEOF_DOUBLE__ /;"	d	line:28
+__SIZEOF_FLOAT128__	/tmp/libs_expanded.h	/^#define __SIZEOF_FLOAT128__ /;"	d	line:371
+__SIZEOF_FLOAT80__	/tmp/libs_expanded.h	/^#define __SIZEOF_FLOAT80__ /;"	d	line:370
+__SIZEOF_FLOAT__	/tmp/libs_expanded.h	/^#define __SIZEOF_FLOAT__ /;"	d	line:27
+__SIZEOF_INT128__	/tmp/libs_expanded.h	/^#define __SIZEOF_INT128__ /;"	d	line:362
+__SIZEOF_INT__	/tmp/libs_expanded.h	/^#define __SIZEOF_INT__ /;"	d	line:23
+__SIZEOF_LONG_DOUBLE__	/tmp/libs_expanded.h	/^#define __SIZEOF_LONG_DOUBLE__ /;"	d	line:29
+__SIZEOF_LONG_LONG__	/tmp/libs_expanded.h	/^#define __SIZEOF_LONG_LONG__ /;"	d	line:25
+__SIZEOF_LONG__	/tmp/libs_expanded.h	/^#define __SIZEOF_LONG__ /;"	d	line:24
+__SIZEOF_POINTER__	/tmp/libs_expanded.h	/^#define __SIZEOF_POINTER__ /;"	d	line:38
+__SIZEOF_PTRDIFF_T__	/tmp/libs_expanded.h	/^#define __SIZEOF_PTRDIFF_T__ /;"	d	line:365
+__SIZEOF_SHORT__	/tmp/libs_expanded.h	/^#define __SIZEOF_SHORT__ /;"	d	line:26
+__SIZEOF_SIZE_T__	/tmp/libs_expanded.h	/^#define __SIZEOF_SIZE_T__ /;"	d	line:30
+__SIZEOF_WCHAR_T__	/tmp/libs_expanded.h	/^#define __SIZEOF_WCHAR_T__ /;"	d	line:363
+__SIZEOF_WINT_T__	/tmp/libs_expanded.h	/^#define __SIZEOF_WINT_T__ /;"	d	line:364
+__SIZE_MAX__	/tmp/libs_expanded.h	/^#define __SIZE_MAX__ /;"	d	line:87
+__SIZE_T	/tmp/libs_expanded.h	/^#define __SIZE_T /;"	d	line:601
+__SIZE_TYPE__	/tmp/libs_expanded.h	/^#define __SIZE_TYPE__ /;"	d	line:41
+__SIZE_T__	/tmp/libs_expanded.h	/^#define __SIZE_T__ /;"	d	line:596
+__SIZE_WIDTH__	/tmp/libs_expanded.h	/^#define __SIZE_WIDTH__ /;"	d	line:96
+__SLONG32_TYPE	/tmp/libs_expanded.h	/^#define __SLONG32_TYPE /;"	d	line:664
+__SLONGWORD_TYPE	/tmp/libs_expanded.h	/^#define __SLONGWORD_TYPE /;"	d	line:658
+__SQUAD_TYPE	/tmp/libs_expanded.h	/^#define __SQUAD_TYPE /;"	d	line:660
+__SSE2_MATH__	/tmp/libs_expanded.h	/^#define __SSE2_MATH__ /;"	d	line:383
+__SSE2__	/tmp/libs_expanded.h	/^#define __SSE2__ /;"	d	line:380
+__SSE_MATH__	/tmp/libs_expanded.h	/^#define __SSE_MATH__ /;"	d	line:382
+__SSE__	/tmp/libs_expanded.h	/^#define __SSE__ /;"	d	line:379
+__SSIZE_T_TYPE	/tmp/libs_expanded.h	/^#define __SSIZE_T_TYPE /;"	d	line:703
+__SSP_STRONG__	/tmp/libs_expanded.h	/^#define __SSP_STRONG__ /;"	d	line:361
+__STATFS_MATCHES_STATFS64	/tmp/libs_expanded.h	/^#define __STATFS_MATCHES_STATFS64 /;"	d	line:708
+__STDC_HOSTED__	/tmp/libs_expanded.h	/^#define __STDC_HOSTED__ /;"	d	line:5
+__STDC_IEC_559_COMPLEX__	/tmp/libs_expanded.h	/^#define __STDC_IEC_559_COMPLEX__ /;"	d	line:400
+__STDC_IEC_559__	/tmp/libs_expanded.h	/^#define __STDC_IEC_559__ /;"	d	line:398
+__STDC_IEC_60559_BFP__	/tmp/libs_expanded.h	/^#define __STDC_IEC_60559_BFP__ /;"	d	line:399
+__STDC_IEC_60559_COMPLEX__	/tmp/libs_expanded.h	/^#define __STDC_IEC_60559_COMPLEX__ /;"	d	line:401
+__STDC_ISO_10646__	/tmp/libs_expanded.h	/^#define __STDC_ISO_10646__ /;"	d	line:402
+__STDC_UTF_16__	/tmp/libs_expanded.h	/^#define __STDC_UTF_16__ /;"	d	line:3
+__STDC_UTF_32__	/tmp/libs_expanded.h	/^#define __STDC_UTF_32__ /;"	d	line:4
+__STDC_VERSION__	/tmp/libs_expanded.h	/^#define __STDC_VERSION__ /;"	d	line:2
+__STDC__	/tmp/libs_expanded.h	/^#define __STDC__ /;"	d	line:1
+__STD_TYPE	/tmp/libs_expanded.h	/^#define __STD_TYPE /;"	d	line:668
+__STRING	/tmp/libs_expanded.h	/^#define __STRING(/;"	d	line:497	signature:(x)
+__SUSECONDS64_T_TYPE	/tmp/libs_expanded.h	/^#define __SUSECONDS64_T_TYPE /;"	d	line:696
+__SUSECONDS_T_TYPE	/tmp/libs_expanded.h	/^#define __SUSECONDS_T_TYPE /;"	d	line:695
+__SWORD_TYPE	/tmp/libs_expanded.h	/^#define __SWORD_TYPE /;"	d	line:662
+__SYSCALL_SLONG_TYPE	/tmp/libs_expanded.h	/^#define __SYSCALL_SLONG_TYPE /;"	d	line:670
+__SYSCALL_ULONG_TYPE	/tmp/libs_expanded.h	/^#define __SYSCALL_ULONG_TYPE /;"	d	line:671
+__SYSCALL_WORDSIZE	/tmp/libs_expanded.h	/^#define __SYSCALL_WORDSIZE /;"	d	line:464
+__SYSCALL_WORDSIZE	/tmp/libs_expanded.h	/^#define __SYSCALL_WORDSIZE /;"	d	line:467
+__SYSCALL_WORDSIZE	/tmp/libs_expanded.h	/^#define __SYSCALL_WORDSIZE /;"	d	line:550
+__SYSCALL_WORDSIZE	/tmp/libs_expanded.h	/^#define __SYSCALL_WORDSIZE /;"	d	line:625
+__SYSCALL_WORDSIZE	/tmp/libs_expanded.h	/^#define __SYSCALL_WORDSIZE /;"	d	line:628
+__THROW	/tmp/libs_expanded.h	/^#define __THROW /;"	d	line:489
+__THROWNL	/tmp/libs_expanded.h	/^#define __THROWNL /;"	d	line:490
+__TIME64_T_TYPE	/tmp/libs_expanded.h	/^#define __TIME64_T_TYPE /;"	d	line:712
+__TIMER_T_TYPE	/tmp/libs_expanded.h	/^#define __TIMER_T_TYPE /;"	d	line:700
+__TIMESIZE	/tmp/libs_expanded.h	/^#define __TIMESIZE /;"	d	line:468
+__TIMESIZE	/tmp/libs_expanded.h	/^#define __TIMESIZE /;"	d	line:629
+__TIME_T_TYPE	/tmp/libs_expanded.h	/^#define __TIME_T_TYPE /;"	d	line:693
+__U16_TYPE	/tmp/libs_expanded.h	/^#define __U16_TYPE /;"	d	line:655
+__U32_TYPE	/tmp/libs_expanded.h	/^#define __U32_TYPE /;"	d	line:657
+__U64_TYPE	/tmp/libs_expanded.h	/^#define __U64_TYPE /;"	d	line:667
+__UID_T_TYPE	/tmp/libs_expanded.h	/^#define __UID_T_TYPE /;"	d	line:673
+__UINT16_C	/tmp/libs_expanded.h	/^#define __UINT16_C(/;"	d	line:129	signature:(c)
+__UINT16_MAX__	/tmp/libs_expanded.h	/^#define __UINT16_MAX__ /;"	d	line:111
+__UINT16_TYPE__	/tmp/libs_expanded.h	/^#define __UINT16_TYPE__ /;"	d	line:55
+__UINT32_C	/tmp/libs_expanded.h	/^#define __UINT32_C(/;"	d	line:131	signature:(c)
+__UINT32_MAX__	/tmp/libs_expanded.h	/^#define __UINT32_MAX__ /;"	d	line:112
+__UINT32_TYPE__	/tmp/libs_expanded.h	/^#define __UINT32_TYPE__ /;"	d	line:56
+__UINT64_C	/tmp/libs_expanded.h	/^#define __UINT64_C(/;"	d	line:133	signature:(c)
+__UINT64_MAX__	/tmp/libs_expanded.h	/^#define __UINT64_MAX__ /;"	d	line:113
+__UINT64_TYPE__	/tmp/libs_expanded.h	/^#define __UINT64_TYPE__ /;"	d	line:57
+__UINT8_C	/tmp/libs_expanded.h	/^#define __UINT8_C(/;"	d	line:127	signature:(c)
+__UINT8_MAX__	/tmp/libs_expanded.h	/^#define __UINT8_MAX__ /;"	d	line:110
+__UINT8_TYPE__	/tmp/libs_expanded.h	/^#define __UINT8_TYPE__ /;"	d	line:54
+__UINTMAX_C	/tmp/libs_expanded.h	/^#define __UINTMAX_C(/;"	d	line:101	signature:(c)
+__UINTMAX_MAX__	/tmp/libs_expanded.h	/^#define __UINTMAX_MAX__ /;"	d	line:100
+__UINTMAX_TYPE__	/tmp/libs_expanded.h	/^#define __UINTMAX_TYPE__ /;"	d	line:46
+__UINTPTR_MAX__	/tmp/libs_expanded.h	/^#define __UINTPTR_MAX__ /;"	d	line:148
+__UINTPTR_TYPE__	/tmp/libs_expanded.h	/^#define __UINTPTR_TYPE__ /;"	d	line:75
+__UINT_FAST16_MAX__	/tmp/libs_expanded.h	/^#define __UINT_FAST16_MAX__ /;"	d	line:143
+__UINT_FAST16_TYPE__	/tmp/libs_expanded.h	/^#define __UINT_FAST16_TYPE__ /;"	d	line:71
+__UINT_FAST32_MAX__	/tmp/libs_expanded.h	/^#define __UINT_FAST32_MAX__ /;"	d	line:144
+__UINT_FAST32_TYPE__	/tmp/libs_expanded.h	/^#define __UINT_FAST32_TYPE__ /;"	d	line:72
+__UINT_FAST64_MAX__	/tmp/libs_expanded.h	/^#define __UINT_FAST64_MAX__ /;"	d	line:145
+__UINT_FAST64_TYPE__	/tmp/libs_expanded.h	/^#define __UINT_FAST64_TYPE__ /;"	d	line:73
+__UINT_FAST8_MAX__	/tmp/libs_expanded.h	/^#define __UINT_FAST8_MAX__ /;"	d	line:142
+__UINT_FAST8_TYPE__	/tmp/libs_expanded.h	/^#define __UINT_FAST8_TYPE__ /;"	d	line:70
+__UINT_LEAST16_MAX__	/tmp/libs_expanded.h	/^#define __UINT_LEAST16_MAX__ /;"	d	line:128
+__UINT_LEAST16_TYPE__	/tmp/libs_expanded.h	/^#define __UINT_LEAST16_TYPE__ /;"	d	line:63
+__UINT_LEAST32_MAX__	/tmp/libs_expanded.h	/^#define __UINT_LEAST32_MAX__ /;"	d	line:130
+__UINT_LEAST32_TYPE__	/tmp/libs_expanded.h	/^#define __UINT_LEAST32_TYPE__ /;"	d	line:64
+__UINT_LEAST64_MAX__	/tmp/libs_expanded.h	/^#define __UINT_LEAST64_MAX__ /;"	d	line:132
+__UINT_LEAST64_TYPE__	/tmp/libs_expanded.h	/^#define __UINT_LEAST64_TYPE__ /;"	d	line:65
+__UINT_LEAST8_MAX__	/tmp/libs_expanded.h	/^#define __UINT_LEAST8_MAX__ /;"	d	line:126
+__UINT_LEAST8_TYPE__	/tmp/libs_expanded.h	/^#define __UINT_LEAST8_TYPE__ /;"	d	line:62
+__ULONG32_TYPE	/tmp/libs_expanded.h	/^#define __ULONG32_TYPE /;"	d	line:665
+__ULONGWORD_TYPE	/tmp/libs_expanded.h	/^#define __ULONGWORD_TYPE /;"	d	line:659
+__UQUAD_TYPE	/tmp/libs_expanded.h	/^#define __UQUAD_TYPE /;"	d	line:661
+__USECONDS_T_TYPE	/tmp/libs_expanded.h	/^#define __USECONDS_T_TYPE /;"	d	line:694
+__USER_LABEL_PREFIX__	/tmp/libs_expanded.h	/^#define __USER_LABEL_PREFIX__ /;"	d	line:338
+__USE_ATFILE	/tmp/libs_expanded.h	/^#define __USE_ATFILE /;"	d	line:471
+__USE_FORTIFY_LEVEL	/tmp/libs_expanded.h	/^#define __USE_FORTIFY_LEVEL /;"	d	line:472
+__USE_ISOC11	/tmp/libs_expanded.h	/^#define __USE_ISOC11 /;"	d	line:442
+__USE_ISOC95	/tmp/libs_expanded.h	/^#define __USE_ISOC95 /;"	d	line:444
+__USE_ISOC95	/tmp/libs_expanded.h	/^#define __USE_ISOC95 /;"	d	line:456
+__USE_ISOC99	/tmp/libs_expanded.h	/^#define __USE_ISOC99 /;"	d	line:443
+__USE_ISOC99	/tmp/libs_expanded.h	/^#define __USE_ISOC99 /;"	d	line:458
+__USE_MISC	/tmp/libs_expanded.h	/^#define __USE_MISC /;"	d	line:470
+__USE_POSIX	/tmp/libs_expanded.h	/^#define __USE_POSIX /;"	d	line:450
+__USE_POSIX199309	/tmp/libs_expanded.h	/^#define __USE_POSIX199309 /;"	d	line:452
+__USE_POSIX199506	/tmp/libs_expanded.h	/^#define __USE_POSIX199506 /;"	d	line:453
+__USE_POSIX2	/tmp/libs_expanded.h	/^#define __USE_POSIX2 /;"	d	line:451
+__USE_POSIX_IMPLICITLY	/tmp/libs_expanded.h	/^#define __USE_POSIX_IMPLICITLY /;"	d	line:445
+__USE_TIME_BITS64	/tmp/libs_expanded.h	/^#define __USE_TIME_BITS64 /;"	d	line:469
+__USE_XOPEN2K	/tmp/libs_expanded.h	/^#define __USE_XOPEN2K /;"	d	line:454
+__USE_XOPEN2K8	/tmp/libs_expanded.h	/^#define __USE_XOPEN2K8 /;"	d	line:459
+__UWORD_TYPE	/tmp/libs_expanded.h	/^#define __UWORD_TYPE /;"	d	line:663
+__VERSION__	/tmp/libs_expanded.h	/^#define __VERSION__ /;"	d	line:9
+__WCHAR_MAX__	/tmp/libs_expanded.h	/^#define __WCHAR_MAX__ /;"	d	line:82
+__WCHAR_MIN__	/tmp/libs_expanded.h	/^#define __WCHAR_MIN__ /;"	d	line:83
+__WCHAR_TYPE__	/tmp/libs_expanded.h	/^#define __WCHAR_TYPE__ /;"	d	line:43
+__WCHAR_WIDTH__	/tmp/libs_expanded.h	/^#define __WCHAR_WIDTH__ /;"	d	line:93
+__WINT_MAX__	/tmp/libs_expanded.h	/^#define __WINT_MAX__ /;"	d	line:84
+__WINT_MIN__	/tmp/libs_expanded.h	/^#define __WINT_MIN__ /;"	d	line:85
+__WINT_TYPE__	/tmp/libs_expanded.h	/^#define __WINT_TYPE__ /;"	d	line:44
+__WINT_WIDTH__	/tmp/libs_expanded.h	/^#define __WINT_WIDTH__ /;"	d	line:94
+__WORDSIZE	/tmp/libs_expanded.h	/^#define __WORDSIZE /;"	d	line:462
+__WORDSIZE	/tmp/libs_expanded.h	/^#define __WORDSIZE /;"	d	line:465
+__WORDSIZE	/tmp/libs_expanded.h	/^#define __WORDSIZE /;"	d	line:548
+__WORDSIZE	/tmp/libs_expanded.h	/^#define __WORDSIZE /;"	d	line:623
+__WORDSIZE	/tmp/libs_expanded.h	/^#define __WORDSIZE /;"	d	line:626
+__WORDSIZE_TIME64_COMPAT32	/tmp/libs_expanded.h	/^#define __WORDSIZE_TIME64_COMPAT32 /;"	d	line:463
+__WORDSIZE_TIME64_COMPAT32	/tmp/libs_expanded.h	/^#define __WORDSIZE_TIME64_COMPAT32 /;"	d	line:466
+__WORDSIZE_TIME64_COMPAT32	/tmp/libs_expanded.h	/^#define __WORDSIZE_TIME64_COMPAT32 /;"	d	line:549
+__WORDSIZE_TIME64_COMPAT32	/tmp/libs_expanded.h	/^#define __WORDSIZE_TIME64_COMPAT32 /;"	d	line:624
+__WORDSIZE_TIME64_COMPAT32	/tmp/libs_expanded.h	/^#define __WORDSIZE_TIME64_COMPAT32 /;"	d	line:627
+____FILE_defined	/tmp/libs_expanded.h	/^#define ____FILE_defined /;"	d	line:775
+_____fpos64_t_defined	/tmp/libs_expanded.h	/^#define _____fpos64_t_defined /;"	d	line:769
+_____fpos_t_defined	/tmp/libs_expanded.h	/^#define _____fpos_t_defined /;"	d	line:753
+____mbstate_t_defined	/tmp/libs_expanded.h	/^#define ____mbstate_t_defined /;"	d	line:754
+___int_size_t_h	/tmp/libs_expanded.h	/^#define ___int_size_t_h /;"	d	line:609
+__always_inline	/tmp/libs_expanded.h	/^#define __always_inline /;"	d	line:535
+__amd64	/tmp/libs_expanded.h	/^#define __amd64 /;"	d	line:366
+__amd64__	/tmp/libs_expanded.h	/^#define __amd64__ /;"	d	line:367
+__anonef0cf4bc0108	/tmp/libs_expanded.h	/^typedef struct { int __val[2]; } __fsid_t;$/;"	s	line:723
+__anonef0cf4bc0208	/tmp/libs_expanded.h	/^{$/;"	s	line:756
+__anonef0cf4bc030a	/tmp/libs_expanded.h	/^  {$/;"	u	line:759	struct:__anonef0cf4bc0208
+__asprintf	/tmp/libs_expanded.h	/^extern int __asprintf (char **__restrict __ptr,$/;"	p	line:926	typeref:typename:int	signature:(char ** __restrict __ptr,const char * __restrict __fmt,...)
+__attr_access	/tmp/libs_expanded.h	/^#define __attr_access(/;"	d	line:563	signature:(x)
+__attr_access_none	/tmp/libs_expanded.h	/^#define __attr_access_none(/;"	d	line:565	signature:(argno)
+__attr_dealloc	/tmp/libs_expanded.h	/^#define __attr_dealloc(/;"	d	line:566	signature:(dealloc,argno)
+__attr_dealloc_fclose	/tmp/libs_expanded.h	/^#define __attr_dealloc_fclose /;"	d	line:875
+__attr_dealloc_free	/tmp/libs_expanded.h	/^#define __attr_dealloc_free /;"	d	line:567
+__attribute_alloc_align__	/tmp/libs_expanded.h	/^#define __attribute_alloc_align__(/;"	d	line:519	signature:(param)
+__attribute_alloc_size__	/tmp/libs_expanded.h	/^#define __attribute_alloc_size__(/;"	d	line:518	signature:(params)
+__attribute_artificial__	/tmp/libs_expanded.h	/^#define __attribute_artificial__ /;"	d	line:536
+__attribute_const__	/tmp/libs_expanded.h	/^#define __attribute_const__ /;"	d	line:521
+__attribute_copy__	/tmp/libs_expanded.h	/^#define __attribute_copy__(/;"	d	line:547	signature:(arg)
+__attribute_deprecated__	/tmp/libs_expanded.h	/^#define __attribute_deprecated__ /;"	d	line:525
+__attribute_deprecated_msg__	/tmp/libs_expanded.h	/^#define __attribute_deprecated_msg__(/;"	d	line:526	signature:(msg)
+__attribute_format_arg__	/tmp/libs_expanded.h	/^#define __attribute_format_arg__(/;"	d	line:527	signature:(x)
+__attribute_format_strfmon__	/tmp/libs_expanded.h	/^#define __attribute_format_strfmon__(/;"	d	line:528	signature:(a,b)
+__attribute_malloc__	/tmp/libs_expanded.h	/^#define __attribute_malloc__ /;"	d	line:517
+__attribute_maybe_unused__	/tmp/libs_expanded.h	/^#define __attribute_maybe_unused__ /;"	d	line:522
+__attribute_noinline__	/tmp/libs_expanded.h	/^#define __attribute_noinline__ /;"	d	line:524
+__attribute_nonnull__	/tmp/libs_expanded.h	/^#define __attribute_nonnull__(/;"	d	line:529	signature:(params)
+__attribute_nonstring__	/tmp/libs_expanded.h	/^#define __attribute_nonstring__ /;"	d	line:545
+__attribute_overloadable__	/tmp/libs_expanded.h	/^#define __attribute_overloadable__ /;"	d	line:501
+__attribute_pure__	/tmp/libs_expanded.h	/^#define __attribute_pure__ /;"	d	line:520
+__attribute_returns_twice__	/tmp/libs_expanded.h	/^#define __attribute_returns_twice__ /;"	d	line:568
+__attribute_struct_may_alias__	/tmp/libs_expanded.h	/^#define __attribute_struct_may_alias__ /;"	d	line:569
+__attribute_used__	/tmp/libs_expanded.h	/^#define __attribute_used__ /;"	d	line:523
+__attribute_warn_unused_result__	/tmp/libs_expanded.h	/^#define __attribute_warn_unused_result__ /;"	d	line:532
+__blkcnt64_t	/tmp/libs_expanded.h	/^typedef long int __blkcnt64_t;$/;"	t	line:738	typeref:typename:long int
+__blkcnt_t	/tmp/libs_expanded.h	/^typedef long int __blkcnt_t;$/;"	t	line:737	typeref:typename:long int
+__blksize_t	/tmp/libs_expanded.h	/^typedef long int __blksize_t;$/;"	t	line:736	typeref:typename:long int
+__bos	/tmp/libs_expanded.h	/^#define __bos(/;"	d	line:502	signature:(ptr)
+__bos0	/tmp/libs_expanded.h	/^#define __bos0(/;"	d	line:503	signature:(ptr)
+__caddr_t	/tmp/libs_expanded.h	/^typedef char *__caddr_t;$/;"	t	line:748	typeref:typename:char *
+__clock_t	/tmp/libs_expanded.h	/^typedef long int __clock_t;$/;"	t	line:724	typeref:typename:long int
+__clockid_t	/tmp/libs_expanded.h	/^typedef int __clockid_t;$/;"	t	line:734	typeref:typename:int
+__code_model_small__	/tmp/libs_expanded.h	/^#define __code_model_small__ /;"	d	line:377
+__cookie_io_functions_t_defined	/tmp/libs_expanded.h	/^#define __cookie_io_functions_t_defined /;"	d	line:826
+__count	/tmp/libs_expanded.h	/^  int __count;$/;"	m	line:757	struct:__anonef0cf4bc0208	typeref:typename:int
+__daddr_t	/tmp/libs_expanded.h	/^typedef int __daddr_t;$/;"	t	line:732	typeref:typename:int
+__dev_t	/tmp/libs_expanded.h	/^typedef unsigned long int __dev_t;$/;"	t	line:713	typeref:typename:unsigned long int
+__errordecl	/tmp/libs_expanded.h	/^#define __errordecl(/;"	d	line:507	signature:(name,msg)
+__extern_always_inline	/tmp/libs_expanded.h	/^#define __extern_always_inline /;"	d	line:538
+__extern_inline	/tmp/libs_expanded.h	/^#define __extern_inline /;"	d	line:537
+__f128	/tmp/libs_expanded.h	/^#define __f128(/;"	d	line:947	signature:(x)
+__f32	/tmp/libs_expanded.h	/^#define __f32(/;"	d	line:964	signature:(x)
+__f32x	/tmp/libs_expanded.h	/^#define __f32x(/;"	d	line:966	signature:(x)
+__f64	/tmp/libs_expanded.h	/^#define __f64(/;"	d	line:965	signature:(x)
+__f64x	/tmp/libs_expanded.h	/^#define __f64x(/;"	d	line:967	signature:(x)
+__feof_unlocked_body	/tmp/libs_expanded.h	/^#define __feof_unlocked_body(/;"	d	line:822	signature:(_fp)
+__ferror_unlocked_body	/tmp/libs_expanded.h	/^#define __ferror_unlocked_body(/;"	d	line:824	signature:(_fp)
+__flexarr	/tmp/libs_expanded.h	/^#define __flexarr /;"	d	line:508
+__fortified_attr_access	/tmp/libs_expanded.h	/^#define __fortified_attr_access(/;"	d	line:564	signature:(a,o,s)
+__fortify_function	/tmp/libs_expanded.h	/^#define __fortify_function /;"	d	line:539
+__fpos64_t	/tmp/libs_expanded.h	/^} __fpos64_t;$/;"	t	line:774	typeref:struct:_G_fpos64_t
+__fpos_t	/tmp/libs_expanded.h	/^} __fpos_t;$/;"	t	line:768	typeref:struct:_G_fpos_t
+__fsblkcnt64_t	/tmp/libs_expanded.h	/^typedef unsigned long int __fsblkcnt64_t;$/;"	t	line:740	typeref:typename:unsigned long int
+__fsblkcnt_t	/tmp/libs_expanded.h	/^typedef unsigned long int __fsblkcnt_t;$/;"	t	line:739	typeref:typename:unsigned long int
+__fsfilcnt64_t	/tmp/libs_expanded.h	/^typedef unsigned long int __fsfilcnt64_t;$/;"	t	line:742	typeref:typename:unsigned long int
+__fsfilcnt_t	/tmp/libs_expanded.h	/^typedef unsigned long int __fsfilcnt_t;$/;"	t	line:741	typeref:typename:unsigned long int
+__fsid_t	/tmp/libs_expanded.h	/^typedef struct { int __val[2]; } __fsid_t;$/;"	t	line:723	typeref:struct:__anonef0cf4bc0108
+__fsword_t	/tmp/libs_expanded.h	/^typedef long int __fsword_t;$/;"	t	line:743	typeref:typename:long int
+__getc_unlocked_body	/tmp/libs_expanded.h	/^#define __getc_unlocked_body(/;"	d	line:819	signature:(_fp)
+__getdelim	/tmp/libs_expanded.h	/^extern __ssize_t __getdelim (char **__restrict __lineptr,$/;"	p	line:1005	typeref:typename:__ssize_t	signature:(char ** __restrict __lineptr,size_t * __restrict __n,int __delimiter,FILE * __restrict __stream)
+__gid_t	/tmp/libs_expanded.h	/^typedef unsigned int __gid_t;$/;"	t	line:715	typeref:typename:unsigned int
+__glibc_c99_flexarr_available	/tmp/libs_expanded.h	/^#define __glibc_c99_flexarr_available /;"	d	line:509
+__glibc_clang_prereq	/tmp/libs_expanded.h	/^#define __glibc_clang_prereq(/;"	d	line:437	signature:(maj,min)
+__glibc_has_attribute	/tmp/libs_expanded.h	/^#define __glibc_has_attribute(/;"	d	line:484	signature:(attr)
+__glibc_has_builtin	/tmp/libs_expanded.h	/^#define __glibc_has_builtin(/;"	d	line:485	signature:(name)
+__glibc_has_extension	/tmp/libs_expanded.h	/^#define __glibc_has_extension(/;"	d	line:486	signature:(ext)
+__glibc_likely	/tmp/libs_expanded.h	/^#define __glibc_likely(/;"	d	line:544	signature:(cond)
+__glibc_macro_warning	/tmp/libs_expanded.h	/^#define __glibc_macro_warning(/;"	d	line:561	signature:(message)
+__glibc_macro_warning1	/tmp/libs_expanded.h	/^#define __glibc_macro_warning1(/;"	d	line:560	signature:(message)
+__glibc_objsize	/tmp/libs_expanded.h	/^#define __glibc_objsize(/;"	d	line:505	signature:(__o)
+__glibc_objsize0	/tmp/libs_expanded.h	/^#define __glibc_objsize0(/;"	d	line:504	signature:(__o)
+__glibc_unlikely	/tmp/libs_expanded.h	/^#define __glibc_unlikely(/;"	d	line:543	signature:(cond)
+__gnu_linux__	/tmp/libs_expanded.h	/^#define __gnu_linux__ /;"	d	line:388
+__gnuc_va_list	/tmp/libs_expanded.h	/^typedef __builtin_va_list __gnuc_va_list;$/;"	t	line:621	typeref:typename:__builtin_va_list
+__id_t	/tmp/libs_expanded.h	/^typedef unsigned int __id_t;$/;"	t	line:727	typeref:typename:unsigned int
+__ino64_t	/tmp/libs_expanded.h	/^typedef unsigned long int __ino64_t;$/;"	t	line:717	typeref:typename:unsigned long int
+__ino_t	/tmp/libs_expanded.h	/^typedef unsigned long int __ino_t;$/;"	t	line:716	typeref:typename:unsigned long int
+__int16_t	/tmp/libs_expanded.h	/^typedef signed short int __int16_t;$/;"	t	line:636	typeref:typename:signed short int
+__int32_t	/tmp/libs_expanded.h	/^typedef signed int __int32_t;$/;"	t	line:638	typeref:typename:signed int
+__int64_t	/tmp/libs_expanded.h	/^typedef signed long int __int64_t;$/;"	t	line:640	typeref:typename:signed long int
+__int8_t	/tmp/libs_expanded.h	/^typedef signed char __int8_t;$/;"	t	line:634	typeref:typename:signed char
+__int_least16_t	/tmp/libs_expanded.h	/^typedef __int16_t __int_least16_t;$/;"	t	line:644	typeref:typename:__int16_t
+__int_least32_t	/tmp/libs_expanded.h	/^typedef __int32_t __int_least32_t;$/;"	t	line:646	typeref:typename:__int32_t
+__int_least64_t	/tmp/libs_expanded.h	/^typedef __int64_t __int_least64_t;$/;"	t	line:648	typeref:typename:__int64_t
+__int_least8_t	/tmp/libs_expanded.h	/^typedef __int8_t __int_least8_t;$/;"	t	line:642	typeref:typename:__int8_t
+__intmax_t	/tmp/libs_expanded.h	/^typedef long int __intmax_t;$/;"	t	line:652	typeref:typename:long int
+__intptr_t	/tmp/libs_expanded.h	/^typedef long int __intptr_t;$/;"	t	line:749	typeref:typename:long int
+__k8	/tmp/libs_expanded.h	/^#define __k8 /;"	d	line:375
+__k8__	/tmp/libs_expanded.h	/^#define __k8__ /;"	d	line:376
+__key_t	/tmp/libs_expanded.h	/^typedef int __key_t;$/;"	t	line:733	typeref:typename:int
+__linux	/tmp/libs_expanded.h	/^#define __linux /;"	d	line:389
+__linux__	/tmp/libs_expanded.h	/^#define __linux__ /;"	d	line:390
+__loff_t	/tmp/libs_expanded.h	/^typedef __off64_t __loff_t;$/;"	t	line:747	typeref:typename:__off64_t
+__mbstate_t	/tmp/libs_expanded.h	/^} __mbstate_t;$/;"	t	line:763	typeref:struct:__anonef0cf4bc0208
+__mode_t	/tmp/libs_expanded.h	/^typedef unsigned int __mode_t;$/;"	t	line:718	typeref:typename:unsigned int
+__need_NULL	/tmp/libs_expanded.h	/^#define __need_NULL /;"	d	line:594
+__need___va_list	/tmp/libs_expanded.h	/^#define __need___va_list /;"	d	line:618
+__need_size_t	/tmp/libs_expanded.h	/^#define __need_size_t /;"	d	line:593
+__nlink_t	/tmp/libs_expanded.h	/^typedef unsigned long int __nlink_t;$/;"	t	line:719	typeref:typename:unsigned long int
+__nonnull	/tmp/libs_expanded.h	/^#define __nonnull(/;"	d	line:530	signature:(params)
+__off64_t	/tmp/libs_expanded.h	/^typedef long int __off64_t;$/;"	t	line:721	typeref:typename:long int
+__off_t	/tmp/libs_expanded.h	/^typedef long int __off_t;$/;"	t	line:720	typeref:typename:long int
+__off_t_defined	/tmp/libs_expanded.h	/^#define __off_t_defined /;"	d	line:843
+__overflow	/tmp/libs_expanded.h	/^extern int __overflow (FILE *, int);$/;"	p	line:1057	typeref:typename:int	signature:(FILE *,int)
+__pic__	/tmp/libs_expanded.h	/^#define __pic__ /;"	d	line:16
+__pid_t	/tmp/libs_expanded.h	/^typedef int __pid_t;$/;"	t	line:722	typeref:typename:int
+__pie__	/tmp/libs_expanded.h	/^#define __pie__ /;"	d	line:18
+__pos	/tmp/libs_expanded.h	/^  __off64_t __pos;$/;"	m	line:772	struct:_G_fpos64_t	typeref:typename:__off64_t
+__pos	/tmp/libs_expanded.h	/^  __off_t __pos;$/;"	m	line:766	struct:_G_fpos_t	typeref:typename:__off_t
+__ptr_t	/tmp/libs_expanded.h	/^#define __ptr_t /;"	d	line:498
+__putc_unlocked_body	/tmp/libs_expanded.h	/^#define __putc_unlocked_body(/;"	d	line:820	signature:(_ch,_fp)
+__quad_t	/tmp/libs_expanded.h	/^typedef long int __quad_t;$/;"	t	line:650	typeref:typename:long int
+__restrict_arr	/tmp/libs_expanded.h	/^#define __restrict_arr /;"	d	line:542
+__returns_nonnull	/tmp/libs_expanded.h	/^#define __returns_nonnull /;"	d	line:531
+__rlim64_t	/tmp/libs_expanded.h	/^typedef unsigned long int __rlim64_t;$/;"	t	line:726	typeref:typename:unsigned long int
+__rlim_t	/tmp/libs_expanded.h	/^typedef unsigned long int __rlim_t;$/;"	t	line:725	typeref:typename:unsigned long int
+__sig_atomic_t	/tmp/libs_expanded.h	/^typedef int __sig_atomic_t;$/;"	t	line:751	typeref:typename:int
+__size_t	/tmp/libs_expanded.h	/^#define __size_t /;"	d	line:612
+__size_t__	/tmp/libs_expanded.h	/^#define __size_t__ /;"	d	line:595
+__socklen_t	/tmp/libs_expanded.h	/^typedef unsigned int __socklen_t;$/;"	t	line:750	typeref:typename:unsigned int
+__ssize_t	/tmp/libs_expanded.h	/^typedef long int __ssize_t;$/;"	t	line:744	typeref:typename:long int
+__ssize_t_defined	/tmp/libs_expanded.h	/^#define __ssize_t_defined /;"	d	line:845
+__state	/tmp/libs_expanded.h	/^  __mbstate_t __state;$/;"	m	line:767	struct:_G_fpos_t	typeref:typename:__mbstate_t
+__state	/tmp/libs_expanded.h	/^  __mbstate_t __state;$/;"	m	line:773	struct:_G_fpos64_t	typeref:typename:__mbstate_t
+__struct_FILE_defined	/tmp/libs_expanded.h	/^#define __struct_FILE_defined /;"	d	line:781
+__stub___compat_bdflush	/tmp/libs_expanded.h	/^#define __stub___compat_bdflush /;"	d	line:570
+__stub_chflags	/tmp/libs_expanded.h	/^#define __stub_chflags /;"	d	line:571
+__stub_fchflags	/tmp/libs_expanded.h	/^#define __stub_fchflags /;"	d	line:572
+__stub_gtty	/tmp/libs_expanded.h	/^#define __stub_gtty /;"	d	line:573
+__stub_revoke	/tmp/libs_expanded.h	/^#define __stub_revoke /;"	d	line:574
+__stub_setlogin	/tmp/libs_expanded.h	/^#define __stub_setlogin /;"	d	line:575
+__stub_sigreturn	/tmp/libs_expanded.h	/^#define __stub_sigreturn /;"	d	line:576
+__stub_stty	/tmp/libs_expanded.h	/^#define __stub_stty /;"	d	line:577
+__suseconds64_t	/tmp/libs_expanded.h	/^typedef long int __suseconds64_t;$/;"	t	line:731	typeref:typename:long int
+__suseconds_t	/tmp/libs_expanded.h	/^typedef long int __suseconds_t;$/;"	t	line:730	typeref:typename:long int
+__syscall_slong_t	/tmp/libs_expanded.h	/^typedef long int __syscall_slong_t;$/;"	t	line:745	typeref:typename:long int
+__syscall_ulong_t	/tmp/libs_expanded.h	/^typedef unsigned long int __syscall_ulong_t;$/;"	t	line:746	typeref:typename:unsigned long int
+__time_t	/tmp/libs_expanded.h	/^typedef long int __time_t;$/;"	t	line:728	typeref:typename:long int
+__timer_t	/tmp/libs_expanded.h	/^typedef void * __timer_t;$/;"	t	line:735	typeref:typename:void *
+__u_char	/tmp/libs_expanded.h	/^typedef unsigned char __u_char;$/;"	t	line:630	typeref:typename:unsigned char
+__u_int	/tmp/libs_expanded.h	/^typedef unsigned int __u_int;$/;"	t	line:632	typeref:typename:unsigned int
+__u_long	/tmp/libs_expanded.h	/^typedef unsigned long int __u_long;$/;"	t	line:633	typeref:typename:unsigned long int
+__u_quad_t	/tmp/libs_expanded.h	/^typedef unsigned long int __u_quad_t;$/;"	t	line:651	typeref:typename:unsigned long int
+__u_short	/tmp/libs_expanded.h	/^typedef unsigned short int __u_short;$/;"	t	line:631	typeref:typename:unsigned short int
+__uflow	/tmp/libs_expanded.h	/^extern int __uflow (FILE *);$/;"	p	line:1056	typeref:typename:int	signature:(FILE *)
+__uid_t	/tmp/libs_expanded.h	/^typedef unsigned int __uid_t;$/;"	t	line:714	typeref:typename:unsigned int
+__uint16_t	/tmp/libs_expanded.h	/^typedef unsigned short int __uint16_t;$/;"	t	line:637	typeref:typename:unsigned short int
+__uint32_t	/tmp/libs_expanded.h	/^typedef unsigned int __uint32_t;$/;"	t	line:639	typeref:typename:unsigned int
+__uint64_t	/tmp/libs_expanded.h	/^typedef unsigned long int __uint64_t;$/;"	t	line:641	typeref:typename:unsigned long int
+__uint8_t	/tmp/libs_expanded.h	/^typedef unsigned char __uint8_t;$/;"	t	line:635	typeref:typename:unsigned char
+__uint_least16_t	/tmp/libs_expanded.h	/^typedef __uint16_t __uint_least16_t;$/;"	t	line:645	typeref:typename:__uint16_t
+__uint_least32_t	/tmp/libs_expanded.h	/^typedef __uint32_t __uint_least32_t;$/;"	t	line:647	typeref:typename:__uint32_t
+__uint_least64_t	/tmp/libs_expanded.h	/^typedef __uint64_t __uint_least64_t;$/;"	t	line:649	typeref:typename:__uint64_t
+__uint_least8_t	/tmp/libs_expanded.h	/^typedef __uint8_t __uint_least8_t;$/;"	t	line:643	typeref:typename:__uint8_t
+__uintmax_t	/tmp/libs_expanded.h	/^typedef unsigned long int __uintmax_t;$/;"	t	line:653	typeref:typename:unsigned long int
+__unix	/tmp/libs_expanded.h	/^#define __unix /;"	d	line:392
+__unix__	/tmp/libs_expanded.h	/^#define __unix__ /;"	d	line:393
+__useconds_t	/tmp/libs_expanded.h	/^typedef unsigned int __useconds_t;$/;"	t	line:729	typeref:typename:unsigned int
+__va_arg_pack	/tmp/libs_expanded.h	/^#define __va_arg_pack(/;"	d	line:540	signature:()
+__va_arg_pack_len	/tmp/libs_expanded.h	/^#define __va_arg_pack_len(/;"	d	line:541	signature:()
+__val	/tmp/libs_expanded.h	/^typedef struct { int __val[2]; } __fsid_t;$/;"	m	line:723	struct:__anonef0cf4bc0108	typeref:typename:int[2]
+__value	/tmp/libs_expanded.h	/^  } __value;$/;"	m	line:762	struct:__anonef0cf4bc0208	typeref:union:__anonef0cf4bc0208::__anonef0cf4bc030a
+__warnattr	/tmp/libs_expanded.h	/^#define __warnattr(/;"	d	line:506	signature:(msg)
+__wch	/tmp/libs_expanded.h	/^    unsigned int __wch;$/;"	m	line:760	union:__anonef0cf4bc0208::__anonef0cf4bc030a	typeref:typename:unsigned int
+__wchb	/tmp/libs_expanded.h	/^    char __wchb[4];$/;"	m	line:761	union:__anonef0cf4bc0208::__anonef0cf4bc030a	typeref:typename:char[4]
+__wur	/tmp/libs_expanded.h	/^#define __wur /;"	d	line:533
+__x86_64	/tmp/libs_expanded.h	/^#define __x86_64 /;"	d	line:368
+__x86_64__	/tmp/libs_expanded.h	/^#define __x86_64__ /;"	d	line:369
+_chain	/tmp/libs_expanded.h	/^  struct _IO_FILE *_chain;$/;"	m	line:802	struct:_IO_FILE	typeref:struct:_IO_FILE *
+_codecvt	/tmp/libs_expanded.h	/^  struct _IO_codecvt *_codecvt;$/;"	m	line:811	struct:_IO_FILE	typeref:struct:_IO_codecvt *
+_cur_column	/tmp/libs_expanded.h	/^  unsigned short _cur_column;$/;"	m	line:806	struct:_IO_FILE	typeref:typename:unsigned short
+_fileno	/tmp/libs_expanded.h	/^  int _fileno;$/;"	m	line:803	struct:_IO_FILE	typeref:typename:int
+_flags	/tmp/libs_expanded.h	/^  int _flags;$/;"	m	line:789	struct:_IO_FILE	typeref:typename:int
+_flags2	/tmp/libs_expanded.h	/^  int _flags2;$/;"	m	line:804	struct:_IO_FILE	typeref:typename:int
+_freeres_buf	/tmp/libs_expanded.h	/^  void *_freeres_buf;$/;"	m	line:814	struct:_IO_FILE	typeref:typename:void *
+_freeres_list	/tmp/libs_expanded.h	/^  struct _IO_FILE *_freeres_list;$/;"	m	line:813	struct:_IO_FILE	typeref:struct:_IO_FILE *
+_lock	/tmp/libs_expanded.h	/^  _IO_lock_t *_lock;$/;"	m	line:809	struct:_IO_FILE	typeref:typename:_IO_lock_t *
+_markers	/tmp/libs_expanded.h	/^  struct _IO_marker *_markers;$/;"	m	line:801	struct:_IO_FILE	typeref:struct:_IO_marker *
+_mode	/tmp/libs_expanded.h	/^  int _mode;$/;"	m	line:816	struct:_IO_FILE	typeref:typename:int
+_offset	/tmp/libs_expanded.h	/^  __off64_t _offset;$/;"	m	line:810	struct:_IO_FILE	typeref:typename:__off64_t
+_old_offset	/tmp/libs_expanded.h	/^  __off_t _old_offset;$/;"	m	line:805	struct:_IO_FILE	typeref:typename:__off_t
+_prevchain	/tmp/libs_expanded.h	/^  struct _IO_FILE **_prevchain;$/;"	m	line:815	struct:_IO_FILE	typeref:struct:_IO_FILE **
+_shortbuf	/tmp/libs_expanded.h	/^  char _shortbuf[1];$/;"	m	line:808	struct:_IO_FILE	typeref:typename:char[1]
+_unused2	/tmp/libs_expanded.h	/^  char _unused2[15 * sizeof (int) - 5 * sizeof (void *)];$/;"	m	line:817	struct:_IO_FILE	typeref:typename:char[]
+_vtable_offset	/tmp/libs_expanded.h	/^  signed char _vtable_offset;$/;"	m	line:807	struct:_IO_FILE	typeref:typename:signed char
+_wide_data	/tmp/libs_expanded.h	/^  struct _IO_wide_data *_wide_data;$/;"	m	line:812	struct:_IO_FILE	typeref:struct:_IO_wide_data *
+asprintf	/tmp/libs_expanded.h	/^extern int asprintf (char **__restrict __ptr,$/;"	p	line:929	typeref:typename:int	signature:(char ** __restrict __ptr,const char * __restrict __fmt,...)
+clearerr	/tmp/libs_expanded.h	/^extern void clearerr (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((_/;"	p	line:1039	typeref:typename:void	signature:(FILE * __stream)
+clearerr_unlocked	/tmp/libs_expanded.h	/^extern void clearerr_unlocked (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) __attrib/;"	p	line:1042	typeref:typename:void	signature:(FILE * __stream)
+close	/tmp/libs_expanded.h	/^  cookie_close_function_t *close;$/;"	m	line:838	struct:_IO_cookie_io_functions_t	typeref:typename:cookie_close_function_t *
+cookie_close_function_t	/tmp/libs_expanded.h	/^typedef int cookie_close_function_t (void *__cookie);$/;"	t	line:832	typeref:typename:int ()(void * __cookie)
+cookie_io_functions_t	/tmp/libs_expanded.h	/^} cookie_io_functions_t;$/;"	t	line:839	typeref:struct:_IO_cookie_io_functions_t
+cookie_read_function_t	/tmp/libs_expanded.h	/^typedef __ssize_t cookie_read_function_t (void *__cookie, char *__buf,$/;"	t	line:827	typeref:typename:__ssize_t ()(void * __cookie,char * __buf,size_t __nbytes)
+cookie_seek_function_t	/tmp/libs_expanded.h	/^typedef int cookie_seek_function_t (void *__cookie, __off64_t *__pos, int __w);$/;"	t	line:831	typeref:typename:int ()(void * __cookie,__off64_t * __pos,int __w)
+cookie_write_function_t	/tmp/libs_expanded.h	/^typedef __ssize_t cookie_write_function_t (void *__cookie, const char *__buf,$/;"	t	line:829	typeref:typename:__ssize_t ()(void * __cookie,const char * __buf,size_t __nbytes)
+ctermid	/tmp/libs_expanded.h	/^extern char *ctermid (char *__s) __attribute__ ((__nothrow__ , __leaf__))$/;"	p	line:1051	typeref:typename:char *	signature:(char * __s)
+dprintf	/tmp/libs_expanded.h	/^extern int dprintf (int __fd, const char *__restrict __fmt, ...)$/;"	p	line:935	typeref:typename:int	signature:(int __fd,const char * __restrict __fmt,...)
+fclose	/tmp/libs_expanded.h	/^extern int fclose (FILE *__stream) __attribute__ ((__nonnull__ (1)));$/;"	p	line:873	typeref:typename:int	signature:(FILE * __stream)
+fdopen	/tmp/libs_expanded.h	/^extern FILE *fdopen (int __fd, const char *__modes) __attribute__ ((__nothrow__ , __leaf__))$/;"	p	line:890	typeref:typename:FILE *	signature:(int __fd,const char * __modes)
+feof	/tmp/libs_expanded.h	/^extern int feof (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonn/;"	p	line:1040	typeref:typename:int	signature:(FILE * __stream)
+feof_unlocked	/tmp/libs_expanded.h	/^extern int feof_unlocked (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) __attribute__/;"	p	line:1043	typeref:typename:int	signature:(FILE * __stream)
+ferror	/tmp/libs_expanded.h	/^extern int ferror (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__no/;"	p	line:1041	typeref:typename:int	signature:(FILE * __stream)
+ferror_unlocked	/tmp/libs_expanded.h	/^extern int ferror_unlocked (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) __attribute/;"	p	line:1044	typeref:typename:int	signature:(FILE * __stream)
+fflush	/tmp/libs_expanded.h	/^extern int fflush (FILE *__stream);$/;"	p	line:882	typeref:typename:int	signature:(FILE * __stream)
+fflush_unlocked	/tmp/libs_expanded.h	/^extern int fflush_unlocked (FILE *__stream);$/;"	p	line:883	typeref:typename:int	signature:(FILE * __stream)
+fgetc	/tmp/libs_expanded.h	/^extern int fgetc (FILE *__stream) __attribute__ ((__nonnull__ (1)));$/;"	p	line:989	typeref:typename:int	signature:(FILE * __stream)
+fgetc_unlocked	/tmp/libs_expanded.h	/^extern int fgetc_unlocked (FILE *__stream) __attribute__ ((__nonnull__ (1)));$/;"	p	line:994	typeref:typename:int	signature:(FILE * __stream)
+fgetpos	/tmp/libs_expanded.h	/^extern int fgetpos (FILE *__restrict __stream, fpos_t *__restrict __pos)$/;"	p	line:1036	typeref:typename:int	signature:(FILE * __restrict __stream,fpos_t * __restrict __pos)
+fgets	/tmp/libs_expanded.h	/^extern char *fgets (char *__restrict __s, int __n, FILE *__restrict __stream)$/;"	p	line:1003	typeref:typename:char *	signature:(char * __restrict __s,int __n,FILE * __restrict __stream)
+fileno	/tmp/libs_expanded.h	/^extern int fileno (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__no/;"	p	line:1046	typeref:typename:int	signature:(FILE * __stream)
+fileno_unlocked	/tmp/libs_expanded.h	/^extern int fileno_unlocked (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) __attribute/;"	p	line:1047	typeref:typename:int	signature:(FILE * __stream)
+flockfile	/tmp/libs_expanded.h	/^extern void flockfile (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((/;"	p	line:1053	typeref:typename:void	signature:(FILE * __stream)
+fmemopen	/tmp/libs_expanded.h	/^extern FILE *fmemopen (void *__s, size_t __len, const char *__modes)$/;"	p	line:896	typeref:typename:FILE *	signature:(void * __s,size_t __len,const char * __modes)
+fopen	/tmp/libs_expanded.h	/^extern FILE *fopen (const char *__restrict __filename,$/;"	p	line:884	typeref:typename:FILE *	signature:(const char * __restrict __filename,const char * __restrict __modes)
+fopencookie	/tmp/libs_expanded.h	/^extern FILE *fopencookie (void *__restrict __magic_cookie,$/;"	p	line:892	typeref:typename:FILE *	signature:(void * __restrict __magic_cookie,const char * __restrict __modes,cookie_io_functions_t __io_funcs)
+fpos_t	/tmp/libs_expanded.h	/^typedef __fpos_t fpos_t;$/;"	t	line:846	typeref:typename:__fpos_t
+fprintf	/tmp/libs_expanded.h	/^extern int fprintf (FILE *__restrict __stream,$/;"	p	line:907	typeref:typename:int	signature:(FILE * __restrict __stream,const char * __restrict __format,...)
+fputc	/tmp/libs_expanded.h	/^extern int fputc (int __c, FILE *__stream) __attribute__ ((__nonnull__ (2)));$/;"	p	line:995	typeref:typename:int	signature:(int __c,FILE * __stream)
+fputc_unlocked	/tmp/libs_expanded.h	/^extern int fputc_unlocked (int __c, FILE *__stream) __attribute__ ((__nonnull__ (2)));$/;"	p	line:998	typeref:typename:int	signature:(int __c,FILE * __stream)
+fputs	/tmp/libs_expanded.h	/^extern int fputs (const char *__restrict __s, FILE *__restrict __stream)$/;"	p	line:1014	typeref:typename:int	signature:(const char * __restrict __s,FILE * __restrict __stream)
+fread	/tmp/libs_expanded.h	/^extern size_t fread (void *__restrict __ptr, size_t __size,$/;"	p	line:1018	typeref:typename:size_t	signature:(void * __restrict __ptr,size_t __size,size_t __n,FILE * __restrict __stream)
+fread_unlocked	/tmp/libs_expanded.h	/^extern size_t fread_unlocked (void *__restrict __ptr, size_t __size,$/;"	p	line:1023	typeref:typename:size_t	signature:(void * __restrict __ptr,size_t __size,size_t __n,FILE * __restrict __stream)
+freopen	/tmp/libs_expanded.h	/^extern FILE *freopen (const char *__restrict __filename,$/;"	p	line:887	typeref:typename:FILE *	signature:(const char * __restrict __filename,const char * __restrict __modes,FILE * __restrict __stream)
+fscanf	/tmp/libs_expanded.h	/^extern int fscanf (FILE *__restrict __stream, const char *__restrict __format, ...) __asm__ ("" /;"	p	line:972	typeref:typename:int	signature:(FILE * __restrict __stream,const char * __restrict __format,...)
+fscanf	/tmp/libs_expanded.h	/^extern int fscanf (FILE *__restrict __stream,$/;"	p	line:937	typeref:typename:int	signature:(FILE * __restrict __stream,const char * __restrict __format,...)
+fseek	/tmp/libs_expanded.h	/^extern int fseek (FILE *__stream, long int __off, int __whence)$/;"	p	line:1029	typeref:typename:int	signature:(FILE * __stream,long int __off,int __whence)
+fseeko	/tmp/libs_expanded.h	/^extern int fseeko (FILE *__stream, __off_t __off, int __whence)$/;"	p	line:1033	typeref:typename:int	signature:(FILE * __stream,__off_t __off,int __whence)
+fsetpos	/tmp/libs_expanded.h	/^extern int fsetpos (FILE *__stream, const fpos_t *__pos) __attribute__ ((__nonnull__ (1)));$/;"	p	line:1038	typeref:typename:int	signature:(FILE * __stream,const fpos_t * __pos)
+ftell	/tmp/libs_expanded.h	/^extern long int ftell (FILE *__stream) __attribute__ ((__nonnull__ (1)));$/;"	p	line:1031	typeref:typename:long int	signature:(FILE * __stream)
+ftello	/tmp/libs_expanded.h	/^extern __off_t ftello (FILE *__stream) __attribute__ ((__nonnull__ (1)));$/;"	p	line:1035	typeref:typename:__off_t	signature:(FILE * __stream)
+ftrylockfile	/tmp/libs_expanded.h	/^extern int ftrylockfile (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ /;"	p	line:1054	typeref:typename:int	signature:(FILE * __stream)
+funlockfile	/tmp/libs_expanded.h	/^extern void funlockfile (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ /;"	p	line:1055	typeref:typename:void	signature:(FILE * __stream)
+fwrite	/tmp/libs_expanded.h	/^extern size_t fwrite (const void *__restrict __ptr, size_t __size,$/;"	p	line:1021	typeref:typename:size_t	signature:(const void * __restrict __ptr,size_t __size,size_t __n,FILE * __restrict __s)
+fwrite_unlocked	/tmp/libs_expanded.h	/^extern size_t fwrite_unlocked (const void *__restrict __ptr, size_t __size,$/;"	p	line:1026	typeref:typename:size_t	signature:(const void * __restrict __ptr,size_t __size,size_t __n,FILE * __restrict __stream)
+getc	/tmp/libs_expanded.h	/^extern int getc (FILE *__stream) __attribute__ ((__nonnull__ (1)));$/;"	p	line:990	typeref:typename:int	signature:(FILE * __stream)
+getc_unlocked	/tmp/libs_expanded.h	/^extern int getc_unlocked (FILE *__stream) __attribute__ ((__nonnull__ (1)));$/;"	p	line:992	typeref:typename:int	signature:(FILE * __stream)
+getchar	/tmp/libs_expanded.h	/^extern int getchar (void);$/;"	p	line:991	typeref:typename:int	signature:(void)
+getchar_unlocked	/tmp/libs_expanded.h	/^extern int getchar_unlocked (void);$/;"	p	line:993	typeref:typename:int	signature:(void)
+getdelim	/tmp/libs_expanded.h	/^extern __ssize_t getdelim (char **__restrict __lineptr,$/;"	p	line:1008	typeref:typename:__ssize_t	signature:(char ** __restrict __lineptr,size_t * __restrict __n,int __delimiter,FILE * __restrict __stream)
+getline	/tmp/libs_expanded.h	/^extern __ssize_t getline (char **__restrict __lineptr,$/;"	p	line:1011	typeref:typename:__ssize_t	signature:(char ** __restrict __lineptr,size_t * __restrict __n,FILE * __restrict __stream)
+getw	/tmp/libs_expanded.h	/^extern int getw (FILE *__stream) __attribute__ ((__nonnull__ (1)));$/;"	p	line:1001	typeref:typename:int	signature:(FILE * __stream)
+linux	/tmp/libs_expanded.h	/^#define linux /;"	d	line:391
+off_t	/tmp/libs_expanded.h	/^typedef __off_t off_t;$/;"	t	line:842	typeref:typename:__off_t
+open_memstream	/tmp/libs_expanded.h	/^extern FILE *open_memstream (char **__bufloc, size_t *__sizeloc) __attribute__ ((__nothrow__ , _/;"	p	line:898	typeref:typename:FILE *	signature:(char ** __bufloc,size_t * __sizeloc)
+pclose	/tmp/libs_expanded.h	/^extern int pclose (FILE *__stream) __attribute__ ((__nonnull__ (1)));$/;"	p	line:1048	typeref:typename:int	signature:(FILE * __stream)
+perror	/tmp/libs_expanded.h	/^extern void perror (const char *__s) __attribute__ ((__cold__));$/;"	p	line:1045	typeref:typename:void	signature:(const char * __s)
+popen	/tmp/libs_expanded.h	/^extern FILE *popen (const char *__command, const char *__modes)$/;"	p	line:1049	typeref:typename:FILE *	signature:(const char * __command,const char * __modes)
+printf	/tmp/libs_expanded.h	/^extern int printf (const char *__restrict __format, ...);$/;"	p	line:909	typeref:typename:int	signature:(const char * __restrict __format,...)
+putc	/tmp/libs_expanded.h	/^extern int putc (int __c, FILE *__stream) __attribute__ ((__nonnull__ (2)));$/;"	p	line:996	typeref:typename:int	signature:(int __c,FILE * __stream)
+putc_unlocked	/tmp/libs_expanded.h	/^extern int putc_unlocked (int __c, FILE *__stream) __attribute__ ((__nonnull__ (2)));$/;"	p	line:999	typeref:typename:int	signature:(int __c,FILE * __stream)
+putchar	/tmp/libs_expanded.h	/^extern int putchar (int __c);$/;"	p	line:997	typeref:typename:int	signature:(int __c)
+putchar_unlocked	/tmp/libs_expanded.h	/^extern int putchar_unlocked (int __c);$/;"	p	line:1000	typeref:typename:int	signature:(int __c)
+puts	/tmp/libs_expanded.h	/^extern int puts (const char *__s);$/;"	p	line:1016	typeref:typename:int	signature:(const char * __s)
+putw	/tmp/libs_expanded.h	/^extern int putw (int __w, FILE *__stream) __attribute__ ((__nonnull__ (2)));$/;"	p	line:1002	typeref:typename:int	signature:(int __w,FILE * __stream)
+read	/tmp/libs_expanded.h	/^  cookie_read_function_t *read;$/;"	m	line:835	struct:_IO_cookie_io_functions_t	typeref:typename:cookie_read_function_t *
+remove	/tmp/libs_expanded.h	/^extern int remove (const char *__filename) __attribute__ ((__nothrow__ , __leaf__));$/;"	p	line:869	typeref:typename:int	signature:(const char * __filename)
+rename	/tmp/libs_expanded.h	/^extern int rename (const char *__old, const char *__new) __attribute__ ((__nothrow__ , __leaf__)/;"	p	line:870	typeref:typename:int	signature:(const char * __old,const char * __new)
+renameat	/tmp/libs_expanded.h	/^extern int renameat (int __oldfd, const char *__old, int __newfd,$/;"	p	line:871	typeref:typename:int	signature:(int __oldfd,const char * __old,int __newfd,const char * __new)
+rewind	/tmp/libs_expanded.h	/^extern void rewind (FILE *__stream) __attribute__ ((__nonnull__ (1)));$/;"	p	line:1032	typeref:typename:void	signature:(FILE * __stream)
+scanf	/tmp/libs_expanded.h	/^extern int scanf (const char *__restrict __format, ...) ;$/;"	p	line:939	typeref:typename:int	signature:(const char * __restrict __format,...)
+scanf	/tmp/libs_expanded.h	/^extern int scanf (const char *__restrict __format, ...) __asm__ ("" "__isoc99_scanf") ;$/;"	p	line:973	typeref:typename:int	signature:(const char * __restrict __format,...)
+seek	/tmp/libs_expanded.h	/^  cookie_seek_function_t *seek;$/;"	m	line:837	struct:_IO_cookie_io_functions_t	typeref:typename:cookie_seek_function_t *
+setbuf	/tmp/libs_expanded.h	/^extern void setbuf (FILE *__restrict __stream, char *__restrict __buf) __attribute__ ((__nothrow/;"	p	line:900	typeref:typename:void	signature:(FILE * __restrict __stream,char * __restrict __buf)
+setbuffer	/tmp/libs_expanded.h	/^extern void setbuffer (FILE *__restrict __stream, char *__restrict __buf,$/;"	p	line:904	typeref:typename:void	signature:(FILE * __restrict __stream,char * __restrict __buf,size_t __size)
+setlinebuf	/tmp/libs_expanded.h	/^extern void setlinebuf (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ (/;"	p	line:906	typeref:typename:void	signature:(FILE * __stream)
+setvbuf	/tmp/libs_expanded.h	/^extern int setvbuf (FILE *__restrict __stream, char *__restrict __buf,$/;"	p	line:902	typeref:typename:int	signature:(FILE * __restrict __stream,char * __restrict __buf,int __modes,size_t __n)
+size_t	/tmp/libs_expanded.h	/^typedef long unsigned int size_t;$/;"	t	line:613	typeref:typename:long unsigned int
+snprintf	/tmp/libs_expanded.h	/^extern int snprintf (char *__restrict __s, size_t __maxlen,$/;"	p	line:917	typeref:typename:int	signature:(char * __restrict __s,size_t __maxlen,const char * __restrict __format,...)
+sprintf	/tmp/libs_expanded.h	/^extern int sprintf (char *__restrict __s,$/;"	p	line:910	typeref:typename:int	signature:(char * __restrict __s,const char * __restrict __format,...)
+sscanf	/tmp/libs_expanded.h	/^extern int sscanf (const char *__restrict __s, const char *__restrict __format, ...) __asm__ (""/;"	p	line:974	typeref:typename:int	signature:(const char * __restrict __s,const char * __restrict __format,...)
+sscanf	/tmp/libs_expanded.h	/^extern int sscanf (const char *__restrict __s,$/;"	p	line:940	typeref:typename:int	signature:(const char * __restrict __s,const char * __restrict __format,...)
+ssize_t	/tmp/libs_expanded.h	/^typedef __ssize_t ssize_t;$/;"	t	line:844	typeref:typename:__ssize_t
+stderr	/tmp/libs_expanded.h	/^#define stderr /;"	d	line:868
+stdin	/tmp/libs_expanded.h	/^#define stdin /;"	d	line:866
+stdout	/tmp/libs_expanded.h	/^#define stdout /;"	d	line:867
+tempnam	/tmp/libs_expanded.h	/^extern char *tempnam (const char *__dir, const char *__pfx)$/;"	p	line:880	typeref:typename:char *	signature:(const char * __dir,const char * __pfx)
+tmpfile	/tmp/libs_expanded.h	/^extern FILE *tmpfile (void)$/;"	p	line:876	typeref:typename:FILE *	signature:(void)
+tmpnam	/tmp/libs_expanded.h	/^extern char *tmpnam (char[20]) __attribute__ ((__nothrow__ , __leaf__)) ;$/;"	p	line:878	typeref:typename:char *	signature:(char[20])
+tmpnam_r	/tmp/libs_expanded.h	/^extern char *tmpnam_r (char __s[20]) __attribute__ ((__nothrow__ , __leaf__)) ;$/;"	p	line:879	typeref:typename:char *	signature:(char __s[20])
+ungetc	/tmp/libs_expanded.h	/^extern int ungetc (int __c, FILE *__stream) __attribute__ ((__nonnull__ (2)));$/;"	p	line:1017	typeref:typename:int	signature:(int __c,FILE * __stream)
+unix	/tmp/libs_expanded.h	/^#define unix /;"	d	line:394
+va_list	/tmp/libs_expanded.h	/^typedef __gnuc_va_list va_list;$/;"	t	line:840	typeref:typename:__gnuc_va_list
+vasprintf	/tmp/libs_expanded.h	/^extern int vasprintf (char **__restrict __ptr, const char *__restrict __f,$/;"	p	line:923	typeref:typename:int	signature:(char ** __restrict __ptr,const char * __restrict __f,__gnuc_va_list __arg)
+vdprintf	/tmp/libs_expanded.h	/^extern int vdprintf (int __fd, const char *__restrict __fmt,$/;"	p	line:932	typeref:typename:int	signature:(int __fd,const char * __restrict __fmt,__gnuc_va_list __arg)
+vfprintf	/tmp/libs_expanded.h	/^extern int vfprintf (FILE *__restrict __s, const char *__restrict __format,$/;"	p	line:912	typeref:typename:int	signature:(FILE * __restrict __s,const char * __restrict __format,__gnuc_va_list __arg)
+vfscanf	/tmp/libs_expanded.h	/^extern int vfscanf (FILE *__restrict __s, const char *__restrict __format, __gnuc_va_list __arg)/;"	p	line:983	typeref:typename:int	signature:(FILE * __restrict __s,const char * __restrict __format,__gnuc_va_list __arg)
+vfscanf	/tmp/libs_expanded.h	/^extern int vfscanf (FILE *__restrict __s, const char *__restrict __format,$/;"	p	line:975	typeref:typename:int	signature:(FILE * __restrict __s,const char * __restrict __format,__gnuc_va_list __arg)
+vprintf	/tmp/libs_expanded.h	/^extern int vprintf (const char *__restrict __format, __gnuc_va_list __arg);$/;"	p	line:914	typeref:typename:int	signature:(const char * __restrict __format,__gnuc_va_list __arg)
+vscanf	/tmp/libs_expanded.h	/^extern int vscanf (const char *__restrict __format, __gnuc_va_list __arg) __asm__ ("" "__isoc99_/;"	p	line:985	typeref:typename:int	signature:(const char * __restrict __format,__gnuc_va_list __arg)
+vscanf	/tmp/libs_expanded.h	/^extern int vscanf (const char *__restrict __format, __gnuc_va_list __arg)$/;"	p	line:978	typeref:typename:int	signature:(const char * __restrict __format,__gnuc_va_list __arg)
+vsnprintf	/tmp/libs_expanded.h	/^extern int vsnprintf (char *__restrict __s, size_t __maxlen,$/;"	p	line:920	typeref:typename:int	signature:(char * __restrict __s,size_t __maxlen,const char * __restrict __format,__gnuc_va_list __arg)
+vsprintf	/tmp/libs_expanded.h	/^extern int vsprintf (char *__restrict __s, const char *__restrict __format,$/;"	p	line:915	typeref:typename:int	signature:(char * __restrict __s,const char * __restrict __format,__gnuc_va_list __arg)
+vsscanf	/tmp/libs_expanded.h	/^extern int vsscanf (const char *__restrict __s, const char *__restrict __format, __gnuc_va_list /;"	p	line:987	typeref:typename:int	signature:(const char * __restrict __s,const char * __restrict __format,__gnuc_va_list __arg)
+vsscanf	/tmp/libs_expanded.h	/^extern int vsscanf (const char *__restrict __s,$/;"	p	line:980	typeref:typename:int	signature:(const char * __restrict __s,const char * __restrict __format,__gnuc_va_list __arg)
+write	/tmp/libs_expanded.h	/^  cookie_write_function_t *write;$/;"	m	line:836	struct:_IO_cookie_io_functions_t	typeref:typename:cookie_write_function_t *

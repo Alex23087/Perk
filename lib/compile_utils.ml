@@ -252,7 +252,7 @@ and add_polydefs ast =
                 let x =
                   Fundef
                     ( ( Polymorphism.subst_type t_res t_param t_actual,
-                        id ^ "perk_polym_"
+                        id ^ "_perk_polym_"
                         ^ Type_symbol_table.type_descriptor_of_perktype t_actual,
                         List.map
                           (fun x ->
@@ -279,6 +279,7 @@ and add_polydefs ast =
 (** for each polydef, typedefs all of its instances. TODO check if this is
     necessary *)
 and check_polydefs_pass (ast : topleveldef_a list) =
+  Var_symbol_table.push_symbol_table ();
   List.map
     (fun tld ->
       match ( $ ) tld with
@@ -293,7 +294,7 @@ and check_polydefs_pass (ast : topleveldef_a list) =
               let fundef =
                 Fundef
                   ( ( Polymorphism.subst_type t_res t_param t_actual,
-                      id ^ "perk_polym_"
+                      id ^ "_perk_polym_"
                       ^ Type_symbol_table.type_descriptor_of_perktype t_actual,
                       List.map
                         (fun x ->
@@ -308,7 +309,8 @@ and check_polydefs_pass (ast : topleveldef_a list) =
           |> ignore
       | _ -> ())
     ast
-  |> ignore
+  |> ignore;
+  Var_symbol_table.pop_symbol_table ()
 
 and process_file ?(dir : string option) (filename : string) (is_main : bool) :
     string * (string * string) =
@@ -347,7 +349,7 @@ and process_file ?(dir : string option) (filename : string) (is_main : bool) :
   let ast = remove_opens ast in
   let ast = typecheck_program ast in
   let ast = add_polydefs ast in
-  check_polydefs_pass ast;
+  (* check_polydefs_pass ast; *)
   let out =
     ( String.concat "\n" (List.map show_topleveldef_a ast),
       ast |> codegen_program header_name is_main )
