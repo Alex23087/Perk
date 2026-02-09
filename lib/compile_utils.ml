@@ -246,7 +246,7 @@ and add_polydefs ast =
                 let x =
                   Fundef
                     ( ( Polymorphism.subst_type t_res t_param t_actual,
-                        id ^ "perk_polym_"
+                        id ^ "_perk_polym_"
                         ^ Type_symbol_table.type_descriptor_of_perktype t_actual,
                         List.map
                           (fun x ->
@@ -274,6 +274,7 @@ and add_polydefs ast =
 (** for each polydef, typedefs all of its instances. TODO check if this is
     necessary *)
 and check_polydefs_pass (ast : topleveldef_a list) =
+  Var_symbol_table.push_symbol_table ();
   List.map
     (fun tld ->
       match ( $ ) tld with
@@ -288,7 +289,7 @@ and check_polydefs_pass (ast : topleveldef_a list) =
               let fundef =
                 Fundef
                   ( ( Polymorphism.subst_type t_res t_param t_actual,
-                      id ^ "perk_polym_"
+                      id ^ "_perk_polym_"
                       ^ Type_symbol_table.type_descriptor_of_perktype t_actual,
                       List.map
                         (fun x ->
@@ -304,7 +305,8 @@ and check_polydefs_pass (ast : topleveldef_a list) =
           |> ignore
       | _ -> ())
     ast
-  |> ignore
+  |> ignore;
+  Var_symbol_table.pop_symbol_table ()
 
 and process_file ?(dir : string option) (filename : string) (is_main : bool) :
     string * (string * string) =
@@ -345,7 +347,7 @@ and process_file ?(dir : string option) (filename : string) (is_main : bool) :
   let ast = remove_opens ast in
   let ast = typecheck_program ast in
   let ast = add_polydefs ast in
-  check_polydefs_pass ast;
+  (* check_polydefs_pass ast; *)
   let out =
     ( String.concat "\n" (List.map show_topleveldef_a ast),
       ast |> codegen_program header_name is_main )
@@ -415,8 +417,8 @@ and process_opens (dir : string) (ast : topleveldef_a list) :
           So we save it and reset it *)
         let symtable = ref !Var_symbol_table.var_symbol_table in
         Var_symbol_table.var_symbol_table := [];
-        let constructor_hashmap = Hashtbl.copy Typecheck.defined_constructors in
-        Hashtbl.clear Typecheck.defined_constructors;
+        let constructor_hashmap = Hashtbl.copy File_info.defined_constructors in
+        Hashtbl.clear File_info.defined_constructors;
 
         (* TODO: Type symbol table should be  *)
         let _ast, (compiled_preamble, compiled_body) =
@@ -431,14 +433,14 @@ and process_opens (dir : string) (ast : topleveldef_a list) :
           To ensure that they come from the same library as the symbol already declared (ideally checking if
           said library is also a #pragma once lib...) *)
         let new_constructor_hashmap =
-          Hashtbl.copy Typecheck.defined_constructors
+          Hashtbl.copy File_info.defined_constructors
         in
-        Hashtbl.clear Typecheck.defined_constructors;
+        Hashtbl.clear File_info.defined_constructors;
         Hashtbl.iter
-          (fun k v -> Hashtbl.add Typecheck.defined_constructors k v)
+          (fun k v -> Hashtbl.add File_info.defined_constructors k v)
           new_constructor_hashmap;
         Hashtbl.iter
-          (fun k v -> Hashtbl.add Typecheck.defined_constructors k v)
+          (fun k v -> Hashtbl.add File_info.defined_constructors k v)
           constructor_hashmap;
         Var_symbol_table.append_symbol_table symtable
           ~filter:(fun (_, _fnm) -> true)

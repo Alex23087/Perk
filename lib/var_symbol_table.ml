@@ -52,7 +52,11 @@ let print_symbol_table_local (symbol_table : symtable_t list ref) =
   List.iter print_table !symbol_table
 
 (** Debug function for printing the var symbol table *)
-let print_symbol_table () = print_symbol_table_local var_symbol_table
+let print_symbol_table () =
+  print_symbol_table_local var_symbol_table;
+  flush stdout
+
+(** List of all variables defined in the program, used for code generation. *)
 
 (** Given a symbol table [symbol_table], and identifier [id] and its type [t],
     it binds [id] in [symbol_table] with type [t] if it is not already defined.
@@ -70,6 +74,10 @@ let bind_var_local (symbol_table : symtable_t list ref) (id : perkident)
 
 (** Binds a variable in the var symbol table. *)
 let bind_var = bind_var_local var_symbol_table
+;;
+
+(* Written like this instead of partial application to avoid caching the filename *)
+Utils.bind_var_ptr := fun a b -> bind_var ~fnm:!Utils.fnm a b;;
 
 (** Given a symbol table [symbol_table], and identifier [id] and its type [t],
     it checks whether [id] is already defined in [symbol_table], and if so

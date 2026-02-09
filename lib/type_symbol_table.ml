@@ -48,7 +48,7 @@ let lookup_type (id : perkident) : perktype option =
 
 let resolve_count, resolve_hit, resolve_miss = (ref 0, ref 0, ref 0)
 
-let resolve_type (typ : perktype) : perktype =
+let rec resolve_type (typ : perktype) : perktype =
   let type_resolve_table : (perktype, perktype) Hashtbl.t = Hashtbl.create 10 in
   let rec resolve_type_aux ?(unfold : int = 0) (typ : perktype)
       (lst : perktype list) : perktype * perktype list =
@@ -180,6 +180,85 @@ let resolve_type (typ : perktype) : perktype =
                   ((a, Tupletype ts_t, q), ts_l)
               | Vararg -> ((a, Vararg, q), lst)
               | Infer -> ((a, Infer, q), lst)
+              | PolyADTPlaceholder (i, t) ->
+                  let dat_t = t in
+                  let polyadt_constructors =
+                    File_info.get_polyadt_constructors ()
+                  in
+                  let constructors =
+                    try Hashtbl.find polyadt_constructors (i, t)
+                    with Not_found ->
+                      let declared_polyadts =
+                        File_info.get_polyadt_declared ()
+                      in
+                      let polyadt_declaration =
+                        try Hashtbl.find declared_polyadts i
+                        with Not_found ->
+                          failwith
+                            (Printf.sprintf
+                               "Polymorphic type %s not declared (TODO turn \
+                                this into proper error by God's grace)"
+                               i)
+                      in
+                      let constructor_table =
+                        File_info.get_polyadt_constructors ()
+                      in
+                      let constructors =
+                        try Hashtbl.find constructor_table (i, t)
+                        with Not_found ->
+                          let constructors =
+                            List.map
+                              (fun (i, t') ->
+                                ( i,
+                                  List.map
+                                    (fun t'' ->
+                                      Polymorphism.subst_type t''
+                                        (fst polyadt_declaration) t)
+                                    t' ))
+                              (snd polyadt_declaration)
+                          in
+                          say_here
+                            (Printf.sprintf
+                               "Mine balls be damned! resolve_type: %s, %s \
+                                being added to constructor_table"
+                               i (show_perktype t));
+                          Hashtbl.add constructor_table (i, t) constructors;
+
+                          List.iter
+                            (fun (ide, t) ->
+                              let ide =
+                                ide ^ "_" ^ type_descriptor_of_perktype dat_t
+                              in
+                              if Hashtbl.mem File_info.defined_constructors ide
+                              then
+                                raise
+                                  (Type_error
+                                     ( (-1, -1),
+                                       (-1, -1),
+                                       !Utils.fnm,
+                                       Printf.sprintf
+                                         "Constructor %s is already defined" ide,
+                                       Double_declaration ));
+                              Hashtbl.add File_info.defined_constructors ide ();
+                              !Utils.add_constructor_name_ptr ide;
+                              !Utils.bind_var_ptr ide
+                                ( [],
+                                  Funtype
+                                    ( t,
+                                      ( [],
+                                        AlgebraicType
+                                          ( i ^ "_"
+                                            ^ type_descriptor_of_perktype dat_t,
+                                            constructors,
+                                            None ),
+                                        [] ) ),
+                                  [] ))
+                            constructors;
+                          constructors
+                      in
+                      constructors
+                  in
+                  ((a, AlgebraicType (i, constructors, Some t), q), lst)
           in
           Hashtbl.add type_resolve_table typ resolved_type;
           (resolved_type, visited)
@@ -188,7 +267,7 @@ let resolve_type (typ : perktype) : perktype =
   in
   fst (resolve_type_aux ~unfold:2 typ [])
 
-let rec c_type_of_base_type (t : perktype) : string =
+and c_type_of_base_type (t : perktype) : string =
   match t with
   | t when t = int_type -> "int"
   | t when t = void_type -> "void"
@@ -198,13 +277,14 @@ let rec c_type_of_base_type (t : perktype) : string =
   | _ -> failwith "not a base type"
 
 (* Returns a C type for the input perktype. The types returned are the ones generated by the various synthesised typedefs *)
-let rec type_descriptor_of_perktype ?(erase_env = true) (t : perktype) : string
-    =
+and type_descriptor_of_perktype ?(erase_env = true) (t : perktype) : string =
   let _, t, _ = t in
   match t with
   | Basetype s -> s
   | Structtype (id, _) -> id
-  | AlgebraicType (id, _) -> id
+  | AlgebraicType (id, _, None) -> id
+  | AlgebraicType (id, _, Some t) ->
+      Printf.sprintf "%s_%s" id (type_descriptor_of_perktype t)
   | Funtype (args, ret) ->
       let args_str =
         String.concat "__" (List.map type_descriptor_of_perktype args)
@@ -240,6 +320,8 @@ let rec type_descriptor_of_perktype ?(erase_env = true) (t : perktype) : string
   | Tupletype ts ->
       Printf.sprintf "tup_%s_le"
         (String.concat "__" (List.map type_descriptor_of_perktype ts))
+  | PolyADTPlaceholder (i, t) ->
+      Printf.sprintf "%s_%s" i (type_descriptor_of_perktype t)
 
 and c_type_of_perktype ?(erase_env = true) (t : perktype) =
   if is_builtin_type_unlabeled t then c_type_of_base_type t
@@ -259,7 +341,8 @@ let print_type_symbol_table () =
   Hashtbl.iter
     (fun id ((typ, _code), _from) ->
       Printf.printf "%s: %s,\n\n" id (show_perktype typ))
-    type_symbol_table
+    type_symbol_table;
+  flush stdout
 
 let to_be_unbound : perktype list ref = ref []
 
@@ -405,7 +488,7 @@ let dependencies_of_type (typ : perktype) : perkident list =
                     (res_t @ acc, res_l))
                   ([ type_descriptor_of_perktype typ ], lst)
                   field_types
-            | AlgebraicType (_, constructors) ->
+            | AlgebraicType (_, constructors, _) ->
                 let field_types =
                   List.map (fun (_id, typ) -> typ) constructors |> List.flatten
                 in
@@ -495,6 +578,8 @@ let dependencies_of_type (typ : perktype) : perkident list =
                   ts
             | Vararg -> ([], lst)
             | Infer -> ([], lst)
+            | PolyADTPlaceholder (_, t) ->
+                ([ type_descriptor_of_perktype t ], lst)
         in
         Hashtbl.add type_dep_table typ deps;
         (* Printf.printf "Type Dependency Table:\n";
@@ -544,11 +629,27 @@ let rec bind_type_if_needed (typ : perktype) =
           | _, Structtype (_id, fields), _ ->
               bind_type typ;
               List.iter (fun ((typ, _id), _) -> bind_type_if_needed typ) fields
-          | _, AlgebraicType (_id, constructors), _ ->
+          | _, AlgebraicType (_id, constructors, None), _ ->
               bind_type typ;
               List.iter
                 (fun (_id, typs) -> List.iter bind_type_if_needed typs)
                 constructors
+          | _, AlgebraicType (i, _, Some t), _ ->
+              (* check whether i is in declared polyADTs, if so add instance to polyADTinstances*)
+              say_here "CALLACABAALLSSSSSSSFNIAOEMFE AND PLACEHOLDER";
+              let declared = File_info.get_polyadt_declared () in
+              (if Hashtbl.mem declared i then say_here "SHEITENCOCK";
+               let instances_table = File_info.get_polyadt_instances () in
+               let instances =
+                 match Hashtbl.find_opt instances_table i with
+                 | None -> []
+                 | Some instances -> instances
+               in
+               if not (List.exists (fun (t', _) -> t' = t) instances) then
+                 Hashtbl.replace instances_table i ((t, false) :: instances));
+
+              bind_type typ;
+              bind_type_if_needed t
           | _, ArcheType (_name, _decls), _ ->
               bind_type typ';
               List.iter
@@ -573,13 +674,19 @@ let rec bind_type_if_needed (typ : perktype) =
               bind_type typ';
               List.iter bind_type_if_needed ts
           | _, Vararg, _ -> ()
-          | _, Infer, _ -> ()))
+          | _, Infer, _ -> ()
+          | _, PolyADTPlaceholder (_i, _t), _ -> failwith "shounnattappah"))
 
 (* Manually add code to the binding. Used by codegen functions for Models and Archetypes, where the struct code is generated during regular codegen, instead of at the end like for simple synthesized types like tuples and functions *)
 let add_code_to_type_binding (_typ : perktype) (code : string) : unit =
   bind_type_if_needed _typ;
   let key = type_descriptor_of_perktype _typ in
-  let (_t, _code), from = Hashtbl.find type_symbol_table key in
+  let (_t, _code), from =
+    try Hashtbl.find type_symbol_table key
+    with Not_found ->
+      print_type_symbol_table ();
+      failwith (Printf.sprintf "key not found %s" key)
+  in
   Hashtbl.replace type_symbol_table key ((_t, Some code), from)
 
 (** Generate the name of an extension function *)

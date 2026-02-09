@@ -36,17 +36,21 @@ and subst_type (t : perktype) (placeholder : perktype) (actual : perktype) =
             List.map base_subst tl,
             idl1 ),
         b )
-  | a, AlgebraicType (id, id_and_tl_list), b ->
+  | a, AlgebraicType (id, id_and_tl_list, t_param), b ->
       ( a,
         AlgebraicType
           ( id,
             List.map
-              (fun (id, tl) -> (id, List.map base_subst tl))
-              id_and_tl_list ),
+              (fun (id, tl) ->
+                (id, List.map (fun t -> subst_type t placeholder actual) tl))
+              id_and_tl_list,
+            Option.map (fun x -> subst_type x placeholder actual) t_param ),
         b )
   | a, Optiontype t, b -> (a, Optiontype (base_subst t), b)
   | a, Tupletype tl, b -> (a, Tupletype (List.map base_subst tl), b)
   | a, ArchetypeSum tl, b -> (a, ArchetypeSum (List.map base_subst tl), b)
+  | a, PolyADTPlaceholder (i, t), b ->
+      (a, PolyADTPlaceholder (i, base_subst t), b)
   | _, Vararg, _ | _, Infer, _ -> t
 
 and subst_perkdef (pvd, e) (placeholder : perktype) (actual : perktype) :
@@ -140,7 +144,14 @@ and subst_type_command (c : command_a) (placeholder : perktype)
     | Switch (e1, ecl) ->
         Switch (subst_e e1, List.map (fun (e, c) -> (subst_e e, subst_c c)) ecl)
     | Return eo -> Return (Option.map subst_e eo)
-    | Match (e1, mel, t) -> Match (subst_e e1, mel, Option.map subst_maybe t))
+    | Match (e1, mel, t) ->
+        Match
+          ( subst_e e1,
+            List.map
+              (fun me ->
+                annot_copy me (subst_mel (( $ ) me) placeholder actual))
+              mel,
+            Option.map subst_maybe t ))
 
 let rec is_type_generic (t : perktype) : bool =
   match t with

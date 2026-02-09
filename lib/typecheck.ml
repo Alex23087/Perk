@@ -54,9 +54,6 @@ let get_lib_path s =
              Printf.sprintf "Could not find library %s" path,
              Library_not_found ))
 
-(** Hash table of the defined ADT constructors*)
-let defined_constructors : (perkident, unit) Hashtbl.t = Hashtbl.create 10
-
 (** Hash table of extension functions. Binds a type to a list of (function_name
     * function_type * is_member_function)*)
 let extension_functions :
@@ -374,18 +371,26 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
         let funtype =
           ([], Funtype (List.map (fun (typ, _) -> typ) params, ret_type), [])
         in
+
         bind_var id funtype;
+
         bind_type_if_needed funtype;
         annot_copy tldf
           (Fundef ((ret_type, id, params, body), _funkind, public))
         (* |> ignore; typecheck_deferred_function tldf *))
   | PolymorphicFundef ((ret_type, id, params, body), type_param) ->
+      (* First we add the polyfun to the global polyfun hashtbl with phony body (to allow recursive polyfuns), checcosè? *)
+      Hashtbl.add global_polyfuns id
+        (PolymorphicFundef ((ret_type, id, params, body), type_param)
+        |> annot_copy tldf);
+
       (* add the type parameter to the hashtable, setting empty bounds and inferred type*)
       Hashtbl.add generic_types_table type_param
         { bounds = []; inferred_type = None };
 
+      (* TODO: The body typecheck has been disabled to allow recursion. Please handle this properly *)
       (* typecheck the body *)
-      push_symbol_table ();
+      (* push_symbol_table ();
       List.iter
         (fun (typ, id) ->
           try bind_var id typ
@@ -397,7 +402,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
       in
       if (not body_returns) && not (is_unit_type ret_type) then
         raise_type_error tldf "Not all code paths return a value" No_return;
-      pop_symbol_table ();
+      pop_symbol_table (); *)
 
       (* add the generic type (bounds and inferred type) to the polyfun_bounds hashtable *)
       let param_gen_type = Hashtbl.find generic_types_table type_param in
@@ -413,11 +418,13 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
         id
         (param_types, ret_type, type_param);
       (* the definition is added to the global polyfun hashtable, to allow it to be instantiated in other files *)
-      Hashtbl.add global_polyfuns id
-        (PolymorphicFundef ((ret_type, id, params, body_res), type_param)
+      Hashtbl.replace global_polyfuns id
+        (PolymorphicFundef
+           ((ret_type, id, params, body (* Should be body_res *)), type_param)
         |> annot_copy tldf);
       annot_copy tldf
-        (PolymorphicFundef ((ret_type, id, params, body_res), type_param))
+        (PolymorphicFundef
+           ((ret_type, id, params, body (* Should be body_res *)), type_param))
   | Extern (id, typ) ->
       (* TODO: Possibly this check can be removed, if it can be performed beforehand by the keyword checker *)
       (if id = "self" then
@@ -742,19 +749,35 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
       in
       bind_type_if_needed ([], Structtype (ident, fields_res), []);
       annot_copy tldf (Struct (ident, fields_res))
-  | ADT (ident, constructors) ->
+  | ADT (ident, constructors, None) ->
       (* TODO: check existence of types *)
       List.iter
         (fun (ide, t) ->
-          if Hashtbl.mem defined_constructors ide then
+          if Hashtbl.mem File_info.defined_constructors ide then
             raise_type_error tldf
               (Printf.sprintf "Constructor %s is already defined" ide)
               Double_declaration;
-          Hashtbl.add defined_constructors ide ();
+          Hashtbl.add File_info.defined_constructors ide ();
           bind_var ide
-            ([], Funtype (t, ([], AlgebraicType (ident, constructors), [])), []))
+            ( [],
+              Funtype (t, ([], AlgebraicType (ident, constructors, None), [])),
+              [] ))
         constructors;
-      bind_type_if_needed ([], AlgebraicType (ident, constructors), []);
+      bind_type_if_needed ([], AlgebraicType (ident, constructors, None), []);
+      tldf
+  | ADT (ident, constructors, Some tparam) ->
+      let declared_table = File_info.get_polyadt_declared () in
+      say_here
+        (Printf.sprintf "Declaring polymorphic ADT %s with type parameter %s"
+           ident (show_perktype tparam));
+      Hashtbl.add declared_table ident (tparam, constructors);
+      List.iter
+        (fun x ->
+          Hashtbl.add
+            (File_info.get_polyadt_adt_from_constructor ())
+            (fst x)
+            ([], AlgebraicType (ident, constructors, Some tparam), []))
+        constructors;
       tldf
 
 (** Typechecks commands
@@ -1049,6 +1072,7 @@ and typecheck_match_entry ?(retype : perktype option = None)
         body_returns )
 
 and typecheck_match_case (match_type : perktype) case =
+  let match_type = resolve_type match_type in
   match ( $ ) case with
   | Matchall -> case
   | MatchVar (x, Some typ) -> (
@@ -1083,10 +1107,13 @@ and typecheck_match_case (match_type : perktype) case =
   | CompoundCase (id, cases) ->
       if is_constructor_name id then
         if is_constructor_of id match_type then (
-          let parameters =
+          let parameters, suffix =
             match resolve_type match_type with
-            | _, AlgebraicType (_, constructors), _ ->
-                List.find (fun (ide, _) -> ide = id) constructors |> snd
+            | _, AlgebraicType (_, constructors, _tparam), _ ->
+                ( List.find (fun (ide, _) -> ide = id) constructors |> snd,
+                  Option.fold ~none:""
+                    ~some:(fun t -> "_" ^ type_descriptor_of_perktype t)
+                    _tparam )
             | _ -> failwith "Impossible, is_constructor_of returned true"
           in
           if List.length parameters <> List.length cases then
@@ -1098,7 +1125,7 @@ and typecheck_match_case (match_type : perktype) case =
           (* Typecheck each case *)
           annot_copy case
             (CompoundCase
-               ( id,
+               ( id ^ suffix,
                  List.mapi
                    (fun i c -> typecheck_match_case (List.nth parameters i) c)
                    cases )))
@@ -1119,7 +1146,7 @@ and typecheck_match_case (match_type : perktype) case =
         in
 
         raise_compilation_error case
-          (Printf.sprintf "%s id not a valid constructor.%s" id smart_msg)
+          (Printf.sprintf "%s is not a valid constructor.%s" id smart_msg)
           ADT_Invalid_constructor
 
 and get_vars_in_case (case : match_case_a) =
@@ -1146,7 +1173,9 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           | Some (Funtype _) -> (expr, t)
           | _ ->
               (* Constructors are automatically applied *)
-              if Hashtbl.mem defined_constructors id && List.length params = 0
+              if
+                Hashtbl.mem File_info.defined_constructors id
+                && List.length params = 0
               then (annot_copy expr (Apply (expr, [], None)), ret)
               else (expr, t))
       | Some t -> (expr, t)
@@ -1155,68 +1184,124 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       )
   | PolymorphicVar (id, t) ->
       if not (Hashtbl.mem global_polyfuns id) then
-        raise_type_error expr
-          ("Unknown polymorphic identifier: " ^ id)
-          Unknown_identifier;
-
-      (if Hashtbl.mem (get_polyfun_bounds ()) id then
-         let g = Hashtbl.find (get_polyfun_bounds ()) id in
-         if Option.is_some g.inferred_type then
-           if not (t = Option.get g.inferred_type) then
-             raise_type_error expr
-               (Printf.sprintf
-                  "Type parameter of %s was inferred to be %s: type %s is \
-                   incompatible"
-                  id
-                  (show_perktype (Option.get g.inferred_type))
-                  (show_perktype t))
-               Type_mismatch
-           else if List.mem Numeric_Bound g.bounds then
+        let dat_t = t in
+        let tabel = File_info.get_polyadt_adt_from_constructor () in
+        let teip =
+          try Hashtbl.find tabel id
+          with Not_found ->
+            raise_compilation_error expr
+              (Printf.sprintf "Generic variable %s not found" id)
+              Unknown_error
+        in
+        match teip with
+        | _, AlgebraicType (ident, _constructors, Some _tparam), _ -> (
+            try
+              (* let constructor =
+                List.find (fun (ide, _) -> ide = id) constructors
+              in *)
+              (* let constructor_params =
+                List.map
+                  (fun t -> Polymorphism.subst_type t tparam dat_t)
+                  (snd constructor)
+              in *)
+              (* let concrete_adt =
+                resolve_type
+                  ( [],
+                    AlgebraicType
+                      ( ident,
+                        List.map
+                          (fun (id, t) ->
+                            (id ^ "_" ^ type_descriptor_of_perktype dat_t, t))
+                          constructors,
+                        Some dat_t ),
+                    [] )
+              in *)
+              let concrete_adt =
+                resolve_type ([], PolyADTPlaceholder (ident, dat_t), [])
+              in
+              bind_type_if_needed concrete_adt;
+              (* let constructor_type =
+                ([], Funtype (constructor_params, concrete_adt), [])
+              in *)
+              typecheck_expr ~expected_return
+                (annot_copy expr
+                   (Var (id ^ "_" ^ type_descriptor_of_perktype t)))
+            with Not_found ->
+              raise_compilation_error expr
+                (Printf.sprintf
+                   "Impossible: Constructor %s not found in its associated \
+                    type %s"
+                   id ident)
+                Unknown_error)
+        | _ ->
+            raise_compilation_error expr
+              (Printf.sprintf
+                 "Impossible: Constructor %s is associated with a type that is \
+                  not a polymorphic AlgebraicType"
+                 id)
+              Unknown_error
+      else (
+        (if Hashtbl.mem (get_polyfun_bounds ()) id then
+           let g = Hashtbl.find (get_polyfun_bounds ()) id in
+           if Option.is_some g.inferred_type then
              if not (t = Option.get g.inferred_type) then
                raise_type_error expr
                  (Printf.sprintf
-                    "Type parameter of %s was inferred to be numerical: type \
-                     %s is not"
-                    id (show_perktype t))
-                 Type_mismatch);
+                    "Type parameter of %s was inferred to be %s: type %s is \
+                     incompatible"
+                    id
+                    (show_perktype (Option.get g.inferred_type))
+                    (show_perktype t))
+                 Type_mismatch
+             else if List.mem Numeric_Bound g.bounds then
+               if not (t = Option.get g.inferred_type) then
+                 raise_type_error expr
+                   (Printf.sprintf
+                      "Type parameter of %s was inferred to be numerical: type \
+                       %s is not"
+                      id (show_perktype t))
+                   Type_mismatch);
 
-      (if not (Hashtbl.mem (File_info.get_file_local_polyfuns ()) id) then
-         (* if the polyfun is defined globally but not locally, add it to a "to be defined" list *)
-         (* Printf.printf "adding definition of %s instantiated on %s to tbd\n" id
+        (if not (Hashtbl.mem (File_info.get_file_local_polyfuns ()) id) then
+           (* if the polyfun is defined globally but not locally, add it to a "to be defined" list *)
+           (* Printf.printf "adding definition of %s instantiated on %s to tbd\n" id
           (show_perktype t); *)
-         let def = Hashtbl.find global_polyfuns id in
-         File_info.get_polyfuns_to_be_defined ()
-         := (def, t) :: !(File_info.get_polyfuns_to_be_defined ()));
+           let def = Hashtbl.find global_polyfuns id in
+           File_info.get_polyfuns_to_be_defined ()
+           := (def, t) :: !(File_info.get_polyfuns_to_be_defined ()));
 
-      (* update the instance list *)
-      let current_instances =
-        if Hashtbl.mem (File_info.get_polyfun_instances ()) id then
-          Hashtbl.find (File_info.get_polyfun_instances ()) id
-        else []
-      in
-      Hashtbl.replace
-        (File_info.get_polyfun_instances ())
-        id
-        (current_instances @ [ (t, false) ]);
+        (* update the instance list *)
+        let current_instances =
+          if Hashtbl.mem (File_info.get_polyfun_instances ()) id then
+            Hashtbl.find (File_info.get_polyfun_instances ()) id
+          else []
+        in
+        if not (List.exists (fun (t', _) -> t = t') current_instances) then
+          Hashtbl.replace
+            (File_info.get_polyfun_instances ())
+            id
+            (current_instances @ [ (t, false) ]);
 
-      let def = Hashtbl.find global_polyfuns id in
+        let def = Hashtbl.find global_polyfuns id in
 
-      let param_types, ret_type, tparam =
-        match ( $ ) def with
-        | PolymorphicFundef ((t_res, _id, args, _body), t_param) ->
-            (List.map fst args, t_res, t_param)
-        | _ -> failwith "Should not happen: definition is not a polyfundef"
-      in
+        let param_types, ret_type, tparam =
+          match ( $ ) def with
+          | PolymorphicFundef ((t_res, _id, args, _body), t_param) ->
+              (List.map fst args, t_res, t_param)
+          | _ -> failwith "Should not happen: definition is not a polyfundef"
+        in
 
-      ( annot_copy expr (PolymorphicVar (id, t)),
-        (* TODO check if it's ok to forget qualifiers here -- if not do right thing *)
-        ( [],
-          Funtype
-            ( List.map (fun x -> subst_type x tparam t) param_types,
-              subst_type ret_type tparam t ),
-          [] ) )
+        ( annot_copy expr (PolymorphicVar (id, t)),
+          (* TODO check if it's ok to forget qualifiers here -- if not do right thing *)
+          ( [],
+            Funtype
+              ( List.map (fun x -> subst_type x tparam t) param_types,
+                subst_type ret_type tparam t ),
+            [] ) ))
   | Apply (func, params, _) -> (
       let normal_handling (_ : unit) =
+        (* say_here
+        (Printf.sprintf "typechecking funcall diocaml: %s\n" (show_expr_a func)); *)
         let fun_expr, fun_type =
           typecheck_expr
             ~expected_return:(Some ([], Funtype ([], void_type), []))
@@ -2099,3 +2184,7 @@ and autoas (expr : expr_a) (actual : perktype) (expected : perktype) : expr_a =
   | ArchetypeSum a1, ArchetypeSum _ | ArchetypeSum a1, Modeltype _ ->
       annot_copy expr (As (expr, a1, Some actual))
   | _ -> expr
+;;
+
+Utils.typecheck_tldf_ptr :=
+  fun tldf -> tldf |> typecheck_topleveldef |> typecheck_deferred_function

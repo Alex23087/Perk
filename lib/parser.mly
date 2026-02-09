@@ -99,7 +99,8 @@ topleveldef:
   | Struct Ident LBrace error                                                                              { raise (ParseError(!fnm, "unexpected token in struct definition", Unexpected_token)) }
   | Struct Ident error                                                                                     { Keyword_tracker.raise_keyword_error fnm "struct" }
   | Struct error                                                                                           { Keyword_tracker.raise_keyword_error fnm "struct" }
-  | ADT i = Ident Assign option(Pipe) l = separated_nonempty_list(Pipe, constructor_type)                  { Keyword_tracker.validate_type_identifier i; annotate_2_code !fnm $loc (Ast.ADT (i, l)) }   
+  | ADT i = Ident Assign option(Pipe) l = separated_nonempty_list(Pipe, constructor_type)                  { Keyword_tracker.validate_type_identifier i; annotate_2_code !fnm $loc (Ast.ADT (i, l, None)) }   
+  | ADT Lt t=perktype Gt i = Ident Assign option(Pipe) l = separated_nonempty_list(Pipe, constructor_type) { Keyword_tracker.validate_type_identifier i; annotate_2_code !fnm $loc (Ast.ADT (i, l, Some t)) } 
   | ADT Ident error                                                                                        { raise (ParseError(!fnm, "expected a list of constructors after ADT definition", ADT_Missing_constructors)) }
   | ADT error                                                                                              { Keyword_tracker.raise_keyword_error fnm "type" }
   | Fun pf = perkfun                                                                                       { annotate_2_code !fnm $loc (Ast.Fundef (pf, Normal, true)) }
@@ -222,6 +223,7 @@ expr:
   | Cast LParen typ = perktype Comma e = expr RParen                                                       { annotate_2_code !fnm $loc (Ast.Cast ((([],Ast.Infer,[]), typ), e)) }
   | Sizeof LParen t = perktype RParen                                                                      { annotate_2_code !fnm $loc (Ast.Sizeof t) }
   | If guard = expr Then e1 = expr Else e2 = expr                                                          { annotate_2_code !fnm $loc (Ast.IfThenElseExpr (guard, e1, e2)) }
+  | i = Ident Poly t = perktype                                                                            { annotate_2_code !fnm $loc (Ast.PolymorphicVar(i, t)) }
 
   | error                                                                                                  { raise (ParseError(!fnm, "expression expected", Expected_token)) }
   | expr error                                                                                             { raise (ParseError(!fnm, "unexpected expression", Unexpected_token)) }
@@ -270,6 +272,7 @@ perktype_partial:
   | t = perktype Star                                                                                      { Ast.Pointertype t }
   | t = perktype Question                                                                                  { Ast.Optiontype t }
   | Lt tys = separated_nonempty_list(Plus, Ident) Gt                                                       { Ast.ArchetypeSum (tys |> List.map (fun x -> ([], Ast.Basetype x, []))) }
+  | i = Ident Poly t = perktype                                                                            { Ast.PolyADTPlaceholder(i, t) }
   | error                                                                                                  { raise (ParseError(!fnm, "type expected", Expected_token)) }
   | Lt error                                                                                               { raise (ParseError(!fnm, "Cannot have empty archetype sum", Invalid_archesum)) }
   | Lt separated_nonempty_list(Plus, Ident) error                                                          { raise (ParseError(!fnm, "Unterminated archetype sum", Invalid_archesum)) }
