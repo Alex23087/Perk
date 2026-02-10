@@ -1,0 +1,65 @@
+import "stdio.h"
+import "malloc.h"
+
+type <T> list = Empty | Cons(T, list @ T)
+
+// fun <T> list_generate (n: int, f: () => T): list @ T {
+//     match (n) {
+//         `{0} {
+//             return Empty @ T()
+//         },
+//         _ {
+//             let head := f();
+//             let tail := list_generate @ T (n - 1, f);
+//             return Cons @ T (head, tail);
+//         }
+//     }
+// }
+
+fun list_generate (n: int, f: () => int): list @ int {
+    match (n) {
+        `{0} {
+            return Empty @ int()
+        },
+        _ {
+            let head := f();
+            let tail := list_generate (n - 1, f);
+            return Cons @ int (head, tail);
+        }
+    }
+}
+
+fun <T> list_length (l : list @ T) : int {
+    match (l) {
+        Empty {
+            return 0
+        },
+        Cons (_, var rest) {
+            return 1 + list_length @ T (rest)
+        }
+    }
+}
+
+fun <T> list_print (l : list @ T, print_func: (T) => void) : void {
+    match (l) {
+        Empty {
+            printf("Empty\n");
+        },
+        Cons (var head, var rest) {
+            printf("Cons: ");
+            print_func(head);
+            printf("\n");
+            list_print @ T (rest, print_func);
+        }
+    }
+}
+
+fun main () : void {
+    let counter : int* = malloc(sizeof(int));
+    let long_list := list_generate (500, (): int {
+        *counter = *counter + 1;
+        return *counter;
+    });
+    printf("length of long_list: %d\n", list_length @ int (long_list));
+    list_print @ int (long_list, (x: int): void {printf("%d", x)});
+}

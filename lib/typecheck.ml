@@ -1207,35 +1207,56 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
         match teip with
         | _, AlgebraicType (ident, _constructors, Some _tparam), _ -> (
             try
-              (* let constructor =
-                List.find (fun (ide, _) -> ide = id) constructors
-              in *)
-              (* let constructor_params =
-                List.map
-                  (fun t -> Polymorphism.subst_type t tparam dat_t)
-                  (snd constructor)
-              in *)
-              (* let concrete_adt =
-                resolve_type
-                  ( [],
-                    AlgebraicType
-                      ( ident,
-                        List.map
-                          (fun (id, t) ->
-                            (id ^ "_" ^ type_descriptor_of_perktype dat_t, t))
-                          constructors,
-                        Some dat_t ),
-                    [] )
-              in *)
+              (* TODO: Fix spurious constructor generation when the type is a type variable *)
+              (* Find out if we are trying to compile a constructor with the current type variable *)
+              (* let is_current_typevar =
+                try
+                  match_types tparam (Option.get !current_type_variable)
+                  |> ignore;
+                  true
+                with _ -> false
+              in
+              say_here
+                (Printf.sprintf
+                   "current_type_variable: %s, dat_t: %s, is_current_typevar: \
+                    %b"
+                   (match !current_type_variable with
+                   | Some ct -> show_perktype ct
+                   | None -> "None")
+                   (show_perktype dat_t) is_current_typevar);
+
+              if not is_current_typevar then ( *)
               let concrete_adt =
                 resolve_type ([], PolyADTPlaceholder (ident, dat_t), [])
               in
               bind_type_if_needed concrete_adt;
-              (* let constructor_type =
-                ([], Funtype (constructor_params, concrete_adt), [])
-              in *)
               typecheck_expr ~expected_return
                 (annot_copy expr (Var (concrete_constructor_name id t)))
+              (* )else
+                let constructor =
+                  List.find (fun (ide, _) -> ide = id) constructors
+                in
+                let constructor_params =
+                  (* List.map
+                    (fun t -> Polymorphism.subst_type t tparam dat_t) *)
+                  snd constructor
+                in
+                let concrete_adt =
+                  resolve_type
+                    ( [],
+                      AlgebraicType
+                        ( ident,
+                          List.map
+                            (fun (id, t) ->
+                              (id ^ "_" ^ type_descriptor_of_perktype dat_t, t))
+                            constructors,
+                          Some dat_t ),
+                      [] )
+                in
+                let constructor_type =
+                  ([], Funtype (constructor_params, concrete_adt), [])
+                in
+                (expr, constructor_type) *)
             with Not_found ->
               raise_compilation_error expr
                 (Printf.sprintf
@@ -1422,7 +1443,16 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                 winner_type,
                 annot_copy rhs_res (Cast ((rhs_type, winner_type), rhs_res)),
                 winner_type )
-            else raise_type_error rhs "Numerical type expected" Type_mismatch
+            else if not (is_numerical lhs_type) then
+              raise_type_error lhs
+                (Printf.sprintf "Numerical type expected. Got: %s"
+                   (show_perktype lhs_type))
+                Type_mismatch
+            else
+              raise_type_error rhs
+                (Printf.sprintf "Numerical type expected. Got: %s"
+                   (show_perktype rhs_type))
+                Type_mismatch
           in
           let res_type =
             try match_types lhs_type rhs_type
