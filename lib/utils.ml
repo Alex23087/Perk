@@ -10,6 +10,9 @@ let bind_var_ptr : (perkident -> perktype -> unit) ref = ref (fun _ _ -> ())
 let add_constructor_name_ptr : (perkident -> unit) ref = ref (fun _ -> ())
 let typecheck_tldf_ptr : (topleveldef_a -> topleveldef_a) ref = ref (fun x -> x)
 
+let type_descriptor_of_perktype_ptr : (perktype -> string) ref =
+  ref (fun _ -> "")
+
 (** Filename of the current perk file being processed *)
 let fnm = ref ""
 
@@ -302,3 +305,20 @@ let random_string n =
 
 let execution_UUID = random_string 10
 let is_C_file f = String.ends_with ~suffix:".h" f
+
+let replace_if_end str old_sub new_sub =
+  let old_len = String.length old_sub in
+  let str_len = String.length str in
+  if old_len > str_len then str
+    (* old_sub is longer than str, no replacement possible *)
+  else if String.sub str (str_len - old_len) old_len = old_sub then
+    String.sub str 0 (str_len - old_len) ^ new_sub (* replace *)
+  else str (* no replacement needed *)
+
+(** Remove spurious type variable concretisations from the constructors *)
+let subst_ctor_name (id : perkident) (placeholder : perktype)
+    (_actual : perktype) : perkident =
+  let pstr = "_perk_polym_" ^ !type_descriptor_of_perktype_ptr placeholder in
+  (* let astr = "_perk_polym_" ^ !type_descriptor_of_perktype_ptr actual in *)
+  let astr = "" in
+  replace_if_end id pstr astr

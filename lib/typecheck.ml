@@ -196,6 +196,12 @@ and add_numeric_bound t annotated_thing =
     Hashtbl.replace generic_types_table t
       { g with bounds = Numeric_Bound :: g.bounds }
 
+(** The type variable in the current context. This is used to avoid generating
+    concrete implementations of functions for generic types. Since we can only
+    have one type variable at a time, there's no need to make this a stack/list.
+*)
+let current_type_variable : perktype option ref = ref None
+
 (* TODO: This ranking cannot be done with a total order, signed and unsigned are not comparable *)
 
 (** provides an integer ranking of numerical types: higher values are most
@@ -390,7 +396,8 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
 
       (* TODO: The body typecheck has been disabled to allow recursion. Please handle this properly *)
       (* typecheck the body *)
-      (* push_symbol_table ();
+      current_type_variable := Some type_param;
+      push_symbol_table ();
       List.iter
         (fun (typ, id) ->
           try bind_var id typ
@@ -402,7 +409,8 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
       in
       if (not body_returns) && not (is_unit_type ret_type) then
         raise_type_error tldf "Not all code paths return a value" No_return;
-      pop_symbol_table (); *)
+      pop_symbol_table ();
+      current_type_variable := None;
 
       (* add the generic type (bounds and inferred type) to the polyfun_bounds hashtable *)
       let param_gen_type = Hashtbl.find generic_types_table type_param in
@@ -420,11 +428,13 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
       (* the definition is added to the global polyfun hashtable, to allow it to be instantiated in other files *)
       Hashtbl.replace global_polyfuns id
         (PolymorphicFundef
-           ((ret_type, id, params, body (* Should be body_res *)), type_param)
+           ( (ret_type, id, params, body_res (* Should be body_res *)),
+             type_param )
         |> annot_copy tldf);
       annot_copy tldf
         (PolymorphicFundef
-           ((ret_type, id, params, body (* Should be body_res *)), type_param))
+           ( (ret_type, id, params, body_res (* Should be body_res *)),
+             type_param ))
   | Extern (id, typ) ->
       (* TODO: Possibly this check can be removed, if it can be performed beforehand by the keyword checker *)
       (if id = "self" then
@@ -1112,7 +1122,8 @@ and typecheck_match_case (match_type : perktype) case =
             | _, AlgebraicType (_, constructors, _tparam), _ ->
                 ( List.find (fun (ide, _) -> ide = id) constructors |> snd,
                   Option.fold ~none:""
-                    ~some:(fun t -> "_" ^ type_descriptor_of_perktype t)
+                    ~some:(fun t ->
+                      "_perk_polym_" ^ type_descriptor_of_perktype t)
                     _tparam )
             | _ -> failwith "Impossible, is_constructor_of returned true"
           in
@@ -1191,7 +1202,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           with Not_found ->
             raise_compilation_error expr
               (Printf.sprintf "Generic variable %s not found" id)
-              Unknown_error
+              Unknown_identifier
         in
         match teip with
         | _, AlgebraicType (ident, _constructors, Some _tparam), _ -> (
@@ -1224,22 +1235,21 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                 ([], Funtype (constructor_params, concrete_adt), [])
               in *)
               typecheck_expr ~expected_return
-                (annot_copy expr
-                   (Var (id ^ "_" ^ type_descriptor_of_perktype t)))
+                (annot_copy expr (Var (concrete_constructor_name id t)))
             with Not_found ->
               raise_compilation_error expr
                 (Printf.sprintf
                    "Impossible: Constructor %s not found in its associated \
                     type %s"
                    id ident)
-                Unknown_error)
+                ADT_Invalid_constructor)
         | _ ->
             raise_compilation_error expr
               (Printf.sprintf
                  "Impossible: Constructor %s is associated with a type that is \
                   not a polymorphic AlgebraicType"
                  id)
-              Unknown_error
+              ADT_Wrong_constructor_type
       else (
         (if Hashtbl.mem (get_polyfun_bounds ()) id then
            let g = Hashtbl.find (get_polyfun_bounds ()) id in
@@ -1262,7 +1272,25 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                       id (show_perktype t))
                    Type_mismatch);
 
-        (if not (Hashtbl.mem (File_info.get_file_local_polyfuns ()) id) then
+        (* Find out if we are trying to compile a function with the current type variable *)
+        let is_current_typevar =
+          try
+            match_types t (Option.get !current_type_variable) |> ignore;
+            true
+          with _ -> false
+        in
+        say_here
+          (Printf.sprintf
+             "current_type_variable: %s, t: %s, is_current_typevar: %b"
+             (match !current_type_variable with
+             | Some ct -> show_perktype ct
+             | None -> "None")
+             (show_perktype t) is_current_typevar);
+
+        (if
+           (not (Hashtbl.mem (File_info.get_file_local_polyfuns ()) id))
+           && not is_current_typevar
+         then
            (* if the polyfun is defined globally but not locally, add it to a "to be defined" list *)
            (* Printf.printf "adding definition of %s instantiated on %s to tbd\n" id
           (show_perktype t); *)
@@ -1276,7 +1304,10 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
             Hashtbl.find (File_info.get_polyfun_instances ()) id
           else []
         in
-        if not (List.exists (fun (t', _) -> t = t') current_instances) then
+        if
+          (not (List.exists (fun (t', _) -> t = t') current_instances))
+          && not is_current_typevar
+        then
           Hashtbl.replace
             (File_info.get_polyfun_instances ())
             id
@@ -2121,8 +2152,7 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
           raise
             (Type_match_error
                (Printf.sprintf "Type mismatch 4: expected %s,\ngot %s instead"
-                  (Codegen.codegen_type ~expand:true expected)
-                  (Codegen.codegen_type ~expand:true actual)))
+                  (show_perktype expected) (show_perktype actual)))
     (* (show_perktype expected)
                   (show_perktype actual))) *)
   in

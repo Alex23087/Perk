@@ -75,7 +75,14 @@ and subst_mc (mc : match_case_a) (placeholder : perktype) (actual : perktype) :
     | MatchVar (id, t) -> MatchVar (id, Option.map subst_maybe t)
     | MatchExpr e -> MatchExpr (subst_e e)
     | CompoundCase (id, mc1) ->
-        CompoundCase (id, List.map (fun x -> subst_mc x placeholder actual) mc1))
+        let subtituted_ctor = Utils.subst_ctor_name id placeholder actual in
+        Utils.say_here
+          (Printf.sprintf
+             "Substituting constructor name %s with %s in match case" id
+             subtituted_ctor);
+        CompoundCase
+          ( subtituted_ctor,
+            List.map (fun x -> subst_mc x placeholder actual) mc1 ))
 
 and subst_type_expr (e : expr_a) (placeholder : perktype) (actual : perktype) =
   let subst_e = fun x -> subst_type_expr x placeholder actual in

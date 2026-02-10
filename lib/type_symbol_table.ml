@@ -226,9 +226,7 @@ let rec resolve_type (typ : perktype) : perktype =
 
                           List.iter
                             (fun (ide, t) ->
-                              let ide =
-                                ide ^ "_" ^ type_descriptor_of_perktype dat_t
-                              in
+                              let ide = concrete_constructor_name ide dat_t in
                               if Hashtbl.mem File_info.defined_constructors ide
                               then
                                 raise
@@ -247,8 +245,7 @@ let rec resolve_type (typ : perktype) : perktype =
                                     ( t,
                                       ( [],
                                         AlgebraicType
-                                          ( i ^ "_"
-                                            ^ type_descriptor_of_perktype dat_t,
+                                          ( concrete_constructor_name i dat_t,
                                             constructors,
                                             None ),
                                         [] ) ),
@@ -284,7 +281,7 @@ and type_descriptor_of_perktype ?(erase_env = true) (t : perktype) : string =
   | Structtype (id, _) -> id
   | AlgebraicType (id, _, None) -> id
   | AlgebraicType (id, _, Some t) ->
-      Printf.sprintf "%s_%s" id (type_descriptor_of_perktype t)
+      Printf.sprintf "%s_perk_polym_%s" id (type_descriptor_of_perktype t)
   | Funtype (args, ret) ->
       let args_str =
         String.concat "__" (List.map type_descriptor_of_perktype args)
@@ -321,7 +318,7 @@ and type_descriptor_of_perktype ?(erase_env = true) (t : perktype) : string =
       Printf.sprintf "tup_%s_le"
         (String.concat "__" (List.map type_descriptor_of_perktype ts))
   | PolyADTPlaceholder (i, t) ->
-      Printf.sprintf "%s_%s" i (type_descriptor_of_perktype t)
+      Printf.sprintf "%s_perk_polym_%s" i (type_descriptor_of_perktype t)
 
 and c_type_of_perktype ?(erase_env = true) (t : perktype) =
   if is_builtin_type_unlabeled t then c_type_of_base_type t
@@ -334,6 +331,11 @@ and type_descriptor_of_environment ?(erase_env = false)
     "env_"
     ^ String.concat "_"
         (List.map (fun (typ, _id) -> type_descriptor_of_perktype typ) free_vars)
+
+(** Generates the name for concrete constructors *)
+and concrete_constructor_name (ctor_name : string) (ctype : perktype) : string =
+  let type_str = type_descriptor_of_perktype ctype in
+  Printf.sprintf "%s_perk_polym_%s" ctor_name type_str
 
 (* Prints the symbol table 🤯 *)
 let print_type_symbol_table () =
@@ -696,3 +698,6 @@ let ext_fun_name (typ : perktype) (id : perkident) =
 (** Returns true if the identifier identifies a type *)
 let is_type (id : perkident) = lookup_type id |> Option.is_some
 (* TODO: Use for builtin types too *)
+;;
+
+Utils.type_descriptor_of_perktype_ptr := type_descriptor_of_perktype

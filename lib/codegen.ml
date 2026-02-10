@@ -606,7 +606,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
               (try Hashtbl.find constructor_table (id, t)
                with Not_found -> failwith "some shite wrong")
               |> List.map (fun (c, azzo) ->
-                  (c ^ "_" ^ type_descriptor_of_perktype t, azzo))
+                  (concrete_constructor_name c t, azzo))
             in
             let adt_type = ([], AlgebraicType (id, constructors, Some t), []) in
             let adt_desc = type_descriptor_of_perktype adt_type in
@@ -697,14 +697,20 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
       ""
   | InlineC s -> s
   | Fundef ((t, id, args, body), _, public) ->
+      say_here (Printf.sprintf "codegen_fundef: %s" id);
       indent_string ^ codegen_fundef ~public t id args body
   | PolymorphicFundef ((t_res, id, args, body), t_param) ->
-      if not (Hashtbl.mem (File_info.get_polyfun_instances ()) id) then
-        (* let _ = Printf.printf "THERE ARE NO INSTANCES of %s\n" id in *)
+      if not (Hashtbl.mem (File_info.get_polyfun_instances ()) id) then (
+        say_here
+          (Printf.sprintf
+             "codegen_polymorphic_fundef: THERE ARE NO INSTANCES of %s\n" id);
         (* there are no instances *)
-        ""
+        "")
       else
         let instances = Hashtbl.find (File_info.get_polyfun_instances ()) id in
+        say_here
+          (Printf.sprintf "codegen_polymorphic_fundef: %s, %d instances" id
+             (List.length instances));
         let instanced_funs =
           List.map
             (fun (t_actual, was_instantiated) ->
@@ -718,21 +724,24 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                     "function %s<%s> was not instantiated, now it is\n" id
                     (show_perktype t_actual)
                 in *)
-                Some
-                  (( $ )
-                     (!Utils.typecheck_tldf_ptr
-                        (annot_copy tldf
-                           (Fundef
-                              ( ( subst_type t_res t_param t_actual,
-                                  id ^ "_perk_polym_"
-                                  ^ type_descriptor_of_perktype t_actual,
-                                  List.map
-                                    (fun x ->
-                                      subst_perkvardesc x t_param t_actual)
-                                    args,
-                                  subst_type_command body t_param t_actual ),
-                                Normal,
-                                false ))))))
+                let concrete_fundef =
+                  annot_copy tldf
+                    (Fundef
+                       ( ( subst_type t_res t_param t_actual,
+                           id ^ "_perk_polym_"
+                           ^ type_descriptor_of_perktype t_actual,
+                           List.map
+                             (fun x -> subst_perkvardesc x t_param t_actual)
+                             args,
+                           subst_type_command body t_param t_actual ),
+                         Normal,
+                         false ))
+                in
+                say_here
+                  (Printf.sprintf
+                     "codegen_topleveldef: codegenning concrete function: %s"
+                     (show_topleveldef_a concrete_fundef));
+                Some (( $ ) (!Utils.typecheck_tldf_ptr concrete_fundef)))
             instances
         in
         String.concat "\n\n"
@@ -1090,7 +1099,7 @@ and codegen_type ?(expand : bool = false) (t : perktype) : string =
     | Structtype (id, _) -> id
     | AlgebraicType (id, _constructors, None) -> id
     | AlgebraicType (id, _constructors, Some t_param) ->
-        id ^ "_" ^ codegen_type t_param
+        id ^ "_perk_polym_" ^ codegen_type t_param
     | Funtype _ -> type_descriptor_of_perktype t
     | Lambdatype _ -> type_descriptor_of_perktype t
     | Pointertype ([], Structtype _, _) when expand -> "void*"
@@ -1756,7 +1765,7 @@ and generate_forward_declaration (t : perktype) : string =
   | AlgebraicType (id, _constructors, Some t_param) ->
       let type_str = type_descriptor_of_perktype t in
       Printf.sprintf "typedef struct %s %s;\n" type_str
-        (id ^ "_" ^ type_descriptor_of_perktype t_param)
+        (id ^ "_perk_polym_" ^ type_descriptor_of_perktype t_param)
   | AlgebraicType (id, _constructors, None) ->
       let type_str = type_descriptor_of_perktype t in
       Printf.sprintf "typedef struct %s %s;\n" type_str id
