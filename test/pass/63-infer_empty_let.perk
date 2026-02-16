@@ -1,0 +1,5 @@
+type <T> unit = Empty
+
+fun main(): void {
+    let x: unit@void = Empty
+}

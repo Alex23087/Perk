@@ -68,4 +68,6 @@ type error_code =
   | Internal_error
   | External_error
   | ADT_Unsame_constructor_types
+  | ADT_Unification_unexpected
+  | ADT_Constructor_does_not_construct
 [@@deriving enum, show { with_path = false }]

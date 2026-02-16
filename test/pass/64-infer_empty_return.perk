@@ -1,0 +1,5 @@
+type <T> unit = Empty
+
+fun main(): unit@void {
+    return Empty
+}
