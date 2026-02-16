@@ -1099,6 +1099,7 @@ and codegen_type ?(expand : bool = false) (t : perktype) : string =
     | Structtype (id, _) -> id
     | AlgebraicType (id, _constructors, None) -> id
     | AlgebraicType (id, _constructors, Some t_param) ->
+      let id = subst_ctor_name id t_param t_param in
         id ^ "_perk_polym_" ^ codegen_type t_param
     | Funtype _ -> type_descriptor_of_perktype t
     | Lambdatype _ -> type_descriptor_of_perktype t

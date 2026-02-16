@@ -1169,6 +1169,119 @@ and get_vars_in_case (case : match_case_a) =
   | _ -> []
 
 (** Typechecks expressions *)
+
+and unify_generic_const (genvar : perktype) (gen : perktype list)
+    (ground : perktype list) =
+  say_here (Printf.sprintf "Unifying: [%s], [%s]\n"
+    (List.map show_perktype gen |> String.concat ", ")
+    (List.map show_perktype ground |> String.concat ", "));
+  match (gen, ground) with
+  | t1 :: rest1, t2 :: rest2 -> (
+      match (t1, t2) with
+      | t1, t2 when genvar = t1 -> Some t2
+      | (_, PolyADTPlaceholder (n1, t1), _), (_, PolyADTPlaceholder (n2, t2), _)
+        when n1 = n2 && genvar = t1 ->
+          Some t2
+      | ( (_, PolyADTPlaceholder (n1, t1), _),
+          (_, AlgebraicType (n2, _, Some t2), _) ) ->
+          let n1 = subst_ctor_name n1 t1 t1 in
+          let n2 = subst_ctor_name n2 t2 t2 in
+          say_here (Printf.sprintf "BAHAN ANHIA XT %s, %s, %s\n" n1 n2 (show_perktype t1));
+          if n1 = n2 && genvar = t1 then (
+            say_here(Printf.sprintf "vaffanchooble\n");
+            Some t2)
+          else None
+      | _ ->
+          if equality_modulo_unresolved t1 t2 then
+            unify_generic_const genvar rest1 rest2
+          else
+            failwith
+              "should not happen, incompatible ground types in generic \
+               constructor")
+  | [], [] -> None
+  | _ ->
+      failwith
+        "should not happen, different number of arguments for same generic \
+         constructor"
+
+and check_if_is_generic_constr id =
+  Hashtbl.mem (File_info.get_polyadt_adt_from_constructor ()) id
+
+and equality_modulo_unresolved ((_, t1, _) as t11 : perktype)
+    ((_, t2, _) as t21 : perktype) =
+  say_here (Printf.sprintf "eq mod unres: %s vs %s\n" (show_perktype t11)
+    (show_perktype t21));
+  match (t1, t2) with
+  | PolyADTPlaceholder (n, t), AlgebraicType (n1, _, _)
+  | AlgebraicType (n1, _, _), PolyADTPlaceholder (n, t) ->
+      say_here(Printf.sprintf "inner check!!! %s vs %s\n"
+        (concrete_constructor_name n t)
+        n1);
+      concrete_constructor_name n t = n1
+  | _ -> t1 = t2
+
+and infer_generic_const_type (v : expr_a) (args : expr_a list) =
+  match ( $ ) v with
+  | Var id ->
+      let arg_types = List.map (fun x -> typecheck_expr x |> snd) args in
+
+      if check_if_is_generic_constr id then (
+        let polyadt_name =
+          match
+            Hashtbl.find (File_info.get_polyadt_adt_from_constructor ()) id
+          with
+          | _, AlgebraicType (n, _, _), _ -> n
+          | x ->
+              failwith
+                (Printf.sprintf "should not happen: compound polyadt name %s ??"
+                   (show_perktype x))
+        in
+
+        (* actually these can be taken from the above expression... *)
+        let genvar, constructors =
+          Hashtbl.find (File_info.get_polyadt_declared ()) polyadt_name
+        in
+        let signature = List.find (fun (n, _) -> n = id) constructors |> snd in
+
+        say_here (Printf.sprintf "maccheruni: %s" polyadt_name);
+
+        (* type obtained by short-circuitedly matching signature and argument types *)
+        let unified_type = unify_generic_const genvar signature arg_types in
+        match unified_type with
+        | None -> None
+        | Some u ->
+            (try
+               Hashtbl.find (File_info.get_polyadt_instances ()) polyadt_name
+               |> List.map fst |> ignore
+             with Not_found ->
+               (* if unified type not in list, bind the type *)
+               (* qua 🦆*)
+               ([], PolyADTPlaceholder (polyadt_name, u), [])
+               |> resolve_type |> bind_type_if_needed |> ignore);
+
+            (* perform grounding of the signature *)
+            let grounded =
+              List.map (fun x -> Polymorphism.subst_type x genvar u) signature
+            in
+            (* check equality of inferred ground type list and arg type list *)
+            say_here (Printf.sprintf "Checking equality mod unres [%s] vs [%s]\n"
+              (List.map show_perktype grounded |> String.concat ", ")
+              (List.map show_perktype arg_types |> String.concat ", "));
+            if List.for_all2 equality_modulo_unresolved grounded arg_types then (
+              say_here(Printf.sprintf "Same!\n");
+              Some (Var (concrete_constructor_name id u)))
+            else (
+              raise_type_error v
+                (Printf.sprintf
+                   "Could not infer type for generic constructor %s with argument \
+                    types [%s]"
+                   id
+                   (List.map show_perktype arg_types |> String.concat ", "))
+                ADT_Unsame_constructor_types
+            ))
+      else None
+  | _ -> None
+
 and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
     expr_a * perktype =
   match ( $ ) expr with
@@ -1351,67 +1464,80 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                 subst_type ret_type tparam t ),
             [] ) ))
   | Apply (func, params, _) -> (
-      let normal_handling (_ : unit) =
-        (* say_here
-        (Printf.sprintf "typechecking funcall diocaml: %s\n" (show_expr_a func)); *)
-        let fun_expr, fun_type =
+      let generic_const_type = infer_generic_const_type func params in
+
+      match generic_const_type with
+      | Some e ->
+          say_here (Printf.sprintf
+            "STUFF HAPPENED :( (good 👍) \
+             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
           typecheck_expr
-            ~expected_return:(Some ([], Funtype ([], void_type), []))
-              (* TODO: Put correct type here *)
-            func
-        in
-        (* Check that the function is a function 👍 *)
-        let fun_param_types, fun_ret_type, apptype =
-          match fun_type with
-          | _, Funtype (param_types, ret_type), _ ->
-              (param_types, ret_type, None)
-          | _, Lambdatype (param_types, ret_type, _), _ ->
-              (param_types, ret_type, Some fun_type)
-          | _ -> raise_type_error func "Function type expected" Type_mismatch
-        in
-        let param_rets =
-          try typecheck_expr_list params fun_param_types
-          with Invalid_argument _ ->
-            raise_type_error expr
-              (Printf.sprintf
-                 "Wrong number of parameters passed to function: expected %d, \
-                  got %d"
-                 (List.length fun_param_types)
-                 (List.length params))
-              Wrong_number_parameters
-        in
-        let _param_types =
-          try match_type_list fun_param_types param_rets
-          with Type_match_error msg -> raise_type_error expr msg Type_mismatch
-        in
-        let param_rets =
-          List.map2
-            (fun (e, t1) t2 -> fill_nothing e t1 t2)
-            param_rets _param_types
-        in
-        ( annot_copy expr (Apply (fun_expr, List.map fst param_rets, apptype)),
-          fun_ret_type )
-      in
-      match ( $ ) func with
-      | Access ({ node = Var e; _ }, _, _, _) when e |> is_type ->
-          normal_handling ()
-      | Access (e, ide, _, _) -> (
-          let exp, exp_t = typecheck_expr e in
-          let exp_t = ([], Basetype (show_perktype exp_t), []) in
-          match lookup_extension_function exp_t ide with
-          | Some _ext_fun ->
-              let synthesized_func =
-                annot_copy exp (Var (ext_fun_name exp_t ide))
-              in
-              let synthesized_expr =
-                Apply (synthesized_func, e :: params, None)
-              in
-              let exp_a, exp_t =
-                typecheck_expr (annot_copy expr synthesized_expr)
-              in
-              (exp_a, exp_t)
-          | None -> normal_handling ())
-      | _ -> normal_handling ())
+            (annot_copy expr (Apply (annot_copy func e, params, None)))
+      | None -> (
+          let normal_handling (_ : unit) =
+            (* say_here
+        (Printf.sprintf "typechecking funcall diocaml: %s\n" (show_expr_a func)); *)
+            let fun_expr, fun_type =
+              typecheck_expr
+                ~expected_return:(Some ([], Funtype ([], void_type), []))
+                  (* TODO: Put correct type here *)
+                func
+            in
+            (* Check that the function is a function 👍 *)
+            let fun_param_types, fun_ret_type, apptype =
+              match fun_type with
+              | _, Funtype (param_types, ret_type), _ ->
+                  (param_types, ret_type, None)
+              | _, Lambdatype (param_types, ret_type, _), _ ->
+                  (param_types, ret_type, Some fun_type)
+              | _ ->
+                  raise_type_error func "Function type expected" Type_mismatch
+            in
+            let param_rets =
+              try typecheck_expr_list params fun_param_types
+              with Invalid_argument _ ->
+                raise_type_error expr
+                  (Printf.sprintf
+                     "Wrong number of parameters passed to function: expected \
+                      %d, got %d"
+                     (List.length fun_param_types)
+                     (List.length params))
+                  Wrong_number_parameters
+            in
+            let _param_types =
+              try match_type_list fun_param_types param_rets
+              with Type_match_error msg ->
+                raise_type_error expr msg Type_mismatch
+            in
+            let param_rets =
+              List.map2
+                (fun (e, t1) t2 -> fill_nothing e t1 t2)
+                param_rets _param_types
+            in
+            ( annot_copy expr
+                (Apply (fun_expr, List.map fst param_rets, apptype)),
+              fun_ret_type )
+          in
+          match ( $ ) func with
+          | Access ({ node = Var e; _ }, _, _, _) when e |> is_type ->
+              normal_handling ()
+          | Access (e, ide, _, _) -> (
+              let exp, exp_t = typecheck_expr e in
+              let exp_t = ([], Basetype (show_perktype exp_t), []) in
+              match lookup_extension_function exp_t ide with
+              | Some _ext_fun ->
+                  let synthesized_func =
+                    annot_copy exp (Var (ext_fun_name exp_t ide))
+                  in
+                  let synthesized_expr =
+                    Apply (synthesized_func, e :: params, None)
+                  in
+                  let exp_a, exp_t =
+                    typecheck_expr (annot_copy expr synthesized_expr)
+                  in
+                  (exp_a, exp_t)
+              | None -> normal_handling ())
+          | _ -> normal_handling ()))
   | Binop (op, lhs, rhs) -> (
       let cast_priority t1 t2 =
         let r1 = numerical_rank t1 in
@@ -2178,6 +2304,41 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
           let ret_type = match_types_aux ret1 ret2 in
           ([], Lambdatype (param_types, ret_type, free1), [])
       | Pointertype (_, Basetype "void", _), Modeltype _ -> actual
+      | AlgebraicType (namel, _, None), AlgebraicType (namer, _, None)
+        when namel = namer ->
+          actual
+      | ( AlgebraicType (namel, _, Some paraml),
+          AlgebraicType (namer, ctors, Some paramr) ) ->
+          (* let polyadt_declared = File_info.get_polyadt_declared () in *)
+          (* let namel =
+            if Hashtbl.mem polyadt_declared namel then
+              concrete_constructor_name namel paraml
+            else namel
+          in
+          let namer =
+            if Hashtbl.mem polyadt_declared namer then
+              concrete_constructor_name namer paramr
+            else namer
+          in *)
+          let namel = subst_ctor_name namel paraml paraml in
+          let namer = subst_ctor_name namer paramr paramr in
+          if namel = namer then
+            try
+              match_types paraml paramr |> ignore;
+              say_here (Printf.sprintf "Match ô cazz: %s" namer);
+              (act_attr, AlgebraicType (namer, ctors, Some paraml), act_qual)
+            with Type_match_error _msg ->
+              raise
+                (Type_match_error
+                   (Printf.sprintf
+                      "Type mismatch in ADT parameters: expected %s,\n\
+                       got %s instead"
+                      (show_perktype paraml) (show_perktype paramr)))
+          else
+            raise
+              (Type_match_error
+                 (Printf.sprintf "Type mismatch 4: expected %s,\ngot %s instead"
+                    (show_perktype expected) (show_perktype actual)))
       | _ ->
           raise
             (Type_match_error

@@ -67,4 +67,5 @@ type error_code =
   | File_not_found
   | Internal_error
   | External_error
+  | ADT_Unsame_constructor_types
 [@@deriving enum, show { with_path = false }]

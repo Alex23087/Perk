@@ -247,7 +247,7 @@ let rec resolve_type (typ : perktype) : perktype =
                                         AlgebraicType
                                           ( concrete_constructor_name i dat_t,
                                             constructors,
-                                            None ),
+                                            Some dat_t ),
                                         [] ) ),
                                   [] ))
                             constructors;
@@ -281,6 +281,7 @@ and type_descriptor_of_perktype ?(erase_env = true) (t : perktype) : string =
   | Structtype (id, _) -> id
   | AlgebraicType (id, _, None) -> id
   | AlgebraicType (id, _, Some t) ->
+    let id = subst_ctor_name id t t in
       Printf.sprintf "%s_perk_polym_%s" id (type_descriptor_of_perktype t)
   | Funtype (args, ret) ->
       let args_str =
@@ -318,6 +319,7 @@ and type_descriptor_of_perktype ?(erase_env = true) (t : perktype) : string =
       Printf.sprintf "tup_%s_le"
         (String.concat "__" (List.map type_descriptor_of_perktype ts))
   | PolyADTPlaceholder (i, t) ->
+    let i = subst_ctor_name i t t in
       Printf.sprintf "%s_perk_polym_%s" i (type_descriptor_of_perktype t)
 
 and c_type_of_perktype ?(erase_env = true) (t : perktype) =

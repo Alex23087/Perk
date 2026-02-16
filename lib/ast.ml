@@ -265,6 +265,7 @@ let rec show_perktype (typ : perktype) : string =
   | Structtype (name, _) -> name
   | AlgebraicType (name, _, None) -> name
   | AlgebraicType (name, _, Some t) ->
+    (* TODO: cleanse name of _perk_polym_ *)
       Printf.sprintf "%s<%s>" name (show_perktype t)
   | PolyADTPlaceholder (name, t) ->
       Printf.sprintf "%s<%s>(unresolved)" name (show_perktype t)

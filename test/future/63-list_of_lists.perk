@@ -1,0 +1,10 @@
+import "stdio.h"
+
+type <T> list = Empty | Cons (T, list@T)
+
+fun main(): void {
+    let x := Cons (
+        Cons (1, Cons (2, Empty@int)),
+        Cons (Cons (3, Empty@int), Empty@int)
+    )
+}

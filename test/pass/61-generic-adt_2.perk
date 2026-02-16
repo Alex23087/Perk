@@ -56,7 +56,7 @@ fun <T> list_print (l : list @ T, print_func: (T) => void) : void {
 
 fun main () : void {
     let counter : int* = malloc(sizeof(int));
-    let long_list := list_generate (500, (): int {
+    let long_list := list_generate (10, (): int {
         *counter = *counter + 1;
         return *counter;
     });

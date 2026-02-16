@@ -322,3 +322,17 @@ let subst_ctor_name (id : perkident) (placeholder : perktype)
   (* let astr = "_perk_polym_" ^ !type_descriptor_of_perktype_ptr actual in *)
   let astr = "" in
   replace_if_end id pstr astr
+
+let print_polyadt_instances (instances : (string, (perktype * bool) list) Hashtbl.t) : unit =
+  if !verbose then (
+    Printf.printf "PolyADT instances:\n";
+    Hashtbl.iter
+      (fun adt_name inst_list ->
+        Printf.printf "ADT: %s\n" adt_name;
+        List.iter
+          (fun (typ, is_concrete) ->
+            let typ_desc = !type_descriptor_of_perktype_ptr typ in
+            Printf.printf "  Type: %s, Concrete: %b\n" typ_desc is_concrete)
+          inst_list)
+      instances;
+    flush stdout)
