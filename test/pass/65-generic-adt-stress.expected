@@ -1,0 +1,6 @@
+queue first: 1
+queue second: 2
+queue remaining sum: 18
+forced thunk: 21
+mapped option: 22
+tree sum: 42
