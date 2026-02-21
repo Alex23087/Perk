@@ -1,0 +1,190 @@
+import "stdio.h"
+
+// A polymorphic linked list used as a building block for other ADTs.
+type <T> list = Nil | Cons(T, list @ T)
+
+// Queue implemented with two lists (front/back) to exercise nested generic ADTs.
+type <T> queue = Queue(list @ T, list @ T)
+// Result ADT for queue pop, similar to an option carrying the updated queue.
+type <T> pop_result = EmptyPop | Popped(T, queue @ T)
+
+// Standard optional value ADT.
+type <T> option = None | Some(T)
+
+// Lazy/eager value ADT to test generic function values in constructors.
+type <T> thunk = Ready(T) | Deferred(() => T)
+
+// Polymorphic binary tree ADT.
+type <T> tree = Leaf(T) | Node(tree @ T, tree @ T)
+
+// Tail-recursive reverse-append on int lists.
+fun list_reverse_append_int(xs: list @ int, acc: list @ int): list @ int {
+    match (xs) {
+        Nil {
+            return acc
+        },
+        Cons(var hd, var tl) {
+            return list_reverse_append_int (tl, Cons(hd, acc))
+        }
+    }
+}
+
+fun list_reverse_int(xs: list @ int): list @ int {
+    return list_reverse_append_int (xs, Nil @ int)
+}
+
+// Create an empty queue.
+fun queue_empty_int(): queue @ int {
+    return Queue @ int (Nil @ int, Nil @ int)
+}
+
+// Keep invariant: if front is empty, move reversed back into front.
+fun queue_normalize_int(q: queue @ int): queue @ int {
+    match (q) {
+        Queue(Nil, var back) {
+            return Queue @ int (list_reverse_int(back), Nil @ int)
+        },
+        _ {
+            return q
+        }
+    }
+}
+
+fun queue_push_int(q: queue @ int, value: int): queue @ int {
+    match (q) {
+        Queue(var front, var back) {
+            return queue_normalize_int(Queue @ int (front, Cons @ int (value, back)))
+        }
+    }
+}
+
+fun queue_pop_int(q: queue @ int): pop_result @ int {
+    let normalized := queue_normalize_int(q);
+    match (normalized) {
+        Queue(Nil, _) {
+            return EmptyPop @ int
+        },
+        Queue(Cons(var hd, var tl), var back) {
+            return Popped @ int (hd, Queue @ int (tl, back))
+        }
+    }
+}
+
+// Consume an entire queue and sum all values.
+fun drain_sum(q: queue @ int): int {
+    match (queue_pop_int(q)) {
+        EmptyPop {
+            return 0
+        },
+        Popped(var head, var rest) {
+            return head + drain_sum(rest)
+        }
+    }
+}
+
+// Evaluate a thunk (either directly available or deferred in a lambda).
+fun <T> force(t: thunk @ T): T {
+    match (t) {
+        Ready(var value) {
+            return value
+        },
+        Deferred(var f) {
+            return f()
+        }
+    }
+}
+
+// Map an endomorphism over an int option.
+fun option_map_int(o: option @ int, f: (int) => int): option @ int {
+    match (o) {
+        None {
+            return o
+        },
+        Some(var value) {
+            return Some @ int (f(value))
+        }
+    }
+}
+
+// Map an endomorphism over all tree leaves.
+fun tree_map_int(t: tree @ int, f: (int) => int): tree @ int {
+    match (t) {
+        Leaf(var value) {
+            return Leaf @ int (f(value))
+        },
+        Node(var left, var right) {
+            return Node @ int (
+                tree_map_int(left, f),
+                tree_map_int(right, f)
+            )
+        }
+    }
+}
+
+// Generic fold over a tree, used here with int but defined polymorphically.
+fun <T> tree_fold(f: (T, T) => T, acc: T, t: tree @ T): T {
+    match (t) {
+        Leaf(var value) {
+            return f(value, acc)
+        },
+        Node(var left, var right) {
+            let acc1 := tree_fold @ T (f, acc, left);
+            return tree_fold @ T (f, acc1, right)
+        }
+    }
+}
+
+fun main(): void {
+    // Build queue [1,2,3,4,5,6] through repeated pushes.
+    let q0 := queue_empty_int();
+    let q1 := queue_push_int(q0, 1);
+    let q2 := queue_push_int(q1, 2);
+    let q3 := queue_push_int(q2, 3);
+    let q4 := queue_push_int(q3, 4);
+    let q5 := queue_push_int(q4, 5);
+    let q6 := queue_push_int(q5, 6);
+
+    // Pop two elements (tests nested matches and ADT destructuring).
+    match (queue_pop_int(q6)) {
+        EmptyPop {
+            printf("unexpected empty queue\n");
+        },
+        Popped(var first, var rest1) {
+            printf("queue first: %d\n", first);
+
+            match (queue_pop_int(rest1)) {
+                EmptyPop {
+                    printf("unexpected queue tail empty\n");
+                },
+                Popped(var second, var rest2) {
+                    printf("queue second: %d\n", second);
+
+                    let remaining := drain_sum(rest2);
+                    printf("queue remaining sum: %d\n", remaining);
+
+                    // Build and force a deferred computation.
+                    let delayed := Deferred @ int (() : int { return first + second + remaining });
+                    let forced := force @ int (delayed);
+                    printf("forced thunk: %d\n", forced);
+
+                    // Map over option and pattern-match the result.
+                    let lifted := option_map_int(Some @ int (first), (x: int): int { return x + forced });
+                    match (lifted) {
+                        None {
+                            printf("mapped option: none\n");
+                        },
+                        Some(var value) {
+                            printf("mapped option: %d\n", value);
+                        }
+                    };
+
+                    // Build a tree from queue-derived values, map, then fold it.
+                    let raw_tree := Node @ int (Leaf @ int (first), Node @ int (Leaf @ int (second), Leaf @ int (remaining)));
+                    let doubled_tree := tree_map_int(raw_tree, (x: int): int { return x * 2 });
+                    let tree_sum := tree_fold @ int ((x: int, acc: int): int { return x + acc }, 0, doubled_tree);
+                    printf("tree sum: %d\n", tree_sum);
+                }
+            }
+        }
+    }
+}
