@@ -88,7 +88,7 @@ let ast_of_filename filename =
   close_in inchn;
   ast
 
-let singletonamble =
+let singletonamble () =
   if !Utils.static_compilation then ""
   else
     "#include <malloc.h>\n#include <string.h>\n#include <stdbool.h>\n"
@@ -184,7 +184,7 @@ let rec compile_program ?(dir : string option) ?(dry_run = false)
       output_string oc compiled_preamble;
       close_out oc;
       let oc = open_out lambdummy_h in
-      output_string oc singletonamble;
+      output_string oc (singletonamble ());
       close_out oc)
   with
   | Syntax_error

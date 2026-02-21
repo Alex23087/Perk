@@ -1615,7 +1615,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       in
 
       match op with
-      | Add | Sub | Mul | Div ->
+      | Add | Sub | Mul | Div | Modulo ->
           let lhs_res, lhs_type = typecheck_expr lhs in
           let rhs_res, rhs_type = typecheck_expr rhs in
           let lhs_res, lhs_type, rhs_res, rhs_type =

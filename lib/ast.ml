@@ -96,7 +96,7 @@ and binop =
   | Lor
   | ShL
   | ShR
-(*  ... boolean and bitwise ops and all that  *)
+  | Modulo
 [@@deriving show, eq]
 
 and preunop =
