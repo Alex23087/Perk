@@ -4,6 +4,11 @@
   open Ast
   open Utils
   open Parse_lexing_commons
+
+  let rec command_of_commandlist (l : command_a list) = match l with
+    | [] -> failwith "should not happen"
+    | c :: [] -> c
+    | c :: rest -> annot_copy c (Seq (c, command_of_commandlist rest))
 %}
 
 /* Tokens declarations */
@@ -49,7 +54,7 @@
 %start program
 %type <Ast.topleveldef_a list> program
 %type <Ast.topleveldef_a> topleveldef
-%type <Ast.command_a> command
+%type <Ast.command_a> command_list
 %type <Ast.perkdef> perkdef
 %type <Ast.deforfun_a> deforfun
 %type <Ast.perkvardesc> perkvardesc
@@ -65,7 +70,7 @@
 %type <Ast.command_a> if_command
 %type <perkident * (Ast.perktype list)> constructor_type
 
-// %on_error_reduce command
+// %on_error_reduce command_list
 
 %%
 
@@ -111,21 +116,23 @@ topleveldef:
 
 
 if_command:
-  | If LParen e = expr RParen LBrace c1 = command RBrace Else LBrace c2 = command RBrace                   { annotate_2_code !fnm $loc (Ast.IfThenElse (e, c1, c2)) }
-  | If LParen e = expr RParen LBrace c1 = command RBrace Else c2 = if_command                              { annotate_2_code !fnm $loc (Ast.IfThenElse (e, c1, c2)) }
-  | If LParen e = expr RParen LBrace c1 = command RBrace                                                   { annotate_2_code !fnm $loc (Ast.IfThenElse (e, c1, annotate_dummy Ast.Skip)) }
+  | If LParen e = expr RParen LBrace c1 = command_list RBrace Else LBrace c2 = command_list RBrace                   { annotate_2_code !fnm $loc (Ast.IfThenElse (e, c1, c2)) }
+  | If LParen e = expr RParen LBrace c1 = command_list RBrace Else c2 = if_command                              { annotate_2_code !fnm $loc (Ast.IfThenElse (e, c1, c2)) }
+  | If LParen e = expr RParen LBrace c1 = command_list RBrace                                                   { annotate_2_code !fnm $loc (Ast.IfThenElse (e, c1, annotate_dummy Ast.Skip)) }
+
+command_list:
+  | l = nonempty_list (command)                                                                       { (command_of_commandlist l) }
 
 command:
   | ic = InlineC                                                                                           { annotate_2_code !fnm $loc (Ast.InlineCCmd(ic)) }
   | d = perkdef                                                                                            { annotate_2_code !fnm $loc (Ast.DefCmd (d, None)) }
   | l = expr Assign r = expr                                                                               { annotate_2_code !fnm $loc (Ast.Assign (l, r, None, None)) }
   | if_command                                                                                             { $1 }
-  | While LParen e = expr RParen LBrace c = command RBrace                                                 { annotate_2_code !fnm $loc (Ast.Whiledo (e, c)) }
-  | Do LBrace c = command RBrace While LParen e = expr RParen                                              { annotate_2_code !fnm $loc (Ast.Dowhile (e, c)) }
-  | For LParen c1 = command Semicolon e2 = expr Semicolon c3 = command RParen LBrace body = command RBrace { annotate_2_code !fnm $loc (Ast.For (c1, e2, c3, body)) }
-  | LBrace c = command RBrace                                                                              { annotate_2_code !fnm $loc (Ast.Block(c)) }
+  | While LParen e = expr RParen LBrace c = command_list RBrace                                                 { annotate_2_code !fnm $loc (Ast.Whiledo (e, c)) }
+  | Do LBrace c = command_list RBrace While LParen e = expr RParen                                              { annotate_2_code !fnm $loc (Ast.Dowhile (e, c)) }
+  | For LParen c1 = command Semicolon e2 = expr Semicolon c3 = command RParen LBrace body = command_list RBrace { annotate_2_code !fnm $loc (Ast.For (c1, e2, c3, body)) }
+  | LBrace c = command_list RBrace                                                                              { annotate_2_code !fnm $loc (Ast.Block(c)) }
   | e = expr                                                                                               { annotate_2_code !fnm $loc (Ast.Expr(e)) }
-  | c1 = command Semicolon c2 = command                                                                    { annotate_2_code !fnm $loc (Ast.Seq (c1, c2)) }
   | c1 = command Semicolon                                                                                 { c1 }
   | Skip                                                                                                   { annotate_2_code !fnm $loc (Ast.Skip) }
   | Return                                                                                                 { annotate_2_code !fnm $loc (Ast.Return (None)) }
@@ -136,18 +143,18 @@ command:
   | Match LParen e = expr RParen LBrace l = separated_nonempty_list (Comma, match_entry) RBrace            { annotate_2_code !fnm $loc (Ast.Match(e, l, None))}
   | Match LParen expr RParen LBrace separated_list (Comma, match_entry) error                              { raise (ParseError(!fnm, "invalid match statement (perhaps you are missing a ',' between cases?)", Invalid_match)) }
   | Match error                                                                                            { raise (ParseError(!fnm, "invalid match scrutinee (perhaps you are missing a '(' ?)", Invalid_match)) }
-  | error                                                                                                  { raise (ParseError(!fnm, "command expected", Expected_token)) }
-  | command error                                                                                          { raise (ParseError(!fnm, "unexpected command (perhaps you are missing a ';'?)", Unexpected_token)) }
+  | error                                                                                                  { raise (ParseError(!fnm, "command_list expected", Expected_token)) }
+  | command error                                                                                     { raise (ParseError(!fnm, "unexpected command_list (perhaps you are missing a ';'?)", Unexpected_token)) }
   | expr Assign error                                                                                      { raise (ParseError(!fnm, "expression expected on the right hand side of =", Expected_token)) }
   | For LParen command Semicolon expr Semicolon command RParen error                                       { raise (ParseError(!fnm, "missing braces after for guard", Missing_braces))}
-  | If LParen expr RParen LBrace command RBrace Else error                                                 { raise (ParseError(!fnm, "missing braces after else", Missing_braces))}
+  | If LParen expr RParen LBrace command_list RBrace Else error                                                 { raise (ParseError(!fnm, "missing braces after else", Missing_braces))}
   | If LParen expr RParen error                                                                            { raise (ParseError(!fnm, "missing braces after if guard", Missing_braces))}
   | While LParen expr RParen error                                                                         { raise (ParseError(!fnm, "missing braces after while guard", Missing_braces))}
   | Do error                                                                                               { raise (ParseError(!fnm, "missing braces after do", Missing_braces))}
 
 match_entry:
-  | m = match_case LBrace c = command RBrace                                                               { annotate_2_code !fnm $loc (Ast.MatchCase(m, None, c))}
-  | m = match_case When e = expr LBrace c = command RBrace                                                 { annotate_2_code !fnm $loc (Ast.MatchCase(m, Some e, c))}
+  | m = match_case LBrace c = command_list RBrace                                                               { annotate_2_code !fnm $loc (Ast.MatchCase(m, None, c))}
+  | m = match_case When e = expr LBrace c = command_list RBrace                                                 { annotate_2_code !fnm $loc (Ast.MatchCase(m, Some e, c))}
   | match_case error                                                                                       { raise (ParseError(!fnm, "invalid match case, expected case body", Expected_token)) }
   | error                                                                                                  { raise (ParseError(!fnm, "match case expected", Expected_token)) }
 
@@ -170,8 +177,8 @@ perkdef:
   | error                                                                                                  { raise (ParseError(!fnm, "definition expected (e.g. let banana : int = 5)", Expected_token)) }
 
 perkfun:
-  | i = Ident LParen id_list = perkvardesc_list RParen Colon rt = perktype LBrace c = command RBrace       { Keyword_tracker.validate_fun_identifier i; (rt, i, id_list, c) }
-  | i = Ident LParen RParen Colon rt = perktype LBrace c = command RBrace                                  { Keyword_tracker.validate_fun_identifier i; (rt, i, [], c) }
+  | i = Ident LParen id_list = perkvardesc_list RParen Colon rt = perktype LBrace c = command_list RBrace       { Keyword_tracker.validate_fun_identifier i; (rt, i, id_list, c) }
+  | i = Ident LParen RParen Colon rt = perktype LBrace c = command_list RBrace                                  { Keyword_tracker.validate_fun_identifier i; (rt, i, [], c) }
   | Ident LParen perkvardesc_list RParen error                                                             { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)", Invalid_fundef)) }
   | Ident LParen RParen error                                                                              { raise (ParseError(!fnm, "invalid function definition (Did you forget to specify the return type?)", Invalid_fundef)) }
   | error                                                                                                  { Keyword_tracker.raise_keyword_error fnm "function" }
@@ -195,8 +202,8 @@ expr:
   | e1 = expr b = binop e2 = expr                                                                          { annotate_2_code !fnm $loc (Ast.Binop (b, e1, e2)) }
   | u = preunop e = expr                                                                                   { annotate_2_code !fnm $loc (Ast.PreUnop (u, e, None)) }
   | e = expr u = postunop %prec POSTFIX                                                                    { annotate_2_code !fnm $loc (Ast.PostUnop (u, e)) }
-  | LParen id_list = perkvardesc_list RParen Colon ret = perktype LBrace c = command RBrace                { annotate_2_code !fnm $loc (Ast.Lambda (ret, id_list, c, [], None)) }
-  | LParen RParen Colon ret = perktype LBrace c = command RBrace                                           { annotate_2_code !fnm $loc (Ast.Lambda (ret, [], c, [], None)) }
+  | LParen id_list = perkvardesc_list RParen Colon ret = perktype LBrace c = command_list RBrace                { annotate_2_code !fnm $loc (Ast.Lambda (ret, id_list, c, [], None)) }
+  | LParen RParen Colon ret = perktype LBrace c = command_list RBrace                                           { annotate_2_code !fnm $loc (Ast.Lambda (ret, [], c, [], None)) }
   | b = Boolean                                                                                            { annotate_2_code !fnm $loc (Ast.Bool (b)) }
   | n = Integer                                                                                            { annotate_2_code !fnm $loc (Ast.Int (n)) }
   | f = Float                                                                                              { annotate_2_code !fnm $loc (Ast.Float (f)) }
