@@ -1151,7 +1151,7 @@ and codegen_expr (e : expr_a) : string =
   | Bool b -> string_of_bool b
   | Int i -> string_of_int i
   | Float f -> string_of_float f
-  | Char c -> Printf.sprintf "'%c'" c
+  | Char c -> Printf.sprintf "'%s'" (Char.escaped c)
   | String s -> Printf.sprintf "\"%s\"" (String.escaped s)
   | Var id -> id
   | PolymorphicVar (id, param) ->
@@ -1443,6 +1443,7 @@ and codegen_binop (op : binop) : string =
   | Neq -> "!="
   | ShL -> "<<"
   | ShR -> ">>"
+  | Modulo -> "%"
 
 (** generates code for prefix unary operators *)
 and codegen_preunop (op : preunop) : string =

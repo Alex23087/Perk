@@ -77,6 +77,7 @@ let rec token lexbuf =
     | "<<" -> ShL
     | ">" -> Gt
     | "-" -> Minus
+    | "%" -> Percent
     | "!" | 0x00AC -> Bang (* ¬ *)
     | "and" | 0x2227 | "&&" -> Land (* ∧ *)
     | "or" | 0x2228 | "||" -> Lor (* ∨ *)
@@ -227,6 +228,7 @@ and multiline_comment lexbuf =
 and char lexbuf =
   match%sedlex lexbuf with
   | character, "'" -> Character (Sedlexing.Utf8.lexeme lexbuf).[0]
+  | "\\n", "'" -> Character '\n' (* Makeshift solution, TODO make more general *)
   | _ ->
       let start_pos =
         ( (fst (Sedlexing.lexing_positions lexbuf)).pos_lnum,

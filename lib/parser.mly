@@ -8,7 +8,7 @@
 
 /* Tokens declarations */
 %token EOF
-%token Plus Eq Neq Lt Leq Gt Geq Minus Star Div Ampersand PlusPlus MinusMinus Dot Ellipsis Question Land Lor ShL ShR
+%token Plus Eq Neq Lt Leq Gt Geq Minus Percent Star Div Ampersand PlusPlus MinusMinus Dot Ellipsis Question Land Lor ShL ShR
 %token Fun TypeFun Assign If Then Else While Do For
 %token <bool> Boolean
 %token <int> Integer
@@ -292,6 +292,7 @@ perktype_partial:
   | Lor                                                                                                    { Ast.Lor }
   | ShL                                                                                                    { Ast.ShL }
   | ShR                                                                                                    { Ast.ShR }
+  | Percent                                                                                                { Ast.Modulo}
 
 %inline preunop:
   | Minus                                                                                                  { Ast.Neg }
