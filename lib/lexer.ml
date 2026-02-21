@@ -127,6 +127,8 @@ let rec token lexbuf =
     | "summon" -> Summon
     | "banish" -> Banish
     | "struct" -> Struct
+    | "@packed" -> Packed
+    | "@aligned" -> Aligned
     | "make" -> Make
     | "type" -> ADT
     | "|" -> Pipe

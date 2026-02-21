@@ -32,6 +32,7 @@
 %token Struct Make
 %token ADT Pipe Match When Matchall Constr Var BTICK
 %token Nothing Something Of Poly
+%token Packed Aligned
 
 /* Precedence and associativity specification */
 %left Semicolon
@@ -100,7 +101,8 @@ topleveldef:
   | Model i = Ident LBrace l = perkdeforfun_list RBrace                                                    { Keyword_tracker.validate_model_identifier i; annotate_2_code !fnm $loc (Ast.Model (i, [], l)) }
   | Model Ident error                                                                                      { Keyword_tracker.raise_keyword_error fnm "model" }
   | Model error                                                                                            { Keyword_tracker.raise_keyword_error fnm "model" }
-  | Struct i = Ident LBrace l = separated_list(Comma, perkdef) RBrace                                      { Keyword_tracker.validate_struct_identifier i; annotate_2_code !fnm $loc (Ast.Struct (i, l)) }
+  | Struct i = Ident LBrace l = separated_list(Comma, perkdef) RBrace                                      { Keyword_tracker.validate_struct_identifier i; annotate_2_code !fnm $loc (Ast.Struct (i, l, [])) }
+  | Struct i = Ident al = list(struct_attr) LBrace l = separated_list(Comma, perkdef) RBrace               { Keyword_tracker.validate_struct_identifier i; annotate_2_code !fnm $loc (Ast.Struct (i, l, al)) }
   | Struct Ident LBrace error                                                                              { raise (ParseError(!fnm, "unexpected token in struct definition", Unexpected_token)) }
   | Struct Ident error                                                                                     { Keyword_tracker.raise_keyword_error fnm "struct" }
   | Struct error                                                                                           { Keyword_tracker.raise_keyword_error fnm "struct" }
@@ -114,6 +116,9 @@ topleveldef:
   | Fun Lt t=perktype Gt pf = perkfun                                                                      { annotate_2_code !fnm $loc (Ast.PolymorphicFundef (pf, t)) }
   | error                                                                                                  { raise (ParseError(!fnm, "top-level definition expected", Top_level_definition_expected)) }
 
+struct_attr:
+  | Packed {Ast.Packed}
+  | Aligned LParen i = Integer RParen {Ast.Aligned(i)}
 
 if_command:
   | If LParen e = expr RParen LBrace c1 = command_list RBrace Else LBrace c2 = command_list RBrace                   { annotate_2_code !fnm $loc (Ast.IfThenElse (e, c1, c2)) }

@@ -743,7 +743,10 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
           | DefVar (_, ((typ, _), _)) -> bind_type_if_needed typ)
         fields_res;
       annot_copy tldf (Model (ident, archetypes, fields_res))
-  | Struct (ident, fields) ->
+  | Struct (ident, fields, attr) ->
+      (* TODO: Check struct attributes: e.g.,
+        check that you are not using duplicate attrs,
+        that you are not using a negative integer for the packing, etc. *)
       let local_symbol_table = ref [ Hashtbl.create 10 ] in
       let (fields_res : perkdef list) =
         List.map
@@ -758,7 +761,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
           fields
       in
       bind_type_if_needed ([], Structtype (ident, fields_res), []);
-      annot_copy tldf (Struct (ident, fields_res))
+      annot_copy tldf (Struct (ident, fields_res, attr))
   | ADT (ident, constructors, None) ->
       (* TODO: check existence of types *)
       List.iter

@@ -196,6 +196,10 @@ and match_case_t =
   | CompoundCase of perkident * match_case_a list
 [@@deriving show, eq]
 
+and struct_attr = 
+  | Packed
+  | Aligned of int
+
 and topleveldef_t =
   | InlineC of string
   | Import of string
@@ -207,7 +211,7 @@ and topleveldef_t =
   | PolymorphicFundef of perkfundef * perktype
   | Archetype of perkident * declorfun_a list
   | Model of perkident * perkident list * deforfun_a list
-  | Struct of perkident * perkdef list
+  | Struct of perkident * perkdef list * (struct_attr list)
   | ADT of perkident * (perkident * perktype list) list * perktype option
       (** name, params, type param *)
   | TLSkip
