@@ -4,6 +4,11 @@
   open Ast
   open Utils
   open Parse_lexing_commons
+
+  let rec command_of_commandlist (l : command_a list) = match l with
+    | [] -> failwith "should not happen"
+    | c :: [] -> c
+    | c :: rest -> annot_copy c (Seq (c, command_of_commandlist rest))
 %}
 
 /* Tokens declarations */
@@ -116,17 +121,19 @@ if_command:
   | If LParen e = expr RParen LBrace c1 = command RBrace                                                   { annotate_2_code !fnm $loc (Ast.IfThenElse (e, c1, annotate_dummy Ast.Skip)) }
 
 command:
+  | l = nonempty_list (command_atom)                                                                       { (command_of_commandlist l) }
+
+command_atom:
   | ic = InlineC                                                                                           { annotate_2_code !fnm $loc (Ast.InlineCCmd(ic)) }
   | d = perkdef                                                                                            { annotate_2_code !fnm $loc (Ast.DefCmd (d, None)) }
   | l = expr Assign r = expr                                                                               { annotate_2_code !fnm $loc (Ast.Assign (l, r, None, None)) }
   | if_command                                                                                             { $1 }
   | While LParen e = expr RParen LBrace c = command RBrace                                                 { annotate_2_code !fnm $loc (Ast.Whiledo (e, c)) }
   | Do LBrace c = command RBrace While LParen e = expr RParen                                              { annotate_2_code !fnm $loc (Ast.Dowhile (e, c)) }
-  | For LParen c1 = command Semicolon e2 = expr Semicolon c3 = command RParen LBrace body = command RBrace { annotate_2_code !fnm $loc (Ast.For (c1, e2, c3, body)) }
+  | For LParen c1 = command_atom Semicolon e2 = expr Semicolon c3 = command_atom RParen LBrace body = command RBrace { annotate_2_code !fnm $loc (Ast.For (c1, e2, c3, body)) }
   | LBrace c = command RBrace                                                                              { annotate_2_code !fnm $loc (Ast.Block(c)) }
   | e = expr                                                                                               { annotate_2_code !fnm $loc (Ast.Expr(e)) }
-  | c1 = command Semicolon c2 = command                                                                    { annotate_2_code !fnm $loc (Ast.Seq (c1, c2)) }
-  | c1 = command Semicolon                                                                                 { c1 }
+  | c1 = command_atom Semicolon                                                                                 { c1 }
   | Skip                                                                                                   { annotate_2_code !fnm $loc (Ast.Skip) }
   | Return                                                                                                 { annotate_2_code !fnm $loc (Ast.Return (None)) }
   | Return e = expr                                                                                        { annotate_2_code !fnm $loc (Ast.Return (Some e)) }
@@ -137,7 +144,7 @@ command:
   | Match LParen expr RParen LBrace separated_list (Comma, match_entry) error                              { raise (ParseError(!fnm, "invalid match statement (perhaps you are missing a ',' between cases?)", Invalid_match)) }
   | Match error                                                                                            { raise (ParseError(!fnm, "invalid match scrutinee (perhaps you are missing a '(' ?)", Invalid_match)) }
   | error                                                                                                  { raise (ParseError(!fnm, "command expected", Expected_token)) }
-  | command error                                                                                          { raise (ParseError(!fnm, "unexpected command (perhaps you are missing a ';'?)", Unexpected_token)) }
+  | command_atom error                                                                                          { raise (ParseError(!fnm, "unexpected command (perhaps you are missing a ';'?)", Unexpected_token)) }
   | expr Assign error                                                                                      { raise (ParseError(!fnm, "expression expected on the right hand side of =", Expected_token)) }
   | For LParen command Semicolon expr Semicolon command RParen error                                       { raise (ParseError(!fnm, "missing braces after for guard", Missing_braces))}
   | If LParen expr RParen LBrace command RBrace Else error                                                 { raise (ParseError(!fnm, "missing braces after else", Missing_braces))}

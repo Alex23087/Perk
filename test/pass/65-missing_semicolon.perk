@@ -1,4 +1,4 @@
-fun main(): void {
+fun main(): int {
     let x: int = 5
     return x
 }
