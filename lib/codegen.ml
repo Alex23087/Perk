@@ -494,11 +494,23 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
         indent_string name name params_str_with_types indent_string name name
         initializers_str archetypes_substruct_str constructor_call_str
         indent_string
-  | Struct (id, fields) ->
+  | Struct (id, fields, attr_list) ->
       let fields_decl = List.map fst fields in
+      let cg_attributes al =
+        if List.is_empty al then "" else
+        Printf.sprintf "__attribute__((%s)) "
+          (List.map
+             (fun a ->
+               match a with
+               | Packed -> "packed"
+               | Aligned n -> "aligned(" ^ string_of_int n ^ ")")
+             al
+          |> String.concat ", ")
+      in
       add_code_to_type_binding
         ([], Structtype (id, fields), [])
-        (Printf.sprintf "\n%stypedef struct %s {\n%s\n} %s;\n" indent_string id
+        (Printf.sprintf "\n%stypedef struct %s {\n%s\n} %s%s;\n" indent_string
+           id
            (if List.length fields_decl = 0 then ""
             else
               (indent_string ^ "    "
@@ -506,7 +518,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                   (";\n" ^ indent_string ^ "    ")
                   (List.map codegen_decl fields_decl))
               ^ ";")
-           id);
+           (cg_attributes attr_list) id);
       ""
       (* TODO for now treating the two cases separately, which results in some code duplication. Should factor out the common code *)
   | ADT (id, constructors, None) ->
@@ -606,7 +618,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
               (try Hashtbl.find constructor_table (id, t)
                with Not_found -> failwith "some shite wrong")
               |> List.map (fun (c, azzo) ->
-                  (concrete_constructor_name c t, azzo))
+                     (concrete_constructor_name c t, azzo))
             in
             let adt_type = ([], AlgebraicType (id, constructors, Some t), []) in
             let adt_desc = type_descriptor_of_perktype adt_type in
@@ -1099,7 +1111,7 @@ and codegen_type ?(expand : bool = false) (t : perktype) : string =
     | Structtype (id, _) -> id
     | AlgebraicType (id, _constructors, None) -> id
     | AlgebraicType (id, _constructors, Some t_param) ->
-      let id = subst_ctor_name id t_param t_param in
+        let id = subst_ctor_name id t_param t_param in
         id ^ "_perk_polym_" ^ codegen_type t_param
     | Funtype _ -> type_descriptor_of_perktype t
     | Lambdatype _ -> type_descriptor_of_perktype t

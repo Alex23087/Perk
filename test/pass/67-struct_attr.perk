@@ -1,0 +1,23 @@
+import "stdio.h"
+
+struct Point @packed {
+    let x := 10,
+    let y := 20,
+    let z := 30
+}
+
+fun main (): void {
+    let p := make Point(y = 42, x = 11);
+    printf("%d\n", p.x); // Should print 11
+    printf("%d\n", p.y); // Should print 42
+    printf("%d\n", p.z); // Should print 30
+
+    let p2 := make Point();
+    p = p2;
+    p2.x = 100;
+    p.x = 200;
+    printf("%d\n", p.x); // Should print 200
+    printf("%d\n", p2.x); // Should print 100
+    printf("%d\n", p2.y); // Should print 20
+    printf("%d\n", p.z); // Should print 30
+}
