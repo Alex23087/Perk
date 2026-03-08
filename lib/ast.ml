@@ -97,6 +97,8 @@ and binop =
   | ShL
   | ShR
   | Modulo
+  | Band
+  | Bor (* 🐗 *)
 [@@deriving show, eq]
 
 and preunop =

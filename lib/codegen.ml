@@ -497,15 +497,16 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
   | Struct (id, fields, attr_list) ->
       let fields_decl = List.map fst fields in
       let cg_attributes al =
-        if List.is_empty al then "" else
-        Printf.sprintf "__attribute__((%s)) "
-          (List.map
-             (fun a ->
-               match a with
-               | Packed -> "packed"
-               | Aligned n -> "aligned(" ^ string_of_int n ^ ")")
-             al
-          |> String.concat ", ")
+        if List.is_empty al then ""
+        else
+          Printf.sprintf "__attribute__((%s)) "
+            (List.map
+               (fun a ->
+                 match a with
+                 | Packed -> "packed"
+                 | Aligned n -> "aligned(" ^ string_of_int n ^ ")")
+               al
+            |> String.concat ", ")
       in
       add_code_to_type_binding
         ([], Structtype (id, fields), [])
@@ -1305,12 +1306,19 @@ and codegen_expr (e : expr_a) : string =
       | Reference ->
           let fresh_ide = fresh_var "ref" in
           let e1_str = codegen_expr e in
-          let e1_decl_string =
-            Printf.sprintf "%s %s = %s;\n" (codegen_type typ) fresh_ide e1_str
+          let e1_decl_string, optional_cast, ampersand_if_required =
+            match typ with
+            | _, Arraytype (t, _), _ ->
+                let ptrtype = codegen_type (pointer_of_type t) in
+                Printf.sprintf "%s %s = (%s)%s;\n" ptrtype fresh_ide ptrtype
+                  e1_str, "("^(typ |> pointer_of_type |> codegen_type)^")", ""
+            | _ ->
+                Printf.sprintf "%s %s = %s;\n" (codegen_type typ) fresh_ide
+                  e1_str, "", codegen_preunop op
           in
           generated_freevars := !generated_freevars ^ e1_decl_string;
 
-          Printf.sprintf "%s%s" (codegen_preunop op) fresh_ide
+          Printf.sprintf "%s(%s%s)" optional_cast (ampersand_if_required) fresh_ide
       | _ -> Printf.sprintf "%s%s" (codegen_preunop op) (codegen_expr e))
   | PostUnop (op, e) -> (
       match op with
@@ -1456,6 +1464,8 @@ and codegen_binop (op : binop) : string =
   | ShL -> "<<"
   | ShR -> ">>"
   | Modulo -> "%"
+  | Band -> "&"
+  | Bor -> "|"
 
 (** generates code for prefix unary operators *)
 and codegen_preunop (op : preunop) : string =

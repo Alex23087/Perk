@@ -304,7 +304,9 @@ perktype_partial:
   | Lor                                                                                                    { Ast.Lor }
   | ShL                                                                                                    { Ast.ShL }
   | ShR                                                                                                    { Ast.ShR }
-  | Percent                                                                                                { Ast.Modulo}
+  | Percent                                                                                                { Ast.Modulo }
+  | Ampersand                                                                                              { Ast.Band }
+  | Pipe                                                                                                   { Ast.Bor }
 
 %inline preunop:
   | Minus                                                                                                  { Ast.Neg }
