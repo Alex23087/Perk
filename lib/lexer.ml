@@ -111,6 +111,7 @@ let rec token lexbuf =
     | "private" -> Private
     | "static" -> Static
     | "extern" -> Extern
+    | "pretend" -> Pretend
     | "const" -> Const
     | "volatile" -> Volatile
     | "restrict" -> Restrict
@@ -176,6 +177,8 @@ let rec token lexbuf =
     | "!" -> Bang
     | "*" | 0x00D7 -> Star (* × *)
     | "/" -> Div
+    | "^" -> Wedge
+    | "~" -> Tilde
     | "//" -> comment lexbuf
     | "/*" -> multiline_comment lexbuf
     | eof -> EOF

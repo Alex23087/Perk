@@ -24,7 +24,7 @@
 %token Comma Semicolon Colon LParen RParen LBrace RBrace LBracket RBracket Bang
 %token Arrow Bigarrow As
 %token Skip Return Let Continue Break
-%token Public Private Static Extern
+%token Public Private Static Extern Pretend
 %token Const Volatile Restrict
 %token <string> InlineC
 %token Import ImportLocal Open
@@ -33,6 +33,7 @@
 %token ADT Pipe Match When Matchall Constr Var BTICK
 %token Nothing Something Of Poly
 %token Packed Aligned
+%token Tilde Wedge
 
 /* Precedence and associativity specification */
 %left Semicolon
@@ -92,6 +93,7 @@ topleveldef:
   | ImportLocal i = String                                                                                 { annotate_2_code !fnm $loc (Ast.Import ("\"" ^ i ^ "\"")) }
   | Open i = String                                                                                        { annotate_2_code !fnm $loc (Ast.Open i) }
   | Extern id = Ident Colon t = perktype                                                                   { annotate_2_code !fnm $loc (Ast.Extern (id, t)) }
+  | Pretend id = Ident Colon t = perktype                                                                  { annotate_2_code !fnm $loc (Ast.Pretend (id, t)) }
   | ic = InlineC                                                                                           { annotate_2_code !fnm $loc (Ast.InlineC(ic)) }
   | d = perkdef                                                                                            { annotate_2_code !fnm $loc (Ast.Def (d, None)) }
   | Archetype i = Ident LBrace l = perkdeclorfun_list RBrace                                               { Keyword_tracker.validate_archetype_identifier i; annotate_2_code !fnm $loc (Ast.Archetype (i, l)) }
@@ -307,6 +309,7 @@ perktype_partial:
   | Percent                                                                                                { Ast.Modulo }
   | Ampersand                                                                                              { Ast.Band }
   | Pipe                                                                                                   { Ast.Bor }
+  | Wedge                                                                                                  { Ast.Bxor }
 
 %inline preunop:
   | Minus                                                                                                  { Ast.Neg }
@@ -315,6 +318,7 @@ perktype_partial:
   | Star                                                                                                   { Ast.Dereference }
   | PlusPlus                                                                                               { Ast.PreIncrement }
   | MinusMinus                                                                                             { Ast.PreDecrement }
+  | Tilde                                                                                                  { Ast.Bnot }
 
 %inline postunop:
   | PlusPlus                                                                                               { Ast.PostIncrement }

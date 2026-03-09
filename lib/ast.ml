@@ -99,6 +99,7 @@ and binop =
   | Modulo
   | Band
   | Bor (* 🐗 *)
+  | Bxor
 [@@deriving show, eq]
 
 and preunop =
@@ -108,6 +109,7 @@ and preunop =
   | Reference
   | PreIncrement
   | PreDecrement
+  | Bnot
 [@@deriving show, eq]
 
 and postunop =
@@ -207,6 +209,7 @@ and topleveldef_t =
   | Import of string
   | Open of string
   | Extern of perkident * perktype
+  | Pretend of perkident * perktype
   | Def of perkdef * perktype option
   | Fundef of perkfundef * funkind * bool
       (** fundef, what kind of function is it? is it public?*)

@@ -435,7 +435,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
         (PolymorphicFundef
            ( (ret_type, id, params, body_res (* Should be body_res *)),
              type_param ))
-  | Extern (id, typ) ->
+  | Extern (id, typ) | Pretend (id, typ) ->
       (* TODO: Possibly this check can be removed, if it can be performed beforehand by the keyword checker *)
       (if id = "self" then
          raise_type_error tldf "Identifier self is reserved" Reserved_identifier
@@ -814,7 +814,12 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       else
         let typ' = resolve_type typ in
         let expr = add_lambda_name expr id in
-        let expr_res, expr_type = typecheck_expr ~expected_return:(match discard_type_aq typ' with | Infer -> None | _ -> Some typ') expr in
+        let expr_res, expr_type =
+          typecheck_expr
+            ~expected_return:
+              (match discard_type_aq typ' with Infer -> None | _ -> Some typ')
+            expr
+        in
         let expr_res, expr_type = fill_nothing expr_res expr_type typ' in
         let expr_type =
           match (typ', expr_type) with
@@ -1618,7 +1623,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       in
 
       match op with
-      | Add | Sub | Mul | Div | Modulo | Bor | Band ->
+      | Add | Sub | Mul | Div | Modulo | Bor | Band | Bxor ->
           let lhs_res, lhs_type = typecheck_expr lhs in
           let rhs_res, rhs_type = typecheck_expr rhs in
           let lhs_res, lhs_type, rhs_res, rhs_type =
@@ -1686,13 +1691,20 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
               (Printf.sprintf "Cannot dereference non-pointer type %s"
                  (show_perktype expr_type))
               Type_mismatch
+        | Bnot, t when not (is_integral t) ->
+            raise_type_error expr
+              (Printf.sprintf
+                 "Bitwise negation can only be applied to numerical types")
+              Type_mismatch
+        | Neg, t when not (is_numerical t) ->
+            raise_type_error expr
+              (Printf.sprintf
+                 "Boolean negation can only be applied to numerical types")
+              Type_mismatch
         | _, t -> t
       in
       (annot_copy expr (PreUnop (op, expr_res, Some expr_type)), res_type)
-  | Lambda (retype, params, body, _, lambda_name) ->
-      if !Utils.static_compilation then
-        raise_compilation_error expr
-          "Lambdas cannot be used in static compilation mode" Static_comp_lambda;
+  | Lambda (retype, params, body, _fvars, lambda_name) ->
       push_symbol_table ();
       if Option.is_some lambda_name then
         bind_var (Option.get lambda_name)
@@ -1727,6 +1739,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                   Unknown_identifier)
           free_vars
       in
+
       (* if a lambda has no free variables, it is made into a function *)
       let lamtype =
         match free_vars with
@@ -1739,6 +1752,14 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                   (List.map (fun (typ, _) -> typ) params, retype, free_vars),
                 [] )
         | _ ->
+            if !Utils.static_compilation then
+              raise_compilation_error expr
+                (Printf.sprintf
+                   "Capturing lambdas not allowed in static compilation mode: \
+                    lambda captures %s"
+                   (String.concat "," (List.map snd free_vars)))
+                Static_comp_lambda;
+
             ( [],
               Lambdatype
                 (List.map (fun (typ, _) -> typ) params, retype, free_vars),
@@ -2170,6 +2191,7 @@ and check_type_constraint_for_inference g candidate_inferred =
 (** Checks if two types are the same or not. *)
 and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
     (expected : perktype) (actual : perktype) : perktype =
+  say_here (Printf.sprintf "Matching types: exp=%s, act=%s" (show_perktype expected) (show_perktype actual));
   let expected = resolve_type expected in
   let actual = resolve_type actual in
 
@@ -2402,18 +2424,18 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
               raise
                 (Type_match_error
                    (Printf.sprintf
-                      "Type mismatch in ADT parameters: expected %s,\n\
-                       got %s instead"
+                      "Type mismatch in ADT parameters: expected %s,got %s \
+                       instead"
                       (show_perktype paraml) (show_perktype paramr)))
           else
             raise
               (Type_match_error
-                 (Printf.sprintf "Type mismatch 4: expected %s,\ngot %s instead"
+                 (Printf.sprintf "Type mismatch 4: expected %s, got %s instead"
                     (show_perktype expected) (show_perktype actual)))
       | _ ->
           raise
             (Type_match_error
-               (Printf.sprintf "Type mismatch 4: expected %s,\ngot %s instead"
+               (Printf.sprintf "Type mismatch 5: expected %s, got %s instead"
                   (show_perktype expected) (show_perktype actual)))
     (* (show_perktype expected)
                   (show_perktype actual))) *)

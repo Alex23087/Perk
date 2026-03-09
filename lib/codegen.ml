@@ -761,7 +761,8 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
           (List.map
              (fun x -> codegen_topleveldef (annot_copy tldf x))
              (List.filter Option.is_some instanced_funs |> List.map Option.get))
-  | Extern _ -> ""
+  | Extern (n, t) -> Printf.sprintf "extern %s %s;" (codegen_type t) n
+  | Pretend _ -> ""
   (* Externs are only useful for type checking. No need to keep it for codegen step *)
   | Def ((t, e), deftype) ->
       indent_string ^ codegen_def t e deftype indent_string
@@ -1466,6 +1467,7 @@ and codegen_binop (op : binop) : string =
   | Modulo -> "%"
   | Band -> "&"
   | Bor -> "|"
+  | Bxor -> "^"
 
 (** generates code for prefix unary operators *)
 and codegen_preunop (op : preunop) : string =
@@ -1476,6 +1478,7 @@ and codegen_preunop (op : preunop) : string =
   | Reference -> "&"
   | PreIncrement -> "++"
   | PreDecrement -> "--"
+  | Bnot -> "~"
 
 (** generates code for postfix unary operators *)
 and codegen_postunop (op : postunop) : string =
