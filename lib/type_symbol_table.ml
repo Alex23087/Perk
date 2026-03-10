@@ -67,6 +67,7 @@ let rec resolve_type (typ : perktype) : perktype =
             else
               let a, typ', q = typ in
               match typ' with
+              | INum _ -> (typ, [ typ ])
               | Basetype t ->
                   ( ( a,
                       (match lookup_type t with
@@ -277,11 +278,17 @@ and c_type_of_base_type (t : perktype) : string =
 and type_descriptor_of_perktype ?(erase_env = true) (t : perktype) : string =
   let _, t, _ = t in
   match t with
+  | INum _ ->
+      failwith
+        "Cannae dea dat (specifically get the type descriptor of INums) and \
+         other sheit as well (falsch)! If you find this error (you have ugly \
+         knees) please file an issue at \
+         https://github.com/Alex23087/Perk/issues"
   | Basetype s -> s
   | Structtype (id, _) -> id
   | AlgebraicType (id, _, None) -> id
   | AlgebraicType (id, _, Some t) ->
-    let id = subst_ctor_name id t t in
+      let id = subst_ctor_name id t t in
       Printf.sprintf "%s_perk_polym_%s" id (type_descriptor_of_perktype t)
   | Funtype (args, ret) ->
       let args_str =
@@ -319,7 +326,7 @@ and type_descriptor_of_perktype ?(erase_env = true) (t : perktype) : string =
       Printf.sprintf "tup_%s_le"
         (String.concat "__" (List.map type_descriptor_of_perktype ts))
   | PolyADTPlaceholder (i, t) ->
-    let i = subst_ctor_name i t t in
+      let i = subst_ctor_name i t t in
       Printf.sprintf "%s_perk_polym_%s" i (type_descriptor_of_perktype t)
 
 and c_type_of_perktype ?(erase_env = true) (t : perktype) =
@@ -419,7 +426,7 @@ let dependencies_of_type (typ : perktype) : perkident list =
           else
             let _, typ', _ = typ in
             match typ' with
-            | Basetype _ -> ([], typ :: lst)
+            | Basetype _ | INum _ -> ([], typ :: lst)
             | Pointertype t ->
                 let deps, visited =
                   dependencies_of_type_aux ~voidize t (typ :: lst)
@@ -612,6 +619,7 @@ let rec bind_type_if_needed (typ : perktype) =
             (Printf.sprintf "bind_type_if_needed: %s" (show_perktype typ));
           let typ' = resolve_type typ in
           match typ' with
+          | _, INum _, _ -> say_here (Printf.sprintf "Trying to bind %s. Ignoring" (show_perktype typ'))
           | _, Basetype _t, _ -> ()
           | _, Pointertype t, _ ->
               bind_type typ;

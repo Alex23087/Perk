@@ -15,6 +15,7 @@ and subst_type (t : perktype) (placeholder : perktype) (actual : perktype) =
   let subst_e e = subst_type_expr e placeholder actual in
   let subst_def (pvd, e) = (subst_pvd pvd, subst_e e) in
   match t with
+  | _, INum _, _ -> t
   | _, Basetype _, _ -> base_subst t
   | a, Funtype (tl, t), b ->
       (a, Funtype (List.map base_subst tl, base_subst t), b)

@@ -1109,6 +1109,7 @@ and codegen_type ?(expand : bool = false) (t : perktype) : string =
   let quals_str = String.concat " " (List.map codegen_qual quals) in
   let type_str =
     match t' with
+    | INum _ -> failwith (Printf.sprintf "Cannot codegenerate type %s. If you find this issue please file an issue at https://github.com/Alex23087/Perk/issues" (show_perktype t))
     | Basetype s -> s
     | Structtype (id, _) -> id
     | AlgebraicType (id, _constructors, None) -> id

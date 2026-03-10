@@ -46,6 +46,7 @@ type perktype_qualifier =
 
 (* type of the perk -- giangpt *)
 type perktype_partial =
+  | INum of int
   | Basetype of string
   | Funtype of perktype list * perktype  (** types of args, return type *)
   | Lambdatype of
@@ -252,6 +253,7 @@ and discard_type_aq (typ : perktype) : perktype_partial =
 
 let rec show_perktype (typ : perktype) : string =
   match discard_type_aq typ with
+  | INum i -> Printf.sprintf "inum(%d)" i
   | Basetype s -> s
   | Funtype (args, ret) ->
       Printf.sprintf "(%s) -> %s"

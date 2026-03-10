@@ -80,8 +80,10 @@ let bind_extension_function (typ : perktype) (fundef : perkfundef) (mem : bool)
 
 (* TODO handle type aliases *)
 
+let is_inum = function _, INum _, _ -> true | _ -> false
+
 (** check if type is integral *)
-let is_integral (_, typ, _) =
+let is_integral ((_, typ, _) as typ') =
   let nums =
     [
       Basetype "int";
@@ -98,7 +100,7 @@ let is_integral (_, typ, _) =
       Basetype "char";
     ]
   in
-  List.mem typ nums
+  List.mem typ nums || is_inum typ'
 
 let get_type_length (_, typ, _) =
   match typ with
@@ -150,7 +152,7 @@ let rec is_numerical ((_, typ, _) as t) =
       Basetype "char";
     ]
   in
-  List.mem typ nums || is_generic_numeric t
+  List.mem typ nums || is_generic_numeric t || is_inum t
 
 (** a generic type is numerical if either
     - its inferred type is empty and a numeric bound is present
@@ -231,6 +233,9 @@ let rec numerical_rank : perktype -> int = function
         numerical_rank (Option.get g.inferred_type)
       else 0
   | _ -> 0 (* non‐numeric or unknown *)
+
+let inum_fits (_typ : perktype) (_size : int) =
+  true (* TODO: Check if the inum fits in the type *)
 
 (** typechecks a set of toplevel definitions, instancing the inferred types *)
 let rec typecheck_program (ast : topleveldef_a list) : topleveldef_a list =
@@ -1114,7 +1119,7 @@ and typecheck_match_case (match_type : perktype) case =
              (show_perktype t))
           Non_equatable_type;
       try
-        let _ = match_types t match_type in
+        let _ = match_types match_type t in
         annot_copy case (MatchExpr e1)
       with Type_match_error _msg ->
         raise_type_error case
@@ -1289,9 +1294,9 @@ and infer_generic_const_type ?(expected : perktype option = None) (v : expr_a)
                      (show_perktype u) id
                      (show_perktype (Option.get expected)))
                   ADT_Unification_unexpected
-            
-            | Some (AlgebraicType (n, _, _type_parameter))
-              when n = polyadt_name -> ()
+            | Some (AlgebraicType (n, _, _type_parameter)) when n = polyadt_name
+              ->
+                ()
             | Some t ->
                 (* If the type is not an ADT or is the wrong ADT, there is no way to unify *)
                 raise_type_error v
@@ -1337,7 +1342,11 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
     expr_a * perktype =
   match ( $ ) expr with
   | Bool _ -> (expr, ([], Basetype "bool", []))
-  | Int _ -> (expr, ([], Basetype "int", []))
+  | Int i ->
+      ( expr,
+        ([], INum Float.(i |> float_of_int |> log2 |> ceil |> int_of_float), [])
+      )
+      (* di fori *)
   | Float _ -> (expr, ([], Basetype "float", []))
   | Char _ -> (expr, ([], Basetype "char", []))
   | String _ -> (expr, ([], Pointertype ([], Basetype "char", []), []))
@@ -1699,7 +1708,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
         | Neg, t when not (is_numerical t) ->
             raise_type_error expr
               (Printf.sprintf
-                 "Boolean negation can only be applied to numerical types")
+                 "Numerical negation can only be applied to numerical types")
               Type_mismatch
         | _, t -> t
       in
@@ -2063,6 +2072,15 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
             with Type_match_error msg ->
               raise_type_error expr msg Type_mismatch
           in
+          let xtyp =
+            match discard_type_aq xtyp with
+            | INum _s ->
+                Option.fold ~none:int_type
+                  ~some:(function
+                    | _, Arraytype (t, _), _ -> t | _ -> failwith "impossible")
+                  expected_return (* TODO: Check that inum fits *)
+            | _ -> xtyp
+          in
           let arraytype =
             ([], Arraytype (xtyp, Some (List.length xs + 1)), [])
           in
@@ -2188,19 +2206,25 @@ and check_type_constraint_for_inference g candidate_inferred =
   if List.mem Numeric_Bound g.bounds then is_numerical candidate_inferred
   else true
 
-(** Checks if two types are the same or not. *)
+(** Checks if two types are the same or not. First type is expected, second is
+    actual*)
 and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
     (expected : perktype) (actual : perktype) : perktype =
-  say_here (Printf.sprintf "Matching types: exp=%s, act=%s" (show_perktype expected) (show_perktype actual));
+  say_here
+    (Printf.sprintf "Matching types: exp=%s, act=%s" (show_perktype expected)
+       (show_perktype actual));
   let expected = resolve_type expected in
   let actual = resolve_type actual in
 
-  let rec match_types_aux expected actual =
+  let rec match_types_aux (expected : perktype) (actual : perktype) =
     (* This catches the case where one type has not been bound yet and thus results as a basetype *)
     let equal =
       try
-        type_descriptor_of_perktype expected
-        = type_descriptor_of_perktype actual
+        match (discard_type_aq expected, discard_type_aq actual) with
+        | INum _, _ | _, INum _ -> false
+        | _ ->
+            type_descriptor_of_perktype expected
+            = type_descriptor_of_perktype actual
       with Not_inferred _ -> false
     in
     if equal then actual
@@ -2209,6 +2233,9 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
         (expected, actual)
       in
       match (expected', actual') with
+      | _, INum s when is_integral expected && inum_fits expected s -> expected
+      | Infer, INum _ ->
+          int_type (* TODO: Issue warning/error if the inum is too bigue *)
       | _, Infer -> expected
       | Infer, _ -> actual
       | Basetype t1, Basetype t2 when t1 = t2 -> actual
@@ -2236,6 +2263,9 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
                       len1
                       (if int2 then "integral" else "floating")
                       len2))
+      | Basetype _, INum _ when Polymorphism.is_type_generic expected ->
+          expected
+          (* TODO: Check if this should be some other kind of int type, or if we should add a numerical bound to the poly var *)
       | _, Basetype _ ->
           (* Printf.printf "actual: %s, expected: %s\n" (show_perktype actual)
             (show_perktype expected); *)
@@ -2284,8 +2314,7 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
             raise
               (Type_match_error
                  (Printf.sprintf "Type mismatch 1: expected %s,\ngot %s instead"
-                    (Codegen.codegen_type ~expand:true expected)
-                    (Codegen.codegen_type ~expand:true actual)))
+                    (show_perktype expected) (show_perktype actual)))
       | Pointertype t1, Pointertype _t2 when t1 = void_type -> actual
       | Pointertype _t1, Pointertype t2 when t2 = void_type -> expected
       | Pointertype t1, Pointertype t2 ->
