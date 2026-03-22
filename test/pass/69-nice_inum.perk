@@ -1,0 +1,8 @@
+import "stdio.h"
+
+type <T> non_empty_list = Elem(T) | Cons(T, non_empty_list @ T)
+
+fun main () : void {
+   // the inum in this is cast to int
+   let l := Cons(4, Cons(2, Elem(0)))
+}

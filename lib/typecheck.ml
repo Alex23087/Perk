@@ -1192,15 +1192,14 @@ and unify_generic_const (genvar : perktype) (gen : perktype list)
   match (gen, ground) with
   | t1 :: rest1, t2 :: rest2 -> (
       match (t1, t2) with
-      | t1, (_, INum _, _) when genvar = t1 -> 
-        (match rest1, rest2 with
-          | [], [] -> 
-             say_here "Well, you did fool in the end...";
-            Some ([], Basetype "int", [])
+      | t1, (_, INum _, _) when genvar = t1 -> (
+          match (rest1, rest2) with
+          | [], [] ->
+              say_here "Well, you did fool me in the end...";
+              Some ([], Basetype "int", [])
           | _ ->
-            say_here "You won't fool me no mo";
-            unify_generic_const genvar rest1 rest2
-        )
+              say_here "You won't fool me no mo";
+              unify_generic_const genvar rest1 rest2)
       | t1, t2 when genvar = t1 -> Some t2
       | (_, PolyADTPlaceholder (n1, t1), _), (_, PolyADTPlaceholder (n2, t2), _)
         when n1 = n2 && genvar = t1 ->
@@ -1241,11 +1240,12 @@ and equality_modulo_unresolved ((_, t1, _) as t11 : perktype)
   | PolyADTPlaceholder (n, t), AlgebraicType (n1, _, tpar)
   | AlgebraicType (n1, _, tpar), PolyADTPlaceholder (n, t) -> (
       match t with
-      | _, INum _, _ -> 
-        (* If an INum is found, we check if it is compatible with the type parameter before substituting it *)
-        if Option.fold ~none:false ~some:is_integral tpar then 
-        let substituted = PolyADTPlaceholder (n, Option.get tpar) in
-        equality_modulo_unresolved t11 (t2q, substituted, t2a) else false
+      | _, INum _, _ ->
+          (* If an INum is found, we check if it is compatible with the type parameter before substituting it *)
+          if Option.fold ~none:false ~some:is_integral tpar then
+            let substituted = PolyADTPlaceholder (n, Option.get tpar) in
+            equality_modulo_unresolved t11 (t2q, substituted, t2a)
+          else false
       | _ ->
           say_here
             (Printf.sprintf
@@ -1257,7 +1257,7 @@ and equality_modulo_unresolved ((_, t1, _) as t11 : perktype)
                (concrete_constructor_name n t)
                n1);
           concrete_constructor_name n t = n1)
-  | INum _, t_other  when is_integral ([], t_other, []) -> true
+  | INum _, t_other when is_integral ([], t_other, []) -> true
   | t_other, INum _ when is_integral ([], t_other, []) -> true
   | _ -> t1 = t2
 
@@ -1290,12 +1290,19 @@ and infer_generic_const_type ?(expected : perktype option = None) (v : expr_a)
         (* type obtained by short-circuitedly matching signature and argument types *)
         let unified_type = unify_generic_const genvar signature arg_types in
 
-        say_here (Printf.sprintf "signature: %s" (List.map show_perktype signature |> String.concat ", ")) ;
-        say_here (Printf.sprintf "arg types: %s" (List.map show_perktype arg_types |> String.concat ", ")) ;
-        say_here (Printf.sprintf "unified type: %s" (Option.fold ~none:"none" ~some:show_perktype unified_type));
+        say_here
+          (Printf.sprintf "signature: %s"
+             (List.map show_perktype signature |> String.concat ", "));
+        say_here
+          (Printf.sprintf "arg types: %s"
+             (List.map show_perktype arg_types |> String.concat ", "));
+        say_here
+          (Printf.sprintf "unified type: %s"
+             (Option.fold ~none:"none" ~some:show_perktype unified_type));
 
         match unified_type with
-        | None -> ( (* there are no occurrences of T in the args*)
+        | None -> (
+            (* there are no occurrences of T in the args*)
             match
               Option.map
                 (fun t -> t |> resolve_type |> discard_type_aq)
@@ -1381,37 +1388,43 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
   | Char _ -> (expr, ([], Basetype "char", []))
   | String _ -> (expr, ([], Pointertype ([], Basetype "char", []), []))
   | Var id -> (
+      let aaa = File_info.get_file_local_polyfuns () in
       try
-        (* Check if this is a constructor for a polymorphic ADT. If it is, expand it to a function call, so that unification is attempted *)
-        match Option.map discard_type_aq expected_return with
-        | Some (Funtype _) -> raise Not_found
-        | _ -> (
-            let adt =
-              Hashtbl.find (File_info.get_polyadt_adt_from_constructor ()) id
-            in
-            match adt with
-            | _, AlgebraicType (_ident, ctors, _tparam), _ ->
-                List.find (fun (i, _t) -> i = id) ctors |> ignore;
-                typecheck_expr ~expected_return
-                  (annot_copy expr (Apply (expr, [], None)))
-            | _ -> raise Not_found)
+        let _ = Hashtbl.find aaa id in
+        say_here (Printf.sprintf "there do be a thing called %s" id);
+        raise_compilation_error expr (Printf.sprintf "Polymorphic function auto-casting not yet supported. Add a type annotation. e.g. %s @ int (...)" id) Error_codes.Not_implemented
       with Not_found -> (
-        match lookup_var id |> Option.map fst with
-        | Some (([], Funtype (params, ret), []) as t) -> (
-            match Option.map discard_type_aq expected_return with
-            | Some (Funtype _) -> (expr, t)
-            | _ ->
-                (* Constructors are automatically applied *)
-                if
-                  Hashtbl.mem File_info.defined_constructors id
-                  && List.length params = 0
-                then (annot_copy expr (Apply (expr, [], None)), ret)
-                else (expr, t))
-        | Some t -> (expr, t)
-        | None ->
-            raise_type_error expr
-              ("Unknown identifier: " ^ id)
-              Unknown_identifier))
+        try
+          (* Check if this is a constructor for a polymorphic ADT. If it is, expand it to a function call, so that unification is attempted *)
+          match Option.map discard_type_aq expected_return with
+          | Some (Funtype _) -> raise Not_found
+          | _ -> (
+              let adt =
+                Hashtbl.find (File_info.get_polyadt_adt_from_constructor ()) id
+              in
+              match adt with
+              | _, AlgebraicType (_ident, ctors, _tparam), _ ->
+                  List.find (fun (i, _t) -> i = id) ctors |> ignore;
+                  typecheck_expr ~expected_return
+                    (annot_copy expr (Apply (expr, [], None)))
+              | _ -> raise Not_found)
+        with Not_found -> (
+          match lookup_var id |> Option.map fst with
+          | Some (([], Funtype (params, ret), []) as t) -> (
+              match Option.map discard_type_aq expected_return with
+              | Some (Funtype _) -> (expr, t)
+              | _ ->
+                  (* Constructors are automatically applied *)
+                  if
+                    Hashtbl.mem File_info.defined_constructors id
+                    && List.length params = 0
+                  then (annot_copy expr (Apply (expr, [], None)), ret)
+                  else (expr, t))
+          | Some t -> (expr, t)
+          | None ->
+              raise_type_error expr
+                ("Unknown identifier: " ^ id)
+                Unknown_identifier)))
   | PolymorphicVar (id, t) ->
       if not (Hashtbl.mem global_polyfuns id) then
         let dat_t = t in
