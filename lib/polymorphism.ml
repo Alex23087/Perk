@@ -9,6 +9,7 @@ let rec subst_perkvardesc ((pt, piden) : perkvardesc) (placeholder : perktype)
   let subst_maybe t = subst_type t placeholder actual in
   (subst_maybe pt, piden)
 
+(** Substitutes a type with a type in a type. Args are type, placeholder, actual *)
 and subst_type (t : perktype) (placeholder : perktype) (actual : perktype) =
   let base_subst t = if t = placeholder then actual else t in
   let subst_pvd t = subst_perkvardesc t placeholder actual in

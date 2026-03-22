@@ -280,8 +280,7 @@ and type_descriptor_of_perktype ?(erase_env = true) (t : perktype) : string =
   match t with
   | INum _ ->
       failwith
-        "Cannae dea dat (specifically get the type descriptor of INums) and \
-         other sheit as well (falsch)! If you find this error (you have ugly \
+        "Inum found in type descriptor generation! If you find this error (you have ugly \
          knees) please file an issue at \
          https://github.com/Alex23087/Perk/issues"
   | Basetype s -> s

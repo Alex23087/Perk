@@ -1192,6 +1192,15 @@ and unify_generic_const (genvar : perktype) (gen : perktype list)
   match (gen, ground) with
   | t1 :: rest1, t2 :: rest2 -> (
       match (t1, t2) with
+      | t1, (_, INum _, _) when genvar = t1 -> 
+        (match rest1, rest2 with
+          | [], [] -> 
+             say_here "Well, you did fool in the end...";
+            Some ([], Basetype "int", [])
+          | _ ->
+            say_here "You won't fool me no mo";
+            unify_generic_const genvar rest1 rest2
+        )
       | t1, t2 when genvar = t1 -> Some t2
       | (_, PolyADTPlaceholder (n1, t1), _), (_, PolyADTPlaceholder (n2, t2), _)
         when n1 = n2 && genvar = t1 ->
@@ -1224,18 +1233,32 @@ and check_if_is_generic_constr id =
   Hashtbl.mem (File_info.get_polyadt_adt_from_constructor ()) id
 
 and equality_modulo_unresolved ((_, t1, _) as t11 : perktype)
-    ((_, t2, _) as t21 : perktype) =
+    ((t2q, t2, t2a) as t21 : perktype) =
   say_here
     (Printf.sprintf "eq mod unres: %s vs %s\n" (show_perktype t11)
        (show_perktype t21));
   match (t1, t2) with
-  | PolyADTPlaceholder (n, t), AlgebraicType (n1, _, _)
-  | AlgebraicType (n1, _, _), PolyADTPlaceholder (n, t) ->
-      say_here
-        (Printf.sprintf "inner check!!! %s vs %s\n"
-           (concrete_constructor_name n t)
-           n1);
-      concrete_constructor_name n t = n1
+  | PolyADTPlaceholder (n, t), AlgebraicType (n1, _, tpar)
+  | AlgebraicType (n1, _, tpar), PolyADTPlaceholder (n, t) -> (
+      match t with
+      | _, INum _, _ -> 
+        (* If an INum is found, we check if it is compatible with the type parameter before substituting it *)
+        if Option.fold ~none:false ~some:is_integral tpar then 
+        let substituted = PolyADTPlaceholder (n, Option.get tpar) in
+        equality_modulo_unresolved t11 (t2q, substituted, t2a) else false
+      | _ ->
+          say_here
+            (Printf.sprintf
+               "boutta call concrete_constructor_name with %s %s. Meanwhile n1 \
+                is %s.\n"
+               n (show_perktype t) n1);
+          say_here
+            (Printf.sprintf "inner check!!! %s vs %s\n"
+               (concrete_constructor_name n t)
+               n1);
+          concrete_constructor_name n t = n1)
+  | INum _, t_other  when is_integral ([], t_other, []) -> true
+  | t_other, INum _ when is_integral ([], t_other, []) -> true
   | _ -> t1 = t2
 
 and infer_generic_const_type ?(expected : perktype option = None) (v : expr_a)
@@ -1266,8 +1289,13 @@ and infer_generic_const_type ?(expected : perktype option = None) (v : expr_a)
 
         (* type obtained by short-circuitedly matching signature and argument types *)
         let unified_type = unify_generic_const genvar signature arg_types in
+
+        say_here (Printf.sprintf "signature: %s" (List.map show_perktype signature |> String.concat ", ")) ;
+        say_here (Printf.sprintf "arg types: %s" (List.map show_perktype arg_types |> String.concat ", ")) ;
+        say_here (Printf.sprintf "unified type: %s" (Option.fold ~none:"none" ~some:show_perktype unified_type));
+
         match unified_type with
-        | None -> (
+        | None -> ( (* there are no occurrences of T in the args*)
             match
               Option.map
                 (fun t -> t |> resolve_type |> discard_type_aq)
@@ -1319,11 +1347,13 @@ and infer_generic_const_type ?(expected : perktype option = None) (v : expr_a)
             let grounded =
               List.map (fun x -> Polymorphism.subst_type x genvar u) signature
             in
+
             (* check equality of inferred ground type list and arg type list *)
             say_here
               (Printf.sprintf "Checking equality mod unres [%s] vs [%s]\n"
                  (List.map show_perktype grounded |> String.concat ", ")
                  (List.map show_perktype arg_types |> String.concat ", "));
+
             if List.for_all2 equality_modulo_unresolved grounded arg_types then (
               say_here (Printf.sprintf "Same!\n");
               Some (Var (concrete_constructor_name id u)))
