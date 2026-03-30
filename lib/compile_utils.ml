@@ -91,7 +91,7 @@ let ast_of_filename filename =
 let singletonamble () =
   if !Utils.static_compilation then ""
   else
-    "#include <malloc.h>\n#include <string.h>\n#include <stdbool.h>\n"
+    "#include <gc/gc.h>\n#include <string.h>\n#include <stdbool.h>\n"
     ^ "#ifndef LAMBDUMMY_PERK\n#define LAMBDUMMY_PERK\n"
     ^ "typedef struct _lambdummy_type {\n\
       \    void *env;\n\
@@ -100,8 +100,8 @@ let singletonamble () =
        static __lambdummy_type *__lambdummy;\n\n\
       \ __lambdummy_type *alloclabmd(int size, void *labmda, void *env)\n\
        {\n\
-      \    __lambdummy_type *ptr = malloc(sizeof(__lambdummy_type));\n\
-      \    ptr->env = malloc(size);\n\
+      \    __lambdummy_type *ptr = GC_malloc(sizeof(__lambdummy_type));\n\
+      \    ptr->env = GC_malloc(size);\n\
       \    memcpy(ptr->env, env, size);\n\
       \    ptr->func = labmda;\n\
       \    return ptr;\n\

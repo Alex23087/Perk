@@ -1053,6 +1053,7 @@ and typecheck_match_entry_list ?(retype : perktype option = None)
              match (Option.map resolve_type x, Option.map resolve_type hd) with
              | Some (_, Basetype "void", _), None -> ()
              | None, Some (_, Basetype "void", _) -> ()
+             | Some(_, INum (_), _),  Some (_, Basetype "int", _) -> ()
              | Some x, Some hd -> (
                  try match_types x hd |> ignore
                  with Type_match_error _ ->

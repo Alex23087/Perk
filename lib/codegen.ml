@@ -196,7 +196,7 @@ and codegen_program (header_name : string) (prog_is_main : bool)
     "#pragma once\n"
     (* Write includes *)
     ^ (if !Utils.static_compilation then ""
-       else "#include <malloc.h>\n#include <string.h>\n#include <stdbool.h>\n")
+       else "#include <gc/gc.h>\n#include <string.h>\n#include <stdbool.h>\n")
     ^ String.concat "\n"
         (List.rev
            (List.map
@@ -486,7 +486,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
       (* Construct the initializer definition using the previously defined strings *)
       Printf.sprintf
         "%s%s %s_init(%s) {\n\
-        \    %s%s self = malloc(sizeof(struct %s));\n\
+        \    %s%s self = GC_malloc(sizeof(struct %s));\n\
          %s\n\
          %s\n\
          %s    %sreturn self;\n\
@@ -593,7 +593,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                           (List.mapi
                              (fun i t ->
                                Printf.sprintf
-                                 "out.data.%s._%d = malloc(sizeof(%s));\n\
+                                 "out.data.%s._%d = GC_malloc(sizeof(%s));\n\
                                  \    *(out.data.%s._%d) = arg_%d;"
                                  c i (codegen_type t) c i i)
                              t)))),
@@ -695,7 +695,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                                 (List.mapi
                                    (fun i t ->
                                      Printf.sprintf
-                                       "out.data.%s._%d = malloc(sizeof(%s));\n\
+                                       "out.data.%s._%d = GC_malloc(sizeof(%s));\n\
                                        \    *(out.data.%s._%d) = arg_%d;"
                                        c i (codegen_type t) c i i)
                                    t)))),
@@ -876,7 +876,7 @@ and codegen_command (cmd : command_a) (indentation : int) : string =
         indent_string expr_str cases_str indent_string
   | Banish name ->
       (* TODO: Automatically banish children (possibly add autobanish keyword to models members) *)
-      Printf.sprintf "%sfree(%s);\n%s%s = NULL;" indent_string name
+      Printf.sprintf "%sGC_free(%s);\n%s%s = NULL;" indent_string name
         indent_string name
   | Return None -> indent_string ^ Printf.sprintf "return;"
   | Return (Some e) ->
