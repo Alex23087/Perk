@@ -228,7 +228,7 @@ and add_polydefs ast =
       (fun (tld, t_actual) acc ->
         annot_copy tld
           (match ( $ ) tld with
-          | PolymorphicFundef ((t_res, id, args, body), t_param) ->
+          | PolymorphicFundef ((t_res, id, args, body), _kind, t_param) ->
               if not (polyfun_is_already_codegened id t_actual) then (
                 let param_types = List.map fst args in
                 (* the definition is added to the file-local polyfun hashtable *)
@@ -278,7 +278,7 @@ and check_polydefs_pass (ast : topleveldef_a list) =
   List.map
     (fun tld ->
       match ( $ ) tld with
-      | PolymorphicFundef ((t_res, id, args, body), t_param) ->
+      | PolymorphicFundef ((t_res, id, args, body), _kind, t_param) ->
           let instances =
             try Hashtbl.find (File_info.get_polyfun_instances ()) id
             with Not_found -> []

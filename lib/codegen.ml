@@ -712,7 +712,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
   | Fundef ((t, id, args, body), _, public) ->
       say_here (Printf.sprintf "codegen_fundef: %s" id);
       indent_string ^ codegen_fundef ~public t id args body
-  | PolymorphicFundef ((t_res, id, args, body), t_param) ->
+  | PolymorphicFundef ((t_res, id, args, body), _kind, t_param) ->
       if not (Hashtbl.mem (File_info.get_polyfun_instances ()) id) then (
         say_here
           (Printf.sprintf
@@ -747,7 +747,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                              (fun x -> subst_perkvardesc x t_param t_actual)
                              args,
                            subst_type_command body t_param t_actual ),
-                         Normal,
+                         _kind,
                          false ))
                 in
                 say_here

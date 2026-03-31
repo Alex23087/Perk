@@ -214,7 +214,7 @@ and topleveldef_t =
   | Def of perkdef * perktype option
   | Fundef of perkfundef * funkind * bool
       (** fundef, what kind of function is it? is it public?*)
-  | PolymorphicFundef of perkfundef * perktype
+  | PolymorphicFundef of perkfundef * funkind * perktype
   | Archetype of perkident * declorfun_a list
   | Model of perkident * perkident list * deforfun_a list
   | Struct of perkident * perkdef list * (struct_attr list)
