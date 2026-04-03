@@ -4,6 +4,15 @@ open Ast
 open Errors
 open Error_codes
 
+let fst_4 (x, _, _, _) = x
+let snd_4 (_, x, _, _) = x
+let fst_3 (x, _, _) = x
+let snd_3 (_, x, _) = x
+let thrd_3 (_, _, x) = x
+let swizzle (x, y) = (y, x)
+let hashtbl_forall f h = Hashtbl.fold (fun k v acc -> f k v && acc) h true
+let hashtbl_exists f h = Hashtbl.fold (fun k v acc -> f k v || acc) h false
+
 (** shite lazy hack *)
 let bind_var_ptr : (perkident -> perktype -> unit) ref = ref (fun _ _ -> ())
 

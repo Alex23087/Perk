@@ -702,6 +702,11 @@ let add_code_to_type_binding (_typ : perktype) (code : string) : unit =
 
 (** Generate the name of an extension function *)
 let ext_fun_name (typ : perktype) (id : perkident) =
+  let typ = match discard_type_aq typ with
+    | AlgebraicType (i, _, _)
+    | PolyADTPlaceholder (i, _) -> [], Basetype(i), []
+    | _ -> typ
+  in
   Printf.sprintf "__perk_%s_ext_%s" (type_descriptor_of_perktype typ) id
 
 (** Returns true if the identifier identifies a type *)

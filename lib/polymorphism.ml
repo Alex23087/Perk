@@ -94,7 +94,8 @@ and subst_type_expr (e : expr_a) (placeholder : perktype) (actual : perktype) =
     (match ( $ ) e with
     | Nothing t -> Nothing (subst_maybe t)
     | Something (e1, t) -> Something (subst_e e1, subst_maybe t)
-    | Bool _ | Int _ | Float _ | Char _ | String _ | Var _ -> ( $ ) e
+    | Var id -> Var (Utils.subst_ctor_name id placeholder actual)
+    | Bool _ | Int _ | Float _ | Char _ | String _ -> ( $ ) e
     | PolymorphicVar (id, t) -> PolymorphicVar (id, subst_maybe t)
     | Apply (e1, e1l, ret_t) ->
         Apply (subst_e e1, List.map subst_e e1l, Option.map subst_maybe ret_t)

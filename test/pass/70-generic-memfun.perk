@@ -1,24 +1,28 @@
 import "stdio.h"
 
-type <T> List = Nil | Cons(int, List @ T)
+type <T> List = Nil | Cons(T, List @ T)
 
-// fun <T> List.forall (self: List @ T, pred: (int) => bool): bool {
-//     match (self) {
-//         Nil {
-//             return true
-//         },
-//         Cons (var hd, var tl) {
-//             if (pred(hd)) {
-//                 return tl.forall(pred)
-//             } else {
-//                 return false
-//             }
-//         }
-//     }
-// }
+fun <T> List.forall (self: List @ T, pred: (T) => bool): bool {
+    match (self) {
+        Nil {
+            return true
+        },
+        Cons (var hd, var tl) {
+            if (pred(hd)) {
+                return tl.forall(pred)
+            } else {
+                return false
+            }
+        }
+    }
+}
 
 type_fun <T> List.make_empty(): List @ T {
-    return Nil;
+    return Nil @ T
+}
+
+type_fun <T> List.num(ber: int): int {
+    return ber
 }
 
 fun main() : void {
@@ -29,4 +33,8 @@ fun main() : void {
             }
         ) then "success" else "failure"
     );
+
+    printf("%d\n", List@int.num(42))
+    let l : List@int = Nil
+    List_make_empty@int()
 }

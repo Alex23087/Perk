@@ -19,7 +19,7 @@ type <T> list = Empty | Cons(T, list @ T)
 fun list_generate (n: int, f: () => int): list @ int {
     match (n) {
         `{0} {
-            return Empty @ int()
+            return Empty
         },
         _ {
             let head := f();
