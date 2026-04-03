@@ -36,5 +36,4 @@ fun main() : void {
 
     printf("%d\n", List@int.num(42))
     let l : List@int = Nil
-    List_make_empty@int()
 }
