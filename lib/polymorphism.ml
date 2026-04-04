@@ -9,12 +9,14 @@ let rec subst_perkvardesc ((pt, piden) : perkvardesc) (placeholder : perktype)
   let subst_maybe t = subst_type t placeholder actual in
   (subst_maybe pt, piden)
 
+(** Substitutes a type with a type in a type. Args are type, placeholder, actual *)
 and subst_type (t : perktype) (placeholder : perktype) (actual : perktype) =
   let base_subst t = if t = placeholder then actual else t in
   let subst_pvd t = subst_perkvardesc t placeholder actual in
   let subst_e e = subst_type_expr e placeholder actual in
   let subst_def (pvd, e) = (subst_pvd pvd, subst_e e) in
   match t with
+  | _, INum _, _ -> t
   | _, Basetype _, _ -> base_subst t
   | a, Funtype (tl, t), b ->
       (a, Funtype (List.map base_subst tl, base_subst t), b)
@@ -92,7 +94,8 @@ and subst_type_expr (e : expr_a) (placeholder : perktype) (actual : perktype) =
     (match ( $ ) e with
     | Nothing t -> Nothing (subst_maybe t)
     | Something (e1, t) -> Something (subst_e e1, subst_maybe t)
-    | Bool _ | Int _ | Float _ | Char _ | String _ | Var _ -> ( $ ) e
+    | Var id -> Var (Utils.subst_ctor_name id placeholder actual)
+    | Bool _ | Int _ | Float _ | Char _ | String _ -> ( $ ) e
     | PolymorphicVar (id, t) -> PolymorphicVar (id, subst_maybe t)
     | Apply (e1, e1l, ret_t) ->
         Apply (subst_e e1, List.map subst_e e1l, Option.map subst_maybe ret_t)

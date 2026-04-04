@@ -1,5 +1,6 @@
 PREFIX ?= /usr/local/perk
 SHELL := /usr/bin/env bash
+LDFLAGS := -lgc
 
 # The following lines allow targets to take arguments from the command line
 FILE := $(word 2,$(MAKECMDGOALS))
@@ -40,7 +41,7 @@ run: build
 	./_build/default/bin/perkc.exe $(FILE)
 	$(eval OUTFILE := $(basename $(FILE)).out)
 	$(eval SRCFILE := $(basename $(FILE)).c)
-	gcc -o $(OUTFILE) $(SRCFILE)
+	gcc -o $(OUTFILE) $(SRCFILE) $(LDFLAGS)
 	./$(OUTFILE)
 	@rm -f $(OUTFILE) $(SRCFILE)
 
@@ -68,7 +69,7 @@ debug_run: build
 	OCAMLRUNPARAM=b ./_build/default/bin/perkc.exe --verbose --record-stack-trace $(FILE)
 	$(eval OUTFILE := $(basename $(FILE)).out)
 	$(eval SRCFILE := $(basename $(FILE)).c)
-	gcc -o $(OUTFILE) $(SRCFILE)
+	gcc -o $(OUTFILE) $(SRCFILE) $(LDFLAGS)
 	./$(OUTFILE)
 	rm -f $(OUTFILE) $(SRCFILE)
 
@@ -128,7 +129,7 @@ test_pass: build
 		BASENAME="$${FILE%.*}"; \
 		EXPECTED="$${BASENAME}.expected"; \
 		CFILE="$${BASENAME}.c"; \
-		RES=$$(_build/default/bin/perkc.exe "$$FILE" > /dev/null && gcc -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast "$$CFILE" -o "$$(dirname $$FILE)/a.out" && "$$(dirname $$FILE)/a.out"); \
+		RES=$$(_build/default/bin/perkc.exe "$$FILE" > /dev/null && gcc -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast "$$CFILE" -o "$$(dirname $$FILE)/a.out" $(LDFLAGS) && "$$(dirname $$FILE)/a.out"); \
 		rm -f "$$(dirname $$FILE)/a.out"; \
 		if [ $$? -eq 0 ]; then \
 			if [ -e "$$EXPECTED" ]; then \
@@ -168,7 +169,7 @@ test_pass: build
 			fi ;\
 			echo "[$$CURRENT/$$COUNT] Testing $$(basename "$${f%.*}")" ; \
 			EXPECTED="$${f%.*}.expected" ;\
-			RES=$$(_build/default/bin/perkc.exe "$$f" > /dev/null && gcc -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast "$${f%.*}.c" -o "$$(dirname $$f)/a.out" && "$$(dirname $$f)/a.out") ; \
+			RES=$$(_build/default/bin/perkc.exe "$$f" > /dev/null && gcc -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast "$${f%.*}.c" -o "$$(dirname $$f)/a.out" $(LDFLAGS) && "$$(dirname $$f)/a.out") ; \
 			rm -f "$$(dirname $$f)/a.out" ;\
 			if [ $$? -eq 0 ]; then \
 				# echo "$$RES" ;\
@@ -215,7 +216,7 @@ test_pass_static: build
 		BASENAME="$${FILE%.*}"; \
 		EXPECTED="$${BASENAME}.expected"; \
 		CFILE="$${BASENAME}.c"; \
-		RES=$$(_build/default/bin/perkc.exe --static "$$FILE" > /dev/null && gcc -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast "$$CFILE" -o "$$(dirname $$FILE)/a.out" && "$$(dirname $$FILE)/a.out"); \
+		RES=$$(_build/default/bin/perkc.exe --static "$$FILE" > /dev/null && gcc -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast "$$CFILE" -o "$$(dirname $$FILE)/a.out" $(LDFLAGS) && "$$(dirname $$FILE)/a.out"); \
 		rm -f "$$(dirname $$FILE)/a.out"; \
 		if [ $$? -eq 0 ]; then \
 			if [ -e "$$EXPECTED" ]; then \
@@ -256,7 +257,7 @@ test_pass_static: build
 			fi ;\
 			echo "[$$CURRENT/$$COUNT] Testing $$(basename "$${f%.*}")" ; \
 			EXPECTED="$${f%.*}.expected" ;\
-			RES=$$(_build/default/bin/perkc.exe --static "$$f" > /dev/null && gcc -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast "$${f%.*}.c" -o "$$(dirname $$f)/a.out" && "$$(dirname $$f)/a.out") ; \
+			RES=$$(_build/default/bin/perkc.exe --static "$$f" > /dev/null && gcc -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast "$${f%.*}.c" -o "$$(dirname $$f)/a.out" $(LDFLAGS) && "$$(dirname $$f)/a.out") ; \
 			rm -f "$$(dirname $$f)/a.out" ;\
 			if [ $$? -eq 0 ]; then \
 				# echo "$$RES" ;\

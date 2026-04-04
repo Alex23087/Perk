@@ -10,6 +10,13 @@ type symtable_t = (perkident, perktype * string) Hashtbl.t
 (** List of hash tables, one for each scope. The head of the table is the
     current scope.*)
 let var_symbol_table : symtable_t list ref = ref []
+let global_symbol_table () : symtable_t list ref =
+  let rec aux ls = match ls with
+    | x::[] -> ref [x]
+    | _::xs -> aux xs
+    | [] -> failwith "g"
+  in
+  aux !var_symbol_table
 
 (** Adds a symbol to the [symbol_table] symbol table. Used for scoping.*)
 let push_symbol_table_local symbol_table =
@@ -63,6 +70,7 @@ let print_symbol_table () =
 *)
 let bind_var_local (symbol_table : symtable_t list ref) (id : perkident)
     ?(fnm : string = !Utils.fnm) (t : perktype) =
+    Utils.say_here (Printf.sprintf "binding var %s" id); 
   match !symbol_table with
   | [] -> failwith "No symbol table available"
   | h :: _ ->
@@ -77,7 +85,7 @@ let bind_var = bind_var_local var_symbol_table
 ;;
 
 (* Written like this instead of partial application to avoid caching the filename *)
-Utils.bind_var_ptr := fun a b -> bind_var ~fnm:!Utils.fnm a b;;
+Utils.bind_var_ptr := fun a b -> bind_var_local (global_symbol_table()) ~fnm:!Utils.fnm a b;;
 
 (** Given a symbol table [symbol_table], and identifier [id] and its type [t],
     it checks whether [id] is already defined in [symbol_table], and if so

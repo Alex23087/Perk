@@ -67,6 +67,7 @@ let rec resolve_type (typ : perktype) : perktype =
             else
               let a, typ', q = typ in
               match typ' with
+              | INum _ -> (typ, [ typ ])
               | Basetype t ->
                   ( ( a,
                       (match lookup_type t with
@@ -118,7 +119,8 @@ let rec resolve_type (typ : perktype) : perktype =
                   in
                   ((a, Arraytype (ret_t, n), q), ret_l)
               | Structtype _ -> (typ, lst) (* TODO: Fix type resolution *)
-              | AlgebraicType _ -> (typ, lst) (* TODO: Fix type resolution *)
+              | AlgebraicType (_, _, None) -> (typ, lst) (* TODO: Fix type resolution *)
+              | AlgebraicType (id, ctors, Some t) -> (([], AlgebraicType(subst_ctor_name id t t, ctors, Some t), []), lst)
               | ArcheType (name, decls) ->
                   let lst = typ :: lst in
                   let decls_t, decls_l =
@@ -181,6 +183,7 @@ let rec resolve_type (typ : perktype) : perktype =
               | Vararg -> ((a, Vararg, q), lst)
               | Infer -> ((a, Infer, q), lst)
               | PolyADTPlaceholder (i, t) ->
+                  let i = subst_ctor_name i t t in
                   let dat_t = t in
                   let polyadt_constructors =
                     File_info.get_polyadt_constructors ()
@@ -277,11 +280,16 @@ and c_type_of_base_type (t : perktype) : string =
 and type_descriptor_of_perktype ?(erase_env = true) (t : perktype) : string =
   let _, t, _ = t in
   match t with
+  | INum _ ->
+      failwith
+        "Inum found in type descriptor generation! If you find this error (you have ugly \
+         knees) please file an issue at \
+         https://github.com/Alex23087/Perk/issues"
   | Basetype s -> s
   | Structtype (id, _) -> id
   | AlgebraicType (id, _, None) -> id
   | AlgebraicType (id, _, Some t) ->
-    let id = subst_ctor_name id t t in
+      let id = subst_ctor_name id t t in
       Printf.sprintf "%s_perk_polym_%s" id (type_descriptor_of_perktype t)
   | Funtype (args, ret) ->
       let args_str =
@@ -319,7 +327,7 @@ and type_descriptor_of_perktype ?(erase_env = true) (t : perktype) : string =
       Printf.sprintf "tup_%s_le"
         (String.concat "__" (List.map type_descriptor_of_perktype ts))
   | PolyADTPlaceholder (i, t) ->
-    let i = subst_ctor_name i t t in
+      let i = subst_ctor_name i t t in
       Printf.sprintf "%s_perk_polym_%s" i (type_descriptor_of_perktype t)
 
 and c_type_of_perktype ?(erase_env = true) (t : perktype) =
@@ -419,7 +427,7 @@ let dependencies_of_type (typ : perktype) : perkident list =
           else
             let _, typ', _ = typ in
             match typ' with
-            | Basetype _ -> ([], typ :: lst)
+            | Basetype _ | INum _ -> ([], typ :: lst)
             | Pointertype t ->
                 let deps, visited =
                   dependencies_of_type_aux ~voidize t (typ :: lst)
@@ -612,6 +620,7 @@ let rec bind_type_if_needed (typ : perktype) =
             (Printf.sprintf "bind_type_if_needed: %s" (show_perktype typ));
           let typ' = resolve_type typ in
           match typ' with
+          | _, INum _, _ -> say_here (Printf.sprintf "Trying to bind %s. Ignoring" (show_perktype typ'))
           | _, Basetype _t, _ -> ()
           | _, Pointertype t, _ ->
               bind_type typ;
@@ -651,7 +660,7 @@ let rec bind_type_if_needed (typ : perktype) =
                in
                if not (List.exists (fun (t', _) -> t' = t) instances) then
                  Hashtbl.replace instances_table i ((t, false) :: instances));
-
+              File_info.print_polyadt_instances();
               bind_type typ;
               bind_type_if_needed t
           | _, ArcheType (_name, _decls), _ ->
@@ -695,6 +704,11 @@ let add_code_to_type_binding (_typ : perktype) (code : string) : unit =
 
 (** Generate the name of an extension function *)
 let ext_fun_name (typ : perktype) (id : perkident) =
+  let typ = match discard_type_aq typ with
+    | AlgebraicType (i, _, _)
+    | PolyADTPlaceholder (i, _) -> [], Basetype(i), []
+    | _ -> typ
+  in
   Printf.sprintf "__perk_%s_ext_%s" (type_descriptor_of_perktype typ) id
 
 (** Returns true if the identifier identifies a type *)

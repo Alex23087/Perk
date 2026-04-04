@@ -91,7 +91,7 @@ let ast_of_filename filename =
 let singletonamble () =
   if !Utils.static_compilation then ""
   else
-    "#include <malloc.h>\n#include <string.h>\n#include <stdbool.h>\n"
+    "#include <gc/gc.h>\n#include <string.h>\n#include <stdbool.h>\n"
     ^ "#ifndef LAMBDUMMY_PERK\n#define LAMBDUMMY_PERK\n"
     ^ "typedef struct _lambdummy_type {\n\
       \    void *env;\n\
@@ -100,8 +100,8 @@ let singletonamble () =
        static __lambdummy_type *__lambdummy;\n\n\
       \ __lambdummy_type *alloclabmd(int size, void *labmda, void *env)\n\
        {\n\
-      \    __lambdummy_type *ptr = malloc(sizeof(__lambdummy_type));\n\
-      \    ptr->env = malloc(size);\n\
+      \    __lambdummy_type *ptr = GC_malloc(sizeof(__lambdummy_type));\n\
+      \    ptr->env = GC_malloc(size);\n\
       \    memcpy(ptr->env, env, size);\n\
       \    ptr->func = labmda;\n\
       \    return ptr;\n\
@@ -228,7 +228,7 @@ and add_polydefs ast =
       (fun (tld, t_actual) acc ->
         annot_copy tld
           (match ( $ ) tld with
-          | PolymorphicFundef ((t_res, id, args, body), t_param) ->
+          | PolymorphicFundef ((t_res, id, args, body), _kind, t_param) ->
               if not (polyfun_is_already_codegened id t_actual) then (
                 let param_types = List.map fst args in
                 (* the definition is added to the file-local polyfun hashtable *)
@@ -278,7 +278,7 @@ and check_polydefs_pass (ast : topleveldef_a list) =
   List.map
     (fun tld ->
       match ( $ ) tld with
-      | PolymorphicFundef ((t_res, id, args, body), t_param) ->
+      | PolymorphicFundef ((t_res, id, args, body), _kind, t_param) ->
           let instances =
             try Hashtbl.find (File_info.get_polyfun_instances ()) id
             with Not_found -> []

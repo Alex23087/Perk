@@ -1,0 +1,29 @@
+import "stdio.h"
+
+type <T> List = Nil | Cons(T, List @ T)
+
+fun <T> List_make_empty(): List @ T {
+    return Nil
+}
+
+fun <T> List.print(self: List@T, print: (T, bool) => void): void {
+    match (self) {
+        Nil {
+            return
+        },
+        Cons(var elem, Nil) {
+            print(elem, false)
+        },
+        Cons(var elem, var rest) {
+            print(elem, true)
+            rest.print(print)
+        }
+    }
+}
+
+fun main() : void {
+    let l : List@int = Cons(1, Cons(2, List_make_empty@int()))
+    l.print((elem: int, has_rest: bool): void {
+        printf(if has_rest then "%d, " else "%d\n", elem)
+    })
+}

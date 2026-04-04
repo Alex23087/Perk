@@ -46,6 +46,7 @@ type perktype_qualifier =
 
 (* type of the perk -- giangpt *)
 type perktype_partial =
+  | INum of int
   | Basetype of string
   | Funtype of perktype list * perktype  (** types of args, return type *)
   | Lambdatype of
@@ -213,7 +214,7 @@ and topleveldef_t =
   | Def of perkdef * perktype option
   | Fundef of perkfundef * funkind * bool
       (** fundef, what kind of function is it? is it public?*)
-  | PolymorphicFundef of perkfundef * perktype
+  | PolymorphicFundef of perkfundef * funkind * perktype
   | Archetype of perkident * declorfun_a list
   | Model of perkident * perkident list * deforfun_a list
   | Struct of perkident * perkdef list * (struct_attr list)
@@ -252,6 +253,7 @@ and discard_type_aq (typ : perktype) : perktype_partial =
 
 let rec show_perktype (typ : perktype) : string =
   match discard_type_aq typ with
+  | INum i -> Printf.sprintf "inum(%d)" i
   | Basetype s -> s
   | Funtype (args, ret) ->
       Printf.sprintf "(%s) -> %s"

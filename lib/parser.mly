@@ -115,7 +115,9 @@ topleveldef:
   | Fun pf = perkfun                                                                                       { annotate_2_code !fnm $loc (Ast.Fundef (pf, Normal, true)) }
   | Fun i = Ident Dot pf = perkfun                                                                         { annotate_2_code !fnm $loc (Ast.Fundef (pf, TypeMemExt(i), true)) }
   | TypeFun i = Ident Dot pf = perkfun                                                                     { annotate_2_code !fnm $loc (Ast.Fundef (pf, TypeExt(i), true)) }
-  | Fun Lt t=perktype Gt pf = perkfun                                                                      { annotate_2_code !fnm $loc (Ast.PolymorphicFundef (pf, t)) }
+  | Fun Lt t=perktype Gt pf = perkfun                                                                      { annotate_2_code !fnm $loc (Ast.PolymorphicFundef (pf, Normal, t)) }
+  | Fun Lt t=perktype Gt i = Ident Dot pf = perkfun                                                        { annotate_2_code !fnm $loc (Ast.PolymorphicFundef (pf, TypeMemExt(i), t)) }
+  | TypeFun Lt t=perktype Gt i = Ident Dot pf = perkfun                                                    { annotate_2_code !fnm $loc (Ast.PolymorphicFundef (pf, TypeExt(i), t)) }
   | error                                                                                                  { raise (ParseError(!fnm, "top-level definition expected", Top_level_definition_expected)) }
 
 struct_attr:
@@ -237,7 +239,6 @@ expr:
   | Cast LParen typ = perktype Comma e = expr RParen                                                       { annotate_2_code !fnm $loc (Ast.Cast ((([],Ast.Infer,[]), typ), e)) }
   | Sizeof LParen t = perktype RParen                                                                      { annotate_2_code !fnm $loc (Ast.Sizeof t) }
   | If guard = expr Then e1 = expr Else e2 = expr                                                          { annotate_2_code !fnm $loc (Ast.IfThenElseExpr (guard, e1, e2)) }
-  | i = Ident Poly t = perktype                                                                            { annotate_2_code !fnm $loc (Ast.PolymorphicVar(i, t)) }
 
   | error                                                                                                  { raise (ParseError(!fnm, "expression expected", Expected_token)) }
   | expr error                                                                                             { raise (ParseError(!fnm, "unexpected expression", Unexpected_token)) }

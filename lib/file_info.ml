@@ -102,3 +102,7 @@ let polyfun_is_already_codegened id t =
   let pi = get_polyfun_instances () in
   let instances = try Hashtbl.find pi id with Not_found -> [] in
   List.mem (t, true) instances
+
+let print_polyadt_instances () =
+  Utils.say_here "Polyadt Instances:\n";
+  Hashtbl.iter (fun k v -> Utils.say_here (Printf.sprintf "%s: %s" k (String.concat ", " (List.map (fun a -> a |> fst |> show_perktype) v)))) (get_polyadt_instances())
