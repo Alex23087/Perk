@@ -11,6 +11,9 @@ exception TypeError of string
 
 let fresh_var_counter = ref 0
 
+let polymorphic_fundef_definitions : (topleveldef_t, string) Hashtbl.t =
+  Hashtbl.create 10
+
 (** creates a new fresh variable __perk_s_n *)
 let fresh_var (s : string) : string =
   let v = !fresh_var_counter in
@@ -174,6 +177,7 @@ and codegen_program (header_name : string) (prog_is_main : bool)
        (fun (id, typ) ->
          Printf.printf "%s: %s\n" id (type_descriptor_of_perktype typ))
        !all_vars; *)
+  List.iter codegen_anticipated_polyfundefs tldfs;
   let body =
     String.concat "\n"
       (List.map
@@ -246,6 +250,63 @@ and codegen_program (header_name : string) (prog_is_main : bool)
        !called_counter !used_counter !unused_counter;
      Printf.printf "resolve_type called: %d\nused: %d\nunused: %d\n" !resolve_count
        !resolve_hit !resolve_miss; *)
+
+and codegen_anticipated_polyfundefs (tldf : topleveldef_a) : unit =
+  match ( $ ) tldf with
+  | PolymorphicFundef ((t_res, id, args, body), _kind, t_param) as pfun ->
+      if not (Hashtbl.mem (File_info.get_polyfun_instances ()) id) then
+        say_here
+          (Printf.sprintf
+             "codegen_polymorphic_fundef: THERE ARE NO INSTANCES of %s\n" id)
+        (* there are no instances *)
+      else
+        let instances = Hashtbl.find (File_info.get_polyfun_instances ()) id in
+        say_here
+          (Printf.sprintf "codegen_polymorphic_fundef: %s, %d instances" id
+             (List.length instances));
+        let instanced_funs =
+          List.map
+            (fun (t_actual, was_instantiated) ->
+              if was_instantiated then
+                (* Printf.printf "function %s<%s> was already instantiated\n" id
+                  (show_perktype t_actual); *)
+                None
+              else
+                (* let _ =
+                  Printf.printf
+                    "function %s<%s> was not instantiated, now it is\n" id
+                    (show_perktype t_actual)
+                in *)
+                let concrete_fundef =
+                  annot_copy tldf
+                    (Fundef
+                       ( ( subst_type t_res t_param t_actual,
+                           id ^ "_perk_polym_"
+                           ^ type_descriptor_of_perktype t_actual,
+                           List.map
+                             (fun x -> subst_perkvardesc x t_param t_actual)
+                             args,
+                           subst_type_command body t_param t_actual ),
+                         _kind,
+                         false ))
+                in
+                say_here
+                  (Printf.sprintf
+                     "codegen_topleveldef: codegenning concrete function: %s \
+                      %s %s"
+                     id
+                     (show_topleveldef_a concrete_fundef)
+                     (show_topleveldef_a concrete_fundef));
+                Some (( $ ) (!Utils.typecheck_tldf_ptr concrete_fundef)))
+            instances
+        in
+        Hashtbl.add polymorphic_fundef_definitions pfun
+          (String.concat "\n\n"
+             (List.map
+                (fun x -> codegen_topleveldef (annot_copy tldf x))
+                (List.filter Option.is_some instanced_funs
+                |> List.map Option.get)))
+  | _ -> ()
 
 (** Generates code for a top level definition. *)
 and codegen_topleveldef (tldf : topleveldef_a) : string =
@@ -600,7 +661,10 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
       let instances =
         try Hashtbl.find instance_table id with Not_found -> []
       in
-      say_here (Printf.sprintf "n instances: %d" (List.length instances));
+      say_here
+        (Printf.sprintf "n instances of polymorphic ADT %s: %d" id
+           (List.length instances));
+      File_info.print_polyadt_instances ();
 
       let constructor_table = File_info.get_polyadt_constructors () in
 
@@ -608,8 +672,14 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
         (fun (t, b) ->
           if not b then
             match discard_type_aq t with
-            | Basetype "__perk_alphafun_param" -> ()
+            | Basetype "__perk_alphafun_param" ->
+                say_here
+                  (Printf.sprintf
+                     "Skipping generation of type %s due to spurious parameter \
+                      version"
+                     (show_perktype t))
             | _ ->
+                say_here (Printf.sprintf "Generating type %s" (show_perktype t));
                 let constructors =
                   (try Hashtbl.find constructor_table (id, t)
                    with Not_found -> failwith "some shite wrong")
@@ -718,58 +788,9 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
   | Fundef ((t, id, args, body), _, public) ->
       say_here (Printf.sprintf "codegen_fundef: %s" id);
       indent_string ^ codegen_fundef ~public t id args body
-  | PolymorphicFundef ((t_res, id, args, body), _kind, t_param) ->
-      if not (Hashtbl.mem (File_info.get_polyfun_instances ()) id) then (
-        say_here
-          (Printf.sprintf
-             "codegen_polymorphic_fundef: THERE ARE NO INSTANCES of %s\n" id);
-        (* there are no instances *)
-        "")
-      else
-        let instances = Hashtbl.find (File_info.get_polyfun_instances ()) id in
-        say_here
-          (Printf.sprintf "codegen_polymorphic_fundef: %s, %d instances" id
-             (List.length instances));
-        let instanced_funs =
-          List.map
-            (fun (t_actual, was_instantiated) ->
-              if was_instantiated then
-                (* Printf.printf "function %s<%s> was already instantiated\n" id
-                  (show_perktype t_actual); *)
-                None
-              else
-                (* let _ =
-                  Printf.printf
-                    "function %s<%s> was not instantiated, now it is\n" id
-                    (show_perktype t_actual)
-                in *)
-                let concrete_fundef =
-                  annot_copy tldf
-                    (Fundef
-                       ( ( subst_type t_res t_param t_actual,
-                           id ^ "_perk_polym_"
-                           ^ type_descriptor_of_perktype t_actual,
-                           List.map
-                             (fun x -> subst_perkvardesc x t_param t_actual)
-                             args,
-                           subst_type_command body t_param t_actual ),
-                         _kind,
-                         false ))
-                in
-                say_here
-                  (Printf.sprintf
-                     "codegen_topleveldef: codegenning concrete function: %s \
-                      %s %s"
-                     id
-                     (show_topleveldef_a concrete_fundef)
-                     (show_topleveldef_a concrete_fundef));
-                Some (( $ ) (!Utils.typecheck_tldf_ptr concrete_fundef)))
-            instances
-        in
-        String.concat "\n\n"
-          (List.map
-             (fun x -> codegen_topleveldef (annot_copy tldf x))
-             (List.filter Option.is_some instanced_funs |> List.map Option.get))
+  | PolymorphicFundef _ as pfun -> (
+      try Hashtbl.find polymorphic_fundef_definitions pfun
+      with Not_found -> "")
   | Extern (n, t) -> Printf.sprintf "extern %s %s;" (codegen_type t) n
   | Pretend _ -> ""
   (* Externs are only useful for type checking. No need to keep it for codegen step *)

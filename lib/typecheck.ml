@@ -1483,9 +1483,11 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           match Option.map discard_type_aq expected_return with
           | Some (Funtype _) -> raise Not_found
           | _ -> (
+              say_here (Printf.sprintf "Attempting to find supposed constructor %s" id);
               let adt =
                 Hashtbl.find (File_info.get_polyadt_adt_from_constructor ()) id
               in
+              say_here (Printf.sprintf "Found constructor %s, type %s" id (show_perktype adt));
               match adt with
               | _, AlgebraicType (_ident, ctors, _tparam), _ ->
                   List.find (fun (i, _t) -> i = id) ctors |> ignore;

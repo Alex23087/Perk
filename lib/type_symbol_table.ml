@@ -119,7 +119,8 @@ let rec resolve_type (typ : perktype) : perktype =
                   in
                   ((a, Arraytype (ret_t, n), q), ret_l)
               | Structtype _ -> (typ, lst) (* TODO: Fix type resolution *)
-              | AlgebraicType _ -> (typ, lst) (* TODO: Fix type resolution *)
+              | AlgebraicType (_, _, None) -> (typ, lst) (* TODO: Fix type resolution *)
+              | AlgebraicType (id, ctors, Some t) -> (([], AlgebraicType(subst_ctor_name id t t, ctors, Some t), []), lst)
               | ArcheType (name, decls) ->
                   let lst = typ :: lst in
                   let decls_t, decls_l =
@@ -182,6 +183,7 @@ let rec resolve_type (typ : perktype) : perktype =
               | Vararg -> ((a, Vararg, q), lst)
               | Infer -> ((a, Infer, q), lst)
               | PolyADTPlaceholder (i, t) ->
+                  let i = subst_ctor_name i t t in
                   let dat_t = t in
                   let polyadt_constructors =
                     File_info.get_polyadt_constructors ()
@@ -658,7 +660,7 @@ let rec bind_type_if_needed (typ : perktype) =
                in
                if not (List.exists (fun (t', _) -> t' = t) instances) then
                  Hashtbl.replace instances_table i ((t, false) :: instances));
-
+              File_info.print_polyadt_instances();
               bind_type typ;
               bind_type_if_needed t
           | _, ArcheType (_name, _decls), _ ->
