@@ -6,17 +6,13 @@ open Utils
 open Type_symbol_table
 open Var_symbol_table
 open Free_variables
-open Parse_tags
 open Parse_lexing_commons
 open Polymorphism
 open File_info
 
 (** List of library functions and their types :
     [(perkident * perktype) list ref]*)
-let library_functions = ref []
-
-(** List of import paths *)
-let import_path_list = ref []
+let library_functions : (perkident * perktype) list ref = ref []
 
 (** gathers the path(s) where libraries are located *)
 let get_lib_path s =
@@ -34,8 +30,8 @@ let get_lib_path s =
                ( (0, 0),
                  (0, 0),
                  !Utils.fnm,
-                 Printf.sprintf "Could not find library %s in include paths" lib
-               ))
+                 Printf.sprintf "Could not find library %s in include paths" lib,
+                 Library_not_found ))
       | dir :: rest ->
           let candidate = Filename.concat dir lib in
           if Sys.file_exists candidate then candidate else find_path rest
@@ -55,15 +51,65 @@ let get_lib_path s =
            ( (0, 0),
              (0, 0),
              !Utils.fnm,
-             Printf.sprintf "Could not find library %s" path ))
+             Printf.sprintf "Could not find library %s" path,
+             Library_not_found ))
 
-(** Hash table of the defined ADT constructors*)
-let defined_constructors : (perkident, unit) Hashtbl.t = Hashtbl.create 10
+(** Hash table of extension functions. Binds a type to a list of (function_name
+    * function_type * optional_type_parameter * is_member_function)*)
+let extension_functions :
+    ( perktype_partial,
+      (perkident * perktype * perktype option * bool) list )
+    Hashtbl.t =
+  Hashtbl.create 10
+
+let lookup_extension_function (typ : perktype) (id : perkident) =
+  let typ =
+    match discard_type_aq typ with
+    | PolyADTPlaceholder (id, _)
+    | AlgebraicType (id, _, Some _) -> ([], PolyADTPlaceholder (id, ([], Basetype "_perk_polym_param_T", [])), [])
+    | AlgebraicType (id, _, None) -> ([], Basetype id, [])
+    | _ -> typ
+  in
+  say_here (Printf.sprintf "Looking up extension function %s for type %s" id (show_perktype typ));
+  Option.bind
+    (Hashtbl.find_opt extension_functions (discard_type_aq typ))
+    (List.find_opt (fun (i, _t, _type_param, _mem) -> id = i))
+
+let bind_extension_function (typ : perktype) (fundef : perkfundef)
+    (type_param : perktype option) (mem : bool) =
+  let typ =
+    match discard_type_aq typ with
+    | PolyADTPlaceholder (id, _)
+    | AlgebraicType (id, _, Some _) -> ([], PolyADTPlaceholder (id, ([], Basetype "_perk_polym_param_T", [])), [])
+    | AlgebraicType (id, _, None) -> ([], Basetype id, [])
+    | _ -> typ
+  in
+  let _, id, _, _ = fundef in
+  say_here (Printf.sprintf "Binding extension function %s for type %s" id (show_perktype typ));
+  let part_typ = discard_type_aq typ in
+  let exts =
+    match Hashtbl.find_opt extension_functions part_typ with
+    | None -> []
+    | Some e -> e
+  in
+  let funtype = funtype_of_perkfundef fundef in
+  let exts = (id, funtype, type_param, mem) :: exts in
+  Hashtbl.replace extension_functions part_typ exts
+
+let print_extension_functions () =
+  say_here ("Extension functions table:");
+  Hashtbl.iter (fun k v -> (
+    say_here (
+      Printf.sprintf "%s: %s" (show_perktype ([], k, [])) 
+    (String.concat ", " (List.map (fst_4) v)))
+  )) extension_functions
 
 (* TODO handle type aliases *)
 
+let is_inum = function _, INum _, _ -> true | _ -> false
+
 (** check if type is integral *)
-let is_integral (_, typ, _) =
+let is_integral ((_, typ, _) as typ') =
   let nums =
     [
       Basetype "int";
@@ -80,7 +126,7 @@ let is_integral (_, typ, _) =
       Basetype "char";
     ]
   in
-  List.mem typ nums
+  List.mem typ nums || is_inum typ'
 
 let get_type_length (_, typ, _) =
   match typ with
@@ -109,7 +155,8 @@ let get_type_length (_, typ, _) =
              (-1, -1),
              !Utils.fnm,
              Printf.sprintf "Unable to determine size for type %s"
-               (show_perktype_partial typ) ))
+               (show_perktype_partial typ),
+             Unknown_type_size ))
 
 (** check if type is numerical *)
 let rec is_numerical ((_, typ, _) as t) =
@@ -131,7 +178,7 @@ let rec is_numerical ((_, typ, _) as t) =
       Basetype "char";
     ]
   in
-  List.mem typ nums || is_generic_numeric t
+  List.mem typ nums || is_generic_numeric t || is_inum t
 
 (** a generic type is numerical if either
     - its inferred type is empty and a numeric bound is present
@@ -161,19 +208,27 @@ and is_generic_non_numeric t =
 and add_numeric_bound t annotated_thing =
   if not (Hashtbl.mem generic_types_table t) then
     raise_type_error annotated_thing
-      (Printf.sprintf "%s is not a generic type" (show_perktype t));
+      (Printf.sprintf "%s is not a generic type" (show_perktype t))
+      Not_a_generic_type;
 
   if is_generic_non_numeric t then
     raise_type_error annotated_thing
       (Printf.sprintf
          "tried to impose numerical bound on non-numerical generic type %s"
-         (show_perktype t));
+         (show_perktype t))
+      Not_a_numerical_type;
 
   let g = Hashtbl.find generic_types_table t in
 
   if not (List.mem Numeric_Bound g.bounds) then
     Hashtbl.replace generic_types_table t
       { g with bounds = Numeric_Bound :: g.bounds }
+
+(** The type variable in the current context. This is used to avoid generating
+    concrete implementations of functions for generic types. Since we can only
+    have one type variable at a time, there's no need to make this a stack/list.
+*)
+let current_type_variable : perktype option ref = ref None
 
 (* TODO: This ranking cannot be done with a total order, signed and unsigned are not comparable *)
 
@@ -205,31 +260,51 @@ let rec numerical_rank : perktype -> int = function
       else 0
   | _ -> 0 (* non‐numeric or unknown *)
 
+let inum_fits (_typ : perktype) (_size : int) =
+  true (* TODO: Check if the inum fits in the type *)
+
 (** typechecks a set of toplevel definitions, instancing the inferred types *)
 let rec typecheck_program (ast : topleveldef_a list) : topleveldef_a list =
-  push_symbol_table ();
   let res = List.map typecheck_topleveldef ast in
   let res = List.map typecheck_deferred_function res in
   (* Will it do it in the right order?? *)
-  (* print_symbol_table (); *)
-  (* print_type_symbol_table (); *)
+  if !Utils.verbose then (
+    print_symbol_table ();
+    print_type_symbol_table ());
   res
 
 (** Typechecks functions after everything else *)
 and typecheck_deferred_function (tldf : topleveldef_a) : topleveldef_a =
   match ( $ ) tldf with
-  | Fundef ((ret_type, id, params, body), public) ->
+  | Fundef ((ret_type, id, params, body), _funkind, public) ->
+      let id, _funkind, public =
+        match _funkind with
+        | Normal -> (id, _funkind, public)
+        | TypeExt t ->
+            ( ext_fun_name
+                (* TODO: Check if this type is ok *) ([], Basetype t, [])
+                id,
+              Normal,
+              true )
+        | TypeMemExt t ->
+            ( ext_fun_name
+                (* TODO: Check if this type is ok *) ([], Basetype t, [])
+                id,
+              Normal,
+              true )
+      in
       push_symbol_table ();
       List.iter
         (fun (typ, id) ->
           try bind_var id typ
-          with Double_declaration msg -> raise_type_error tldf msg)
+          with Double_declaration msg ->
+            raise_type_error tldf msg Double_declaration)
         params;
       let body_res, _body_type, body_returns =
         typecheck_command ~retype:(Some ret_type) body
       in
       if (not body_returns) && not (is_unit_type ret_type) then
-        raise_type_error tldf "Not all code paths return a value";
+        raise_type_error tldf "Not all code paths return a value" No_return;
       pop_symbol_table ();
       (* TODO: add public/private to qualifiers *)
       let funtype =
@@ -237,38 +312,25 @@ and typecheck_deferred_function (tldf : topleveldef_a) : topleveldef_a =
       in
       rebind_var id funtype;
       rebind_type (type_descriptor_of_perktype funtype) funtype;
-      annot_copy tldf (Fundef ((ret_type, id, params, body_res), public))
+      annot_copy tldf
+        (Fundef ((ret_type, id, params, body_res), _funkind, public))
   | _ -> tldf
 
 (** Typechecks toplevel definitions *)
 and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
   match ( $ ) tldf with
   | TLSkip -> annot_copy tldf TLSkip
-  | Import s ->
-      import_path_list := get_lib_path s :: !import_path_list;
-      generate_tags !import_path_list;
-      library_functions := get_prototype_types ();
-      (* for each library function, if it is not already defined define it *)
-      (* TODO solve conditionally compiled definitions *)
-      (* TODO hoist these*)
-      List.iter
-        (fun (id, t) ->
-          say_here
-            (Printf.sprintf "Adding library function %s of type %s" id
-               (show_perktype t));
-          if Option.is_none (lookup_var id) then bind_var id t
-          else say_here "Skipping")
-        !library_functions;
-      remove_tags ();
-      remove_libs_expanded ();
-      tldf
+  | Import _s -> tldf
   | Open _ ->
       raise_compilation_error tldf
         "Opens should not reach this point (typecheck). If you see this error, \
          please open an issue at https://github.com/Alex23087/Perk/issues"
+        Impossible
   | InlineC _ -> tldf
   | Def (((typ, id), expr), _) ->
-      if id = "self" then raise_type_error tldf "Identifier self is reserved"
+      (* TODO: Possibly this check can be removed, if it can be performed beforehand by the keyword checker *)
+      if id = "self" then
+        raise_type_error tldf "Identifier self is reserved" Reserved_identifier
       else
         let typ' = resolve_type typ in
         let expr_res, expr_type = typecheck_expr expr in
@@ -285,7 +347,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
         in
         let typ'' =
           try match_types ~coalesce:true ~array_init typ' expr_type
-          with Type_match_error msg -> raise_type_error tldf msg
+          with Type_match_error msg -> raise_type_error tldf msg Type_mismatch
         in
         let typ''_nocoal =
           try match_types ~coalesce:false ~array_init typ' expr_type
@@ -303,14 +365,38 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
                   | Basetype "void" -> true
                   | _ -> false)
                 params
-            then raise_type_error tldf "Cannot have void parameters in a lambda"
+            then
+              raise_type_error tldf "Cannot have void parameters in a lambda"
+                Lambda_void_param
         | _ -> ());
         bind_type_if_needed typ';
         bind_type_if_needed typ'';
         bind_var id typ'';
         annot_copy tldf (Def (((typ'', id), expr_res), deftype))
-  | Fundef ((ret_type, id, params, body), public) ->
-      if id = "self" then raise_type_error tldf "Identifier self is reserved"
+  | Fundef ((ret_type, id, params, body), _funkind, public) ->
+      let id, _funkind, public =
+        match _funkind with
+        | Normal -> (id, _funkind, public)
+        | TypeExt t ->
+            let ext_type =
+              (* TODO: Check if this type is ok *) ([], Basetype t, [])
+            in
+            bind_extension_function ext_type
+              (ret_type, id, params, body)
+              None false;
+            (ext_fun_name ext_type id, Normal, true)
+        | TypeMemExt t ->
+            let ext_type =
+              (* TODO: Check if this type is ok *) ([], Basetype t, [])
+            in
+            bind_extension_function ext_type
+              (ret_type, id, params, body)
+              None true;
+            (ext_fun_name ext_type id, Normal, true)
+      in
+      (* TODO: Possibly this check can be removed, if it can be performed beforehand by the keyword checker *)
+      if id = "self" then
+        raise_type_error tldf "Identifier self is reserved" Reserved_identifier
       else (
         if
           List.exists
@@ -319,33 +405,71 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
               | Basetype "void" -> true
               | _ -> false)
             params
-        then raise_type_error tldf "Cannot have void parameters in a function";
+        then
+          raise_type_error tldf "Cannot have void parameters in a function"
+            Function_void_param;
         (* TODO add private / public to qualifiers *)
         let funtype =
           ([], Funtype (List.map (fun (typ, _) -> typ) params, ret_type), [])
         in
+
         bind_var id funtype;
+
         bind_type_if_needed funtype;
-        annot_copy tldf (Fundef ((ret_type, id, params, body), public))
+        annot_copy tldf
+          (Fundef ((ret_type, id, params, body), _funkind, public))
         (* |> ignore; typecheck_deferred_function tldf *))
-  | PolymorphicFundef ((ret_type, id, params, body), type_param) ->
+  | PolymorphicFundef ((ret_type, id, params, body), _kind, type_param) ->
+
+     (match type_param with
+      | _, Basetype "__perk_alphafun_param", _ -> (
+
+      (* First we add the polyfun to the global polyfun hashtbl with phony body (to allow recursive polyfuns), checcosè? *)
+      let id, _kind =
+        match _kind with
+        | Normal -> (id, _kind)
+        | TypeExt t ->
+            let ext_type =
+              resolve_type ([], PolyADTPlaceholder(t, type_param), [])
+            in
+            bind_extension_function ext_type
+              (ret_type, id, params, body)
+              (Some type_param) false;
+            (ext_fun_name ext_type id, Normal)
+        | TypeMemExt t ->
+            let ext_type =
+              resolve_type ([], PolyADTPlaceholder(t, type_param), [])
+            in
+            bind_extension_function ext_type
+              (ret_type, id, params, body)
+              (Some type_param) true;
+            (ext_fun_name ext_type id, Normal)
+      in
+      Hashtbl.add global_polyfuns id
+        (PolymorphicFundef ((ret_type, id, params, body), _kind, type_param)
+        |> annot_copy tldf);
+
       (* add the type parameter to the hashtable, setting empty bounds and inferred type*)
       Hashtbl.add generic_types_table type_param
         { bounds = []; inferred_type = None };
 
+      (* TODO: The body typecheck has been disabled to allow recursion. Please handle this properly *)
       (* typecheck the body *)
+      current_type_variable := Some type_param;
       push_symbol_table ();
       List.iter
         (fun (typ, id) ->
           try bind_var id typ
-          with Double_declaration msg -> raise_type_error tldf msg)
+          with Double_declaration msg ->
+            raise_type_error tldf msg Double_declaration)
         params;
       let body_res, _body_type, body_returns =
         typecheck_command ~retype:(Some ret_type) body
       in
       if (not body_returns) && not (is_unit_type ret_type) then
-        raise_type_error tldf "Not all code paths return a value";
+        raise_type_error tldf "Not all code paths return a value" No_return;
       pop_symbol_table ();
+      current_type_variable := None;
 
       (* add the generic type (bounds and inferred type) to the polyfun_bounds hashtable *)
       let param_gen_type = Hashtbl.find generic_types_table type_param in
@@ -361,18 +485,38 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
         id
         (param_types, ret_type, type_param);
       (* the definition is added to the global polyfun hashtable, to allow it to be instantiated in other files *)
-      Hashtbl.add global_polyfuns id
-        (PolymorphicFundef ((ret_type, id, params, body_res), type_param)
+      Hashtbl.replace global_polyfuns id
+        (PolymorphicFundef
+           ( (ret_type, id, params, body_res (* Should be body_res *)),
+             _kind,
+             type_param )
         |> annot_copy tldf);
       annot_copy tldf
-        (PolymorphicFundef ((ret_type, id, params, body_res), type_param))
-  | Extern (id, typ) ->
-      (if id = "self" then raise_type_error tldf "Identifier self is reserved"
+        (PolymorphicFundef
+           ( (ret_type, id, params, body_res (* Should be body_res *)),
+             _kind,
+             type_param )))
+
+      | _ -> 
+        
+        let ret_type = Polymorphism.subst_type ret_type (type_param) ([], Basetype "__perk_alphafun_param", []) in
+        let params = List.map (fun pvd -> Polymorphism.subst_perkvardesc pvd type_param ([], Basetype "__perk_alphafun_param", [])) params in
+        let body = Polymorphism.subst_type_command body type_param ([], Basetype "__perk_alphafun_param", []) in
+
+        typecheck_topleveldef ( annot_copy tldf (PolymorphicFundef ((ret_type, id, params, body), _kind, ([], Basetype "__perk_alphafun_param", []))))
+        
+        )
+
+  | Extern (id, typ) | Pretend (id, typ) ->
+      (* TODO: Possibly this check can be removed, if it can be performed beforehand by the keyword checker *)
+      (if id = "self" then
+         raise_type_error tldf "Identifier self is reserved" Reserved_identifier
        else
          match lookup_var id with
          | Some _ ->
              raise_type_error tldf
                (Printf.sprintf "Identifier %s is already defined" id)
+               Double_declaration
          | None -> ());
       bind_var id typ;
       bind_type_if_needed typ;
@@ -382,13 +526,18 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
   | Archetype (name, decls) -> (
       if !Utils.static_compilation then
         raise_compilation_error tldf
-          "Archetypes cannot be used in static compilation mode";
-      if name = "self" then raise_type_error tldf "Identifier self is reserved"
+          "Archetypes cannot be used in static compilation mode"
+          Static_comp_archetype;
+
+      (* TODO: Possibly this check can be removed, if it can be performed beforehand by the keyword checker *)
+      if name = "self" then
+        raise_type_error tldf "Identifier self is reserved" Reserved_identifier
       else
         match lookup_type name with
         | Some _ ->
             raise_type_error tldf
               (Printf.sprintf "Archetype %s is already defined" name)
+              Double_declaration
         | None ->
             List.iter bind_type_if_needed
               (List.map
@@ -407,6 +556,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
                        then
                          raise_type_error tldf
                            "Cannot have void parameters in a function"
+                           Function_void_param
                    | Lambdatype (params, _, _) ->
                        if
                          List.exists
@@ -418,6 +568,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
                        then
                          raise_type_error tldf
                            "Cannot have void parameters in a lambda"
+                           Lambda_void_param
                    | _ -> ());
 
                    (add_parameter_to_func_only void_pointer typ, id))
@@ -429,9 +580,11 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
   | Model (ident, archetypes, fields) ->
       (if !Utils.static_compilation then
          raise_compilation_error tldf
-           "Models cannot be used in static compilation mode";
+           "Models cannot be used in static compilation mode" Static_comp_model;
+
+       (* TODO: Possibly this check can be removed, if it can be performed beforehand by the keyword checker *)
        if ident = "self" then
-         raise_type_error tldf "Identifier self is reserved"
+         raise_type_error tldf "Identifier self is reserved" Reserved_identifier
        else
          (* Check that the model is not already defined *)
          let m = lookup_type ident in
@@ -439,6 +592,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
          | Some _ ->
              raise_type_error tldf
                (Printf.sprintf "Model %s is already defined" ident)
+               Double_declaration
          | None -> ());
 
       (* Get implemented archetypes *)
@@ -453,11 +607,13 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
                     raise_type_error tldf
                       (Printf.sprintf
                          "Model %s is trying to implement non-archetype %s"
-                         ident a))
+                         ident a)
+                      Model_implements_non_archetype)
             | None ->
                 raise_type_error tldf
                   (Printf.sprintf
-                     "Model %s implements non-existent Archetype %s" ident a))
+                     "Model %s implements non-existent Archetype %s" ident a)
+                  Model_implements_non_archetype)
           archetypes
       in
 
@@ -486,7 +642,8 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
                 if id = i then
                   let _ =
                     try match_types t typ
-                    with Type_match_error msg -> raise_type_error def msg
+                    with Type_match_error msg ->
+                      raise_type_error def msg Type_mismatch
                   in
                   true
                 else false)
@@ -498,7 +655,8 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
                 (Printf.sprintf
                    "Model %s is missing required field '%s' of type %s, \
                     declared in archetype %s"
-                   ident id (show_perktype typ) arch))
+                   ident id (show_perktype typ) arch)
+                Model_missing_required_field)
         required_fields;
 
       (* Gather member functions *)
@@ -523,6 +681,7 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
             | DefVar (_, ((_, id), expr)) ->
                 if id = "constructor" then
                   raise_type_error expr "Constructor must be a function"
+                    Constructor_is_not_function
                 else false)
           fields
       in
@@ -532,12 +691,13 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
             (* Check that constructor returns void *)
             let _ =
               try match_types ([], Basetype "void", []) ret
-              with Type_match_error msg -> raise_type_error tldf msg
+              with Type_match_error msg ->
+                raise_type_error tldf msg Type_mismatch
             in
             List.map fst params
         | Some _ ->
             raise_type_error (Option.get constr)
-              "Constructor must be a function 2"
+              "Constructor must be a function 2" Constructor_is_not_function
         | None -> []
       in
       pop_symbol_table ();
@@ -574,22 +734,26 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
                     params
                 then
                   raise_type_error tldf
-                    "Cannot have void parameters in a function";
+                    "Cannot have void parameters in a function"
+                    Function_void_param;
                 List.iter
                   (fun (typ, id) ->
                     try bind_var id typ
-                    with Double_declaration msg -> raise_type_error def msg)
+                    with Double_declaration msg ->
+                      raise_type_error def msg Double_declaration)
                   params;
                 let body_res, _body_type, body_returns =
                   typecheck_command ~retype:(Some ret) body
                 in
                 if (not body_returns) && not (is_unit_type ret) then
-                  raise_type_error tldf "Not all code paths return a value";
+                  raise_type_error tldf "Not all code paths return a value"
+                    No_return;
                 pop_symbol_table ();
                 (try
                    bind_var_local local_symbol_table id
                      ([], Funtype (List.map fst params, ret), [])
-                 with Double_declaration msg -> raise_type_error def msg);
+                 with Double_declaration msg ->
+                   raise_type_error def msg Double_declaration);
                 annot_copy def (DefFun (attrs, (ret, id, params, body_res)))
             | DefVar (attrs, ((typ, id), expr)) ->
                 let expr_res, expr_type = typecheck_expr expr in
@@ -604,7 +768,8 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
                 in
                 let typ' =
                   try match_types ~array_init typ expr_type
-                  with Type_match_error msg -> raise_type_error expr msg
+                  with Type_match_error msg ->
+                    raise_type_error expr msg Type_mismatch
                 in
                 (match discard_type_aq typ' with
                 | Lambdatype (params, _, _) ->
@@ -618,9 +783,11 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
                     then
                       raise_type_error tldf
                         "Cannot have void parameters in a lambda"
+                        Lambda_void_param
                 | _ -> ());
                 (try bind_var_local local_symbol_table id typ'
-                 with Double_declaration msg -> raise_type_error def msg);
+                 with Double_declaration msg ->
+                   raise_type_error def msg Double_declaration);
                 annot_copy def (DefVar (attrs, ((typ', id), expr_res))))
           fields
       in
@@ -648,13 +815,17 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
           | DefVar (_, ((typ, _), _)) -> bind_type_if_needed typ)
         fields_res;
       annot_copy tldf (Model (ident, archetypes, fields_res))
-  | Struct (ident, fields) ->
+  | Struct (ident, fields, attr) ->
+      (* TODO: Check struct attributes: e.g.,
+        check that you are not using duplicate attrs,
+        that you are not using a negative integer for the packing, etc. *)
       let local_symbol_table = ref [ Hashtbl.create 10 ] in
       let (fields_res : perkdef list) =
         List.map
           (fun ((typ, id), expr) ->
             (try bind_var_local local_symbol_table id typ
-             with Double_declaration msg -> raise_type_error tldf msg);
+             with Double_declaration msg ->
+               raise_type_error tldf msg Double_declaration);
             let typ' = resolve_type typ in
             let expr_res, expr_type = typecheck_expr expr in
             let field_type = match_types typ' expr_type in
@@ -662,20 +833,48 @@ and typecheck_topleveldef (tldf : topleveldef_a) : topleveldef_a =
           fields
       in
       bind_type_if_needed ([], Structtype (ident, fields_res), []);
-      annot_copy tldf (Struct (ident, fields_res))
-  | ADT (ident, constructors) ->
+      annot_copy tldf (Struct (ident, fields_res, attr))
+  | ADT (ident, constructors, None) ->
       (* TODO: check existence of types *)
       List.iter
         (fun (ide, t) ->
-          if Hashtbl.mem defined_constructors ide then
+          if Hashtbl.mem File_info.defined_constructors ide then
             raise_type_error tldf
-              (Printf.sprintf "Constructor %s is already defined" ide);
-          Hashtbl.add defined_constructors ide ();
+              (Printf.sprintf "Constructor %s is already defined" ide)
+              Double_declaration;
+          Hashtbl.add File_info.defined_constructors ide ();
           bind_var ide
-            ([], Funtype (t, ([], AlgebraicType (ident, constructors), [])), []))
+            ( [],
+              Funtype (t, ([], AlgebraicType (ident, constructors, None), [])),
+              [] ))
         constructors;
-      bind_type_if_needed ([], AlgebraicType (ident, constructors), []);
+      bind_type_if_needed ([], AlgebraicType (ident, constructors, None), []);
       tldf
+  | ADT (ident, constructors, Some tparam) ->
+
+      match tparam with
+      | _, Basetype "__perk_alpha_param", _ ->
+
+        let declared_table = File_info.get_polyadt_declared () in
+        say_here
+          (Printf.sprintf "Declaring polymorphic ADT %s with type parameter %s"
+            ident (show_perktype tparam));
+        Hashtbl.add declared_table ident (tparam, constructors);
+        List.iter
+          (fun x ->
+            Hashtbl.add
+              (File_info.get_polyadt_adt_from_constructor ())
+              (fst x)
+              ([], AlgebraicType (ident, constructors, Some tparam), []))
+          constructors;
+        tldf
+
+      | _ -> 
+
+        let balls = List.map (fun x -> Polymorphism.subst_type x tparam ([],  Basetype "__perk_alpha_param", [])) in 
+        let constructors = List.map (fun (i, cl) -> (i, balls cl)) constructors in
+
+        typecheck_topleveldef (annot_copy tldf (ADT (ident, constructors, Some ([],  Basetype "__perk_alpha_param", []))))
 
 (** Typechecks commands
     @param retype the expected return type
@@ -692,11 +891,18 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       pop_symbol_table ();
       (annot_copy cmd (Block c_res), return_type, does_return)
   | DefCmd (((typ, id), expr), _) ->
-      if id = "self" then raise_type_error cmd "Identifier self is reserved"
+      (* TODO: Possibly this check can be removed, if it can be performed beforehand by the keyword checker *)
+      if id = "self" then
+        raise_type_error cmd "Identifier self is reserved" Reserved_identifier
       else
         let typ' = resolve_type typ in
         let expr = add_lambda_name expr id in
-        let expr_res, expr_type = typecheck_expr expr in
+        let expr_res, expr_type =
+          typecheck_expr
+            ~expected_return:
+              (match discard_type_aq typ' with Infer -> None | _ -> Some typ')
+            expr
+        in
         let expr_res, expr_type = fill_nothing expr_res expr_type typ' in
         let expr_type =
           match (typ', expr_type) with
@@ -711,7 +917,7 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
         in
         let typ'' =
           try match_types ~coalesce:true ~array_init typ' expr_type
-          with Type_match_error msg -> raise_type_error cmd msg
+          with Type_match_error msg -> raise_type_error cmd msg Type_mismatch
         in
         let typ''_nocoal =
           try match_types ~coalesce:false ~array_init typ' expr_type
@@ -729,7 +935,9 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
                   | Basetype "void" -> true
                   | _ -> false)
                 params
-            then raise_type_error cmd "Cannot have void parameters in a lambda"
+            then
+              raise_type_error cmd "Cannot have void parameters in a lambda"
+                Lambda_void_param
         | _ -> ());
         bind_type_if_needed typ';
         bind_type_if_needed typ'';
@@ -745,7 +953,7 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       let rhs_res, rhs_type = fill_nothing rhs_res rhs_type lhs_type in
       let exprval =
         try match_types ~coalesce:true lhs_type rhs_type
-        with Type_match_error msg -> raise_type_error cmd msg
+        with Type_match_error msg -> raise_type_error cmd msg Type_mismatch
       in
       let exprval_nocoal =
         try match_types ~coalesce:false lhs_type rhs_type
@@ -772,7 +980,8 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
         match (c1_type, c2_type) with
         | Some t, Some t' -> (
             try Some (match_types t t')
-            with Type_match_error msg -> raise_type_error cmd msg)
+            with Type_match_error msg ->
+              raise_type_error cmd msg Type_mismatch)
         | Some t, None | None, Some t -> Some t
         | None, None -> None
       in
@@ -787,7 +996,8 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       | _ ->
           raise_type_error cmd
             (Printf.sprintf "If guard must be a boolean or an int, got %s"
-               (show_perktype guard_type)));
+               (show_perktype guard_type))
+            If_non_boolean_guard);
       push_symbol_table ();
       let then_branch_res, _then_branch_type, then_branch_returns =
         typecheck_command ~retype then_branch
@@ -809,7 +1019,8 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       | _ ->
           raise_type_error cmd
             (Printf.sprintf "While guard must be a boolean or an int, got %s"
-               (show_perktype guard_type)));
+               (show_perktype guard_type))
+            While_non_boolean_guard);
       push_symbol_table ();
       let body_res, body_type, body_returns = typecheck_command ~retype body in
       pop_symbol_table ();
@@ -822,7 +1033,8 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       | _ ->
           raise_type_error cmd
             (Printf.sprintf "While guard must be a boolean or an int, got %s"
-               (show_perktype guard_type)));
+               (show_perktype guard_type))
+            While_non_boolean_guard);
       push_symbol_table ();
       let body_res, body_type, body_returns = typecheck_command ~retype body in
       pop_symbol_table ();
@@ -839,7 +1051,8 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
       | _ ->
           raise_type_error cmd
             (Printf.sprintf "For guard must be a boolean or an int, got %s"
-               (show_perktype guard_type)));
+               (show_perktype guard_type))
+            For_non_boolean_guard);
       let incrcmd_res, _incrcmd_type, incrcmd_returns =
         typecheck_command ~retype incrcmd
       in
@@ -854,12 +1067,16 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
   | Skip -> (cmd, None, false)
   | Banish id ->
       (* TODO: Let banish unbind the future (unbind banished things after they're banished) *)
-      (match Option.map resolve_type (lookup_var id) with
-      | None -> raise_syntax_error cmd ("Identifier " ^ id ^ " not found")
+      (match lookup_var id |> Option.map fst |> Option.map resolve_type with
+      | None ->
+          raise_syntax_error cmd
+            ("Identifier " ^ id ^ " not found")
+            Unknown_identifier
       | Some (_, Modeltype _, _) -> ()
       | Some _ ->
           raise_syntax_error cmd
-            (Printf.sprintf "Variable %s is not a model" id));
+            (Printf.sprintf "Variable %s is not a model" id)
+            Banish_non_model);
       (cmd, None, false)
   | Return None -> (
       match retype with
@@ -869,12 +1086,14 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
             (Printf.sprintf
                "This return is supposed to return a value of type %s, but it's \
                 empty"
-               (show_perktype t)))
+               (show_perktype t))
+            Wrong_return)
   | Return (Some e) ->
-      let e_res, e_type = typecheck_expr e in
+      let e_res, e_type = typecheck_expr ~expected_return:retype e in
       (match retype with
       | Some (_, Basetype "void", _) | None ->
           raise_type_error cmd "This return is not supposed to return any value"
+            Wrong_return
       | Some t ->
           ignore
             (try match_types t e_type
@@ -883,7 +1102,8 @@ and typecheck_command ?(retype : perktype option = None) (cmd : command_a) :
                  (Printf.sprintf
                     "This return is supposed to return a value of type %s, got \
                      %s instead"
-                    (show_perktype t) (show_perktype e_type))));
+                    (show_perktype t) (show_perktype e_type))
+                 Wrong_return));
       (annot_copy cmd (Return (Some e_res)), Some e_type, true)
   | Continue | Break -> (cmd, None, false)
   | Match (e, match_entry_list, _) ->
@@ -911,6 +1131,7 @@ and typecheck_match_entry_list ?(retype : perktype option = None)
              match (Option.map resolve_type x, Option.map resolve_type hd) with
              | Some (_, Basetype "void", _), None -> ()
              | None, Some (_, Basetype "void", _) -> ()
+             | Some (_, INum _, _), Some (_, Basetype "int", _) -> ()
              | Some x, Some hd -> (
                  try match_types x hd |> ignore
                  with Type_match_error _ ->
@@ -918,14 +1139,16 @@ and typecheck_match_entry_list ?(retype : perktype option = None)
                      (Printf.sprintf
                         "Entries of match have different return types: %s and \
                          %s"
-                        (show_perktype x) (show_perktype hd)))
+                        (show_perktype x) (show_perktype hd))
+                     Type_mismatch)
              | None, None -> ()
              | Some x, None | None, Some x ->
                  raise_type_error (List.hd firsts)
                    (Printf.sprintf
                       "Entries of match have different return types: %s and \
                        None"
-                      (show_perktype x))))
+                      (show_perktype x))
+                   Type_mismatch))
           tl;
         hd
   in
@@ -951,6 +1174,7 @@ and typecheck_match_entry ?(retype : perktype option = None)
         body_returns )
 
 and typecheck_match_case (match_type : perktype) case =
+  let match_type = resolve_type match_type in
   match ( $ ) case with
   | Matchall -> case
   | MatchVar (x, Some typ) -> (
@@ -960,7 +1184,8 @@ and typecheck_match_case (match_type : perktype) case =
       with Type_match_error _msg ->
         raise_type_error case
           (Printf.sprintf "Variable %s has type %s but it should have type %s" x
-             (show_perktype typ) (show_perktype match_type)))
+             (show_perktype typ) (show_perktype match_type))
+          Type_mismatch)
   | MatchVar (x, None) ->
       (* matchvar type inference *)
       annot_copy case (MatchVar (x, Some match_type))
@@ -970,33 +1195,40 @@ and typecheck_match_case (match_type : perktype) case =
       if not (is_equatable_type t) then
         raise_type_error case
           (Printf.sprintf "Expression in case has non-equatable type %s"
-             (show_perktype t));
+             (show_perktype t))
+          Non_equatable_type;
       try
-        let _ = match_types t match_type in
+        let _ = match_types match_type t in
         annot_copy case (MatchExpr e1)
       with Type_match_error _msg ->
         raise_type_error case
           (Printf.sprintf
              "Expression in case has type %s but it should have type %s"
-             (show_perktype t) (show_perktype match_type)))
+             (show_perktype t) (show_perktype match_type))
+          Type_mismatch)
   | CompoundCase (id, cases) ->
       if is_constructor_name id then
         if is_constructor_of id match_type then (
-          let parameters =
+          let parameters, suffix =
             match resolve_type match_type with
-            | _, AlgebraicType (_, constructors), _ ->
-                List.find (fun (ide, _) -> ide = id) constructors |> snd
+            | _, AlgebraicType (_, constructors, _tparam), _ ->
+                ( List.find (fun (ide, _) -> ide = id) constructors |> snd,
+                  Option.fold ~none:""
+                    ~some:(fun t ->
+                      "_perk_polym_" ^ type_descriptor_of_perktype t)
+                    _tparam )
             | _ -> failwith "Impossible, is_constructor_of returned true"
           in
           if List.length parameters <> List.length cases then
             raise_type_error case
               (Printf.sprintf
                  "Constructor %s expects %d parameters, got %d instead" id
-                 (List.length parameters) (List.length cases));
+                 (List.length parameters) (List.length cases))
+              Wrong_number_parameters;
           (* Typecheck each case *)
           annot_copy case
             (CompoundCase
-               ( id,
+               ( id ^ suffix,
                  List.mapi
                    (fun i c -> typecheck_match_case (List.nth parameters i) c)
                    cases )))
@@ -1004,11 +1236,12 @@ and typecheck_match_case (match_type : perktype) case =
           raise_type_error case
             (Printf.sprintf "Constructor %s does not construct type %s" id
                (show_perktype match_type))
+            ADT_Wrong_constructor_type
       else
         let smart_msg =
           let lvid = lookup_var id in
           if Option.is_some lvid then
-            let t = Option.get lvid in
+            let t = Option.get lvid |> fst in
             Printf.sprintf
               " To access the variable %s : %s use the syntax `{%s}" id
               (show_perktype t) id
@@ -1016,7 +1249,8 @@ and typecheck_match_case (match_type : perktype) case =
         in
 
         raise_compilation_error case
-          (Printf.sprintf "%s id not a valid constructor.%s" id smart_msg)
+          (Printf.sprintf "%s is not a valid constructor.%s" id smart_msg)
+          ADT_Invalid_constructor
 
 and get_vars_in_case (case : match_case_a) =
   match ( $ ) case with
@@ -1027,120 +1261,534 @@ and get_vars_in_case (case : match_case_a) =
   | _ -> []
 
 (** Typechecks expressions *)
+
+and unify_generic_const (genvar : perktype) (gen : perktype list)
+    (ground : perktype list) =
+  say_here
+    (Printf.sprintf "Unifying: [%s], [%s]\n"
+       (List.map show_perktype gen |> String.concat ", ")
+       (List.map show_perktype ground |> String.concat ", "));
+  match (gen, ground) with
+  | t1 :: rest1, t2 :: rest2 -> (
+      match (t1, t2) with
+      | t1, (_, INum _, _) when genvar = t1 -> (
+          match (rest1, rest2) with
+          | [], [] ->
+              say_here "Well, you did fool me in the end...";
+              Some ([], Basetype "int", [])
+          | _ ->
+              say_here "You won't fool me no mo";
+              unify_generic_const genvar rest1 rest2)
+      | t1, t2 when genvar = t1 -> Some t2
+      | (_, PolyADTPlaceholder (n1, t1), _), (_, PolyADTPlaceholder (n2, t2), _)
+        when n1 = n2 && genvar = t1 ->
+          Some t2
+      | ( (_, PolyADTPlaceholder (n1, t1), _),
+          (_, AlgebraicType (n2, _, Some t2), _) ) ->
+          let n1 = subst_ctor_name n1 t1 t1 in
+          let n2 = subst_ctor_name n2 t2 t2 in
+          say_here
+            (Printf.sprintf "BAHAN ANHIA XT %s, %s, %s\n" n1 n2
+               (show_perktype t1));
+          if n1 = n2 && genvar = t1 then (
+            say_here (Printf.sprintf "vaffanchooble\n");
+            Some t2)
+          else None
+      | _ ->
+          if equality_modulo_unresolved t1 t2 then
+            unify_generic_const genvar rest1 rest2
+          else
+            failwith
+              "should not happen, incompatible ground types in generic \
+               constructor")
+  | [], [] -> None
+  | _ ->
+      failwith
+        "should not happen, different number of arguments for same generic \
+         constructor"
+
+and check_if_is_generic_constr id =
+  Hashtbl.mem (File_info.get_polyadt_adt_from_constructor ()) id
+
+and equality_modulo_unresolved ((_, t1, _) as t11 : perktype)
+    ((t2q, t2, t2a) as t21 : perktype) =
+  say_here
+    (Printf.sprintf "eq mod unres: %s vs %s\n" (show_perktype t11)
+       (show_perktype t21));
+  match (t1, t2) with
+  | PolyADTPlaceholder (n, t), AlgebraicType (n1, _, tpar)
+  | AlgebraicType (n1, _, tpar), PolyADTPlaceholder (n, t) -> (
+      match t with
+      | _, INum _, _ ->
+          (* If an INum is found, we check if it is compatible with the type parameter before substituting it *)
+          if Option.fold ~none:false ~some:is_integral tpar then
+            let substituted = PolyADTPlaceholder (n, Option.get tpar) in
+            equality_modulo_unresolved t11 (t2q, substituted, t2a)
+          else false
+      | _ ->
+          say_here
+            (Printf.sprintf
+               "boutta call concrete_constructor_name with %s %s. Meanwhile n1 \
+                is %s.\n"
+               n (show_perktype t) n1);
+          say_here
+            (Printf.sprintf "inner check!!! %s vs %s\n"
+               (concrete_constructor_name n t)
+               n1);
+          concrete_constructor_name n t = n1)
+  | INum _, t_other when is_integral ([], t_other, []) -> true
+  | t_other, INum _ when is_integral ([], t_other, []) -> true
+  | _ -> t1 = t2
+
+and infer_generic_const_type ?(expected : perktype option = None) (v : expr_a)
+    (args : expr_a list) : expr_t option =
+  match ( $ ) v with
+  | Var id ->
+      let arg_types = List.map (fun x -> typecheck_expr x |> snd) args in
+
+      if check_if_is_generic_constr id then (
+        let polyadt_name =
+          match
+            Hashtbl.find (File_info.get_polyadt_adt_from_constructor ()) id
+          with
+          | _, AlgebraicType (n, _, _), _ -> n
+          | x ->
+              failwith
+                (Printf.sprintf "should not happen: compound polyadt name %s ??"
+                   (show_perktype x))
+        in
+
+        (* actually these can be taken from the above expression... *)
+        let genvar, constructors =
+          Hashtbl.find (File_info.get_polyadt_declared ()) polyadt_name
+        in
+        let signature = List.find (fun (n, _) -> n = id) constructors |> snd in
+
+        say_here (Printf.sprintf "maccheruni: %s" polyadt_name);
+
+        (* type obtained by short-circuitedly matching signature and argument types *)
+        let unified_type = unify_generic_const genvar signature arg_types in
+
+        say_here
+          (Printf.sprintf "signature: %s"
+             (List.map show_perktype signature |> String.concat ", "));
+        say_here
+          (Printf.sprintf "arg types: %s"
+             (List.map show_perktype arg_types |> String.concat ", "));
+        say_here
+          (Printf.sprintf "unified type: %s"
+             (Option.fold ~none:"none" ~some:show_perktype unified_type));
+
+        match unified_type with
+        | None -> (
+            (* there are no occurrences of T in the args*)
+            match
+              Option.map
+                (fun t -> t |> resolve_type |> discard_type_aq)
+                expected
+            with
+            | Some (AlgebraicType (n, _, type_parameter)) when n = polyadt_name
+              ->
+                Option.map
+                  (fun x -> Var (concrete_constructor_name id x))
+                  type_parameter
+            | _ -> None)
+        | Some u ->
+            (match
+               Option.map
+                 (fun t -> t |> resolve_type |> discard_type_aq)
+                 expected
+             with
+            | Some (AlgebraicType (n, _, type_parameter))
+              when n = polyadt_name && type_parameter <> unified_type ->
+                raise_type_error v
+                  (Printf.sprintf
+                     "Inferred type %s in arguments of constructor %s when %s \
+                      was expected"
+                     (show_perktype u) id
+                     (show_perktype (Option.get expected)))
+                  ADT_Unification_unexpected
+            | Some (AlgebraicType (n, _, _type_parameter)) when n = polyadt_name
+              ->
+                ()
+            | Some t ->
+                (* If the type is not an ADT or is the wrong ADT, there is no way to unify *)
+                raise_type_error v
+                  (Printf.sprintf
+                     "1Constructor %s does not construct expected type %s" id
+                     (show_perktype ([], t, [])))
+                  ADT_Constructor_does_not_construct
+            | _ -> ());
+
+            (try
+               Hashtbl.find (File_info.get_polyadt_instances ()) polyadt_name
+               |> List.map fst |> ignore
+             with Not_found ->
+               (* if unified type not in list, bind the type *)
+               (* qua 🦆*)
+               ([], PolyADTPlaceholder (polyadt_name, u), [])
+               |> resolve_type |> bind_type_if_needed |> ignore);
+
+            (* perform grounding of the signature *)
+            let grounded =
+              List.map (fun x -> Polymorphism.subst_type x genvar u) signature
+            in
+
+            (* check equality of inferred ground type list and arg type list *)
+            say_here
+              (Printf.sprintf "Checking equality mod unres [%s] vs [%s]\n"
+                 (List.map show_perktype grounded |> String.concat ", ")
+                 (List.map show_perktype arg_types |> String.concat ", "));
+
+            if List.for_all2 equality_modulo_unresolved grounded arg_types then (
+              say_here (Printf.sprintf "Same!\n");
+              Some (Var (concrete_constructor_name id u)))
+            else
+              raise_type_error v
+                (Printf.sprintf
+                   "Could not infer type for generic constructor %s with \
+                    argument types [%s]"
+                   id
+                   (List.map show_perktype arg_types |> String.concat ", "))
+                ADT_Unsame_constructor_types)
+      else None
+  | _ -> None
+
 and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
     expr_a * perktype =
   match ( $ ) expr with
   | Bool _ -> (expr, ([], Basetype "bool", []))
-  | Int _ -> (expr, ([], Basetype "int", []))
+  | Int i ->
+      ( expr,
+        ([], INum Float.(i |> float_of_int |> log2 |> ceil |> int_of_float), [])
+      )
+      (* di fori *)
   | Float _ -> (expr, ([], Basetype "float", []))
   | Char _ -> (expr, ([], Basetype "char", []))
   | String _ -> (expr, ([], Pointertype ([], Basetype "char", []), []))
   | Var id -> (
-      match lookup_var id with
-      | Some (([], Funtype (params, ret), []) as t) -> (
+      let aaa = File_info.get_file_local_polyfuns () in
+      try
+        let _ = Hashtbl.find aaa id in
+        say_here (Printf.sprintf "there do be a thing called %s" id);
+        raise_compilation_error expr
+          (Printf.sprintf
+             "Polymorphic function auto-casting not yet supported. Add a type \
+              annotation. e.g. %s @ int (...)"
+             id)
+          Error_codes.Not_implemented
+      with Not_found -> (
+        try
+          (* Check if this is a constructor for a polymorphic ADT. If it is, expand it to a function call, so that unification is attempted *)
           match Option.map discard_type_aq expected_return with
-          | Some (Funtype _) -> (expr, t)
-          | _ ->
-              (* Constructors are automatically applied *)
-              if Hashtbl.mem defined_constructors id && List.length params = 0
-              then (annot_copy expr (Apply (expr, [], None)), ret)
-              else (expr, t))
-      | Some t -> (expr, t)
-      | None -> raise_type_error expr ("Unknown identifier: " ^ id))
+          | Some (Funtype _) -> raise Not_found
+          | _ -> (
+              say_here (Printf.sprintf "Attempting to find supposed constructor %s" id);
+              let adt =
+                Hashtbl.find (File_info.get_polyadt_adt_from_constructor ()) id
+              in
+              say_here (Printf.sprintf "Found constructor %s, type %s" id (show_perktype adt));
+              match adt with
+              | _, AlgebraicType (_ident, ctors, _tparam), _ ->
+                  List.find (fun (i, _t) -> i = id) ctors |> ignore;
+                  typecheck_expr ~expected_return
+                    (annot_copy expr (Apply (expr, [], None)))
+              | _ -> raise Not_found)
+        with Not_found -> (
+          match lookup_var id |> Option.map fst with
+          | Some (([], Funtype (params, ret), []) as t) -> (
+              match Option.map discard_type_aq expected_return with
+              | Some (Funtype _) -> (expr, t)
+              | _ ->
+                  (* Constructors are automatically applied *)
+                  if
+                    Hashtbl.mem File_info.defined_constructors id
+                    && List.length params = 0
+                  then (annot_copy expr (Apply (expr, [], None)), ret)
+                  else (expr, t))
+          | Some t -> (expr, t)
+          | None ->
+              raise_type_error expr
+                ("Unknown identifier: " ^ id)
+                Unknown_identifier)))
   | PolymorphicVar (id, t) ->
       if not (Hashtbl.mem global_polyfuns id) then
-        raise_type_error expr ("Unknown polymorphic identifier: " ^ id);
+        let dat_t = t in
+        let tabel = File_info.get_polyadt_adt_from_constructor () in
+        let teip =
+          try Hashtbl.find tabel id
+          with Not_found ->
+            raise_compilation_error expr
+              (Printf.sprintf "Generic variable %s not found" id)
+              Unknown_identifier
+        in
+        match teip with
+        | _, AlgebraicType (ident, _constructors, Some _tparam), _ -> (
+            try
+              (* TODO: Fix spurious constructor generation when the type is a type variable *)
+              (* Find out if we are trying to compile a constructor with the current type variable *)
+              (* let is_current_typevar =
+                try
+                  match_types tparam (Option.get !current_type_variable)
+                  |> ignore;
+                  true
+                with _ -> false
+              in
+              say_here
+                (Printf.sprintf
+                   "current_type_variable: %s, dat_t: %s, is_current_typevar: \
+                    %b"
+                   (match !current_type_variable with
+                   | Some ct -> show_perktype ct
+                   | None -> "None")
+                   (show_perktype dat_t) is_current_typevar);
 
-      (if Hashtbl.mem (get_polyfun_bounds ()) id then
-         let g = Hashtbl.find (get_polyfun_bounds ()) id in
-         if Option.is_some g.inferred_type then
-           if not (t = Option.get g.inferred_type) then
-             raise_type_error expr
-               (Printf.sprintf
-                  "Type parameter of %s was inferred to be %s: type %s is \
-                   incompatible"
-                  id
-                  (show_perktype (Option.get g.inferred_type))
-                  (show_perktype t))
-           else if List.mem Numeric_Bound g.bounds then
+              if not is_current_typevar then ( *)
+              let concrete_adt =
+                resolve_type ([], PolyADTPlaceholder (ident, dat_t), [])
+              in
+              bind_type_if_needed concrete_adt;
+              typecheck_expr ~expected_return
+                (annot_copy expr (Var (concrete_constructor_name id t)))
+              (* )else
+                let constructor =
+                  List.find (fun (ide, _) -> ide = id) constructors
+                in
+                let constructor_params =
+                  (* List.map
+                    (fun t -> Polymorphism.subst_type t tparam dat_t) *)
+                  snd constructor
+                in
+                let concrete_adt =
+                  resolve_type
+                    ( [],
+                      AlgebraicType
+                        ( ident,
+                          List.map
+                            (fun (id, t) ->
+                              (id ^ "_" ^ type_descriptor_of_perktype dat_t, t))
+                            constructors,
+                          Some dat_t ),
+                      [] )
+                in
+                let constructor_type =
+                  ([], Funtype (constructor_params, concrete_adt), [])
+                in
+                (expr, constructor_type) *)
+            with Not_found ->
+              raise_compilation_error expr
+                (Printf.sprintf
+                   "Impossible: Constructor %s not found in its associated \
+                    type %s"
+                   id ident)
+                ADT_Invalid_constructor)
+        | _ ->
+            raise_compilation_error expr
+              (Printf.sprintf
+                 "Impossible: Constructor %s is associated with a type that is \
+                  not a polymorphic AlgebraicType"
+                 id)
+              ADT_Wrong_constructor_type
+      else (
+        (if Hashtbl.mem (get_polyfun_bounds ()) id then
+           let g = Hashtbl.find (get_polyfun_bounds ()) id in
+           if Option.is_some g.inferred_type then
              if not (t = Option.get g.inferred_type) then
                raise_type_error expr
                  (Printf.sprintf
-                    "Type parameter of %s was inferred to be numerical: type \
-                     %s is not"
-                    id (show_perktype t)));
+                    "Type parameter of %s was inferred to be %s: type %s is \
+                     incompatible"
+                    id
+                    (show_perktype (Option.get g.inferred_type))
+                    (show_perktype t))
+                 Type_mismatch
+             else if List.mem Numeric_Bound g.bounds then
+               if not (t = Option.get g.inferred_type) then
+                 raise_type_error expr
+                   (Printf.sprintf
+                      "Type parameter of %s was inferred to be numerical: type \
+                       %s is not"
+                      id (show_perktype t))
+                   Type_mismatch);
 
-      (if not (Hashtbl.mem (File_info.get_file_local_polyfuns ()) id) then
-         (* if the polyfun is defined globally but not locally, add it to a "to be defined" list *)
-         (* Printf.printf "adding definition of %s instantiated on %s to tbd\n" id
+        (* Find out if we are trying to compile a function with the current type variable *)
+        let is_current_typevar =
+          try
+            match_types t (Option.get !current_type_variable) |> ignore;
+            true
+          with _ -> false
+        in
+        say_here
+          (Printf.sprintf
+             "current_type_variable: %s, t: %s, is_current_typevar: %b"
+             (match !current_type_variable with
+             | Some ct -> show_perktype ct
+             | None -> "None")
+             (show_perktype t) is_current_typevar);
+
+        (if
+           (not (Hashtbl.mem (File_info.get_file_local_polyfuns ()) id))
+           && not is_current_typevar
+         then
+           (* if the polyfun is defined globally but not locally, add it to a "to be defined" list *)
+           (* Printf.printf "adding definition of %s instantiated on %s to tbd\n" id
           (show_perktype t); *)
-         let def = Hashtbl.find global_polyfuns id in
-         File_info.get_polyfuns_to_be_defined ()
-         := (def, t) :: !(File_info.get_polyfuns_to_be_defined ()));
+           let def = Hashtbl.find global_polyfuns id in
+           File_info.get_polyfuns_to_be_defined ()
+           := (def, t) :: !(File_info.get_polyfuns_to_be_defined ()));
 
-      (* update the instance list *)
-      let current_instances =
-        if Hashtbl.mem (File_info.get_polyfun_instances ()) id then
-          Hashtbl.find (File_info.get_polyfun_instances ()) id
-        else []
-      in
-      Hashtbl.replace
-        (File_info.get_polyfun_instances ())
-        id
-        (current_instances @ [ (t, false) ]);
+        (* update the instance list *)
+        let current_instances =
+          if Hashtbl.mem (File_info.get_polyfun_instances ()) id then
+            Hashtbl.find (File_info.get_polyfun_instances ()) id
+          else []
+        in
+        if
+          (not (List.exists (fun (t', _) -> t = t') current_instances))
+          && not is_current_typevar
+        then
+          Hashtbl.replace
+            (File_info.get_polyfun_instances ())
+            id
+            (current_instances @ [ (t, false) ]);
 
-      let def = Hashtbl.find global_polyfuns id in
+        let def = Hashtbl.find global_polyfuns id in
 
-      let param_types, ret_type, tparam =
-        match ( $ ) def with
-        | PolymorphicFundef ((t_res, _id, args, _body), t_param) ->
-            (List.map fst args, t_res, t_param)
-        | _ -> failwith "Should not happen: definition is not a polyfundef"
+        let param_types, ret_type, tparam =
+          match ( $ ) def with
+          | PolymorphicFundef ((t_res, _id, args, _body), _kind, t_param) ->
+              (List.map fst args, t_res, t_param)
+          | _ -> failwith "Should not happen: definition is not a polyfundef"
+        in
+
+        ( annot_copy expr (PolymorphicVar (id, t)),
+          (* TODO check if it's ok to forget qualifiers here -- if not do right thing *)
+          ( [],
+            Funtype
+              ( List.map (fun x -> subst_type x tparam t) param_types,
+                subst_type ret_type tparam t ),
+            [] ) ))
+  | Apply (func, params, _) -> (
+      let generic_const_type =
+        say_here
+          (Printf.sprintf
+             "Trying to infer generic constructor type for func: %s, with \
+              expected return: %s\n"
+             (show_expr_a func)
+             (Option.fold ~none:"None" ~some:show_perktype expected_return));
+        infer_generic_const_type ~expected:expected_return func params
       in
 
-      ( annot_copy expr (PolymorphicVar (id, t)),
-        (* TODO check if it's ok to forget qualifiers here -- if not do right thing *)
-        ( [],
-          Funtype
-            ( List.map (fun x -> subst_type x tparam t) param_types,
-              subst_type ret_type tparam t ),
-          [] ) )
-  | Apply (func, params, _) ->
-      let fun_expr, fun_type =
-        typecheck_expr
-          ~expected_return:(Some ([], Funtype ([], void_type), []))
-            (* TODO: Put correct type here *)
-          func
-      in
-      (* Check that the function is a function 👍 *)
-      let fun_param_types, fun_ret_type, apptype =
-        match fun_type with
-        | _, Funtype (param_types, ret_type), _ -> (param_types, ret_type, None)
-        | _, Lambdatype (param_types, ret_type, _), _ ->
-            (param_types, ret_type, Some fun_type)
-        | _ -> raise_type_error func "Function type expected"
-      in
-      let param_rets =
-        try typecheck_expr_list params fun_param_types
-        with Invalid_argument _ ->
-          raise_type_error expr
+      match generic_const_type with
+      | Some e ->
+          say_here
             (Printf.sprintf
-               "Wrong number of parameters passed to function: expected %d, \
-                got %d"
-               (List.length fun_param_types)
-               (List.length params))
-      in
-      let _param_types =
-        try match_type_list fun_param_types param_rets
-        with Type_match_error msg -> raise_type_error expr msg
-      in
-      let param_rets =
-        List.map2
-          (fun (e, t1) t2 -> fill_nothing e t1 t2)
-          param_rets _param_types
-      in
-      ( annot_copy expr (Apply (fun_expr, List.map fst param_rets, apptype)),
-        fun_ret_type )
+               "STUFF HAPPENED :( (good 👍) \
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+          typecheck_expr
+            (annot_copy expr (Apply (annot_copy func e, params, None)))
+      | None -> (
+          let normal_handling (_ : unit) =
+            (* say_here
+        (Printf.sprintf "typechecking funcall diocaml: %s\n" (show_expr_a func)); *)
+            let fun_expr, fun_type =
+              typecheck_expr
+                ~expected_return:(Some ([], Funtype ([], void_type), []))
+                  (* TODO: Put correct type here *)
+                func
+            in
+            (* Check that the function is a function 👍 *)
+            let fun_param_types, fun_ret_type, apptype =
+              match fun_type with
+              | _, Funtype (param_types, ret_type), _ ->
+                  (param_types, ret_type, None)
+              | _, Lambdatype (param_types, ret_type, _), _ ->
+                  (param_types, ret_type, Some fun_type)
+              | _ ->
+                  raise_type_error func "Function type expected" Type_mismatch
+            in
+            let param_rets =
+              try typecheck_expr_list params fun_param_types
+              with Invalid_argument _ ->
+                raise_type_error expr
+                  (Printf.sprintf
+                     "Wrong number of parameters passed to function: expected \
+                      %d, got %d"
+                     (List.length fun_param_types)
+                     (List.length params))
+                  Wrong_number_parameters
+            in
+            let _param_types =
+              try match_type_list fun_param_types param_rets
+              with Type_match_error msg ->
+                raise_type_error expr msg Type_mismatch
+            in
+            let param_rets =
+              List.map2
+                (fun (e, t1) t2 -> fill_nothing e t1 t2)
+                param_rets _param_types
+            in
+            ( annot_copy expr
+                (Apply (fun_expr, List.map fst param_rets, apptype)),
+              fun_ret_type )
+          in
+          match ( $ ) func with
+          | Access ({ node = Var e; _ }, _, _, _) when e |> is_type ->
+              normal_handling ()
+          (* TODO: Add PolymorphicVar case *)
+          | Access
+              (({ node = PolymorphicVar (ident, dat_t); _ } as exp), ide, _, _)
+            -> (
+              let concrete_adt =
+                resolve_type ([], PolyADTPlaceholder (ident, dat_t), [])
+              in
+              bind_type_if_needed concrete_adt;
+
+              match lookup_extension_function concrete_adt ide with
+              | Some _ext_fun ->
+                  let synthesized_func =
+                    annot_copy exp (PolymorphicVar (ext_fun_name concrete_adt ide, dat_t))
+                  in
+                  let synthesized_expr =
+                    Apply (synthesized_func, params, None)
+                  in
+                  let exp_a, concrete_adt =
+                    typecheck_expr (annot_copy expr synthesized_expr)
+                  in
+                  (exp_a, concrete_adt)
+              | None ->
+                  print_extension_functions ();
+                  raise_type_error exp
+                    (Printf.sprintf "Type %s does not implement function %s"
+                       (show_perktype concrete_adt)
+                       ide)
+                    Unknown_identifier)
+          | Access (e, ide, _, _) -> (
+              let exp, exp_t = typecheck_expr e in
+              let type_param = match discard_type_aq exp_t with
+                | AlgebraicType (_, _, Some t)
+                | PolyADTPlaceholder (_, t) -> Some t
+                | _ -> None
+              in
+              match lookup_extension_function exp_t ide with
+              | Some _ext_fun ->
+                  say_here (Printf.sprintf "piovi giü su di me %s" (show_perktype exp_t));
+                  let synthesized_func =
+                    if Option.is_some type_param then
+                      annot_copy exp (PolymorphicVar (ext_fun_name exp_t ide, Option.get type_param))
+                    else
+                      annot_copy exp (Var (ext_fun_name exp_t ide))
+                  in
+                  let synthesized_expr =
+                    Apply (synthesized_func, e :: params, None)
+                  in
+                  say_here (show_expr_t synthesized_expr);
+                  let exp_a, exp_t =
+                    typecheck_expr (annot_copy expr synthesized_expr)
+                  in
+                  (exp_a, exp_t)
+              | None -> normal_handling ())
+          | _ -> normal_handling ()))
   | Binop (op, lhs, rhs) -> (
       let cast_priority t1 t2 =
         let r1 = numerical_rank t1 in
@@ -1150,7 +1798,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       in
 
       match op with
-      | Add | Sub | Mul | Div ->
+      | Add | Sub | Mul | Div | Modulo | Bor | Band | Bxor ->
           let lhs_res, lhs_type = typecheck_expr lhs in
           let rhs_res, rhs_type = typecheck_expr rhs in
           let lhs_res, lhs_type, rhs_res, rhs_type =
@@ -1172,11 +1820,21 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                 winner_type,
                 annot_copy rhs_res (Cast ((rhs_type, winner_type), rhs_res)),
                 winner_type )
-            else raise_type_error rhs "Numerical type expected"
+            else if not (is_numerical lhs_type) then
+              raise_type_error lhs
+                (Printf.sprintf "Numerical type expected. Got: %s"
+                   (show_perktype lhs_type))
+                Type_mismatch
+            else
+              raise_type_error rhs
+                (Printf.sprintf "Numerical type expected. Got: %s"
+                   (show_perktype rhs_type))
+                Type_mismatch
           in
           let res_type =
             try match_types lhs_type rhs_type
-            with Type_match_error msg -> raise_type_error expr msg
+            with Type_match_error msg ->
+              raise_type_error expr msg Type_mismatch
           in
           let lhs_res, _lhs_type = fill_nothing lhs_res lhs_type res_type in
           let rhs_res, _rhs_type = fill_nothing rhs_res rhs_type res_type in
@@ -1196,7 +1854,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
               (annot_copy expr (Binop (op, lhs_res, rhs_res)), lhs_type)
           | _ ->
               raise_type_error expr
-                "Bitwise shift operators require integral types"))
+                "Bitwise shift operators require integral types" Type_mismatch))
   | PreUnop (op, e, _) ->
       let expr_res, expr_type = typecheck_expr e in
       let res_type =
@@ -1207,13 +1865,21 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
             raise_type_error expr
               (Printf.sprintf "Cannot dereference non-pointer type %s"
                  (show_perktype expr_type))
+              Type_mismatch
+        | Bnot, t when not (is_integral t) ->
+            raise_type_error expr
+              (Printf.sprintf
+                 "Bitwise negation can only be applied to numerical types")
+              Type_mismatch
+        | Neg, t when not (is_numerical t) ->
+            raise_type_error expr
+              (Printf.sprintf
+                 "Numerical negation can only be applied to numerical types")
+              Type_mismatch
         | _, t -> t
       in
       (annot_copy expr (PreUnop (op, expr_res, Some expr_type)), res_type)
-  | Lambda (retype, params, body, _, lambda_name) ->
-      if !Utils.static_compilation then
-        raise_compilation_error expr
-          "Lambdas cannot be used in static compilation mode";
+  | Lambda (retype, params, body, _fvars, lambda_name) ->
       push_symbol_table ();
       if Option.is_some lambda_name then
         bind_var (Option.get lambda_name)
@@ -1222,13 +1888,14 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       List.iter
         (fun (typ, id) ->
           try bind_var id typ
-          with Double_declaration msg -> raise_type_error expr msg)
+          with Double_declaration msg ->
+            raise_type_error expr msg Double_declaration)
         params;
       let body_res, _body_type, body_returns =
         typecheck_command ~retype:(Some retype) body
       in
       if (not body_returns) && not (is_unit_type retype) then
-        raise_type_error expr "Not all code paths return a value";
+        raise_type_error expr "Not all code paths return a value" No_return;
       let free_vars = fst (free_variables_expr expr) in
       (* Remove lambda name from the list of free variables (recursion) *)
       let free_vars =
@@ -1239,12 +1906,15 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       let free_vars =
         List.map
           (fun v ->
-            match lookup_var v with
+            match lookup_var v |> Option.map fst with
             | Some vt -> (vt, v)
             | None ->
-                raise_type_error expr (Printf.sprintf "Unbound variable %s" v))
+                raise_type_error expr
+                  (Printf.sprintf "Unbound variable %s" v)
+                  Unknown_identifier)
           free_vars
       in
+
       (* if a lambda has no free variables, it is made into a function *)
       let lamtype =
         match free_vars with
@@ -1257,6 +1927,14 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                   (List.map (fun (typ, _) -> typ) params, retype, free_vars),
                 [] )
         | _ ->
+            if !Utils.static_compilation then
+              raise_compilation_error expr
+                (Printf.sprintf
+                   "Capturing lambdas not allowed in static compilation mode: \
+                    lambda captures %s"
+                   (String.concat "," (List.map snd free_vars)))
+                Static_comp_lambda;
+
             ( [],
               Lambdatype
                 (List.map (fun (typ, _) -> typ) params, retype, free_vars),
@@ -1278,6 +1956,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
             raise_type_error expr
               (Printf.sprintf "Option operator requires option type, got %s"
                  (show_perktype expr_type))
+              Type_mismatch
         | _, t -> (op, t)
       in
       (annot_copy expr (PostUnop (op, expr_res)), res_type)
@@ -1291,7 +1970,8 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       else
         raise_type_error expr
           (Printf.sprintf "Subscript operator requires integer type, got %s"
-             (show_perktype accessor_type));
+             (show_perktype accessor_type))
+          Type_mismatch;
       match container_type with
       | _, Arraytype (t, _n), _ ->
           (annot_copy expr (Subscript (container_res, accessor_res)), t)
@@ -1302,17 +1982,20 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           | Int i ->
               if i < 0 || i >= List.length ts then
                 raise_type_error expr
-                  (Printf.sprintf "Subscript out of bounds: %d" i);
+                  (Printf.sprintf "Subscript out of bounds: %d" i)
+                  Out_of_bounds;
               ( annot_copy expr (TupleSubscript (container_res, i)),
                 List.nth ts i )
           | _ ->
               raise_type_error expr
-                "Subscript operator requires constant integer")
+                "Subscript operator requires constant integer" Invalid_subscript
+          )
       | _ ->
           raise_type_error expr
             (Printf.sprintf
                "Subscript operator requires array, tuple or pointer, got %s"
-               (show_perktype container_type)))
+               (show_perktype container_type))
+            Invalid_subscript)
   | Summon (typeid, params) -> (
       let typ = lookup_type typeid in
       match typ with
@@ -1343,6 +2026,7 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                         fields
                     then ""
                     else ". Constructor is not defined"))
+                Wrong_number_parameters
             else
               List.map2
                 (fun (a, b) c -> fill_nothing a b c)
@@ -1350,7 +2034,8 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           in
           let _ =
             try match_type_list constr_params param_rets
-            with Type_match_error msg -> raise_type_error expr msg
+            with Type_match_error msg ->
+              raise_type_error expr msg Type_mismatch
           in
           ( annot_copy expr (Summon (typeid, List.map fst param_rets)),
             ( attrs,
@@ -1360,56 +2045,84 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           raise_type_error expr
             (Printf.sprintf "Can only summon model types. %s is not a model."
                typeid)
-      | None -> raise_type_error expr (Printf.sprintf "Unknown type: %s" typeid)
-      )
-  | Access (expr, ide, _, _) ->
-      let expr_res, expr_type = typecheck_expr expr in
-      let ( (res_type : perktype),
-            (access_type : perktype option),
-            (rightype : perktype option) ) =
-        let is_self =
-          match ( $ ) expr_res with Var "self" -> true | _ -> false
-        in
-        let expr_type' = resolve_type expr_type in
-        match expr_type' with
-        | ( _,
-            Modeltype (name, _archetypes, fields, _constr_params, _member_funcs),
-            _ ) -> (
-            let field = List.find_opt (fun (_, (_, id)) -> id = ide) fields in
-            match field with
-            | Some (attrs, (typ, _))
-              when is_self || not (List.mem Private attrs) ->
-                (typ, Some expr_type, Some typ)
-            | Some (_, (_, _)) ->
-                raise_type_error expr
-                  (Printf.sprintf
-                     "Trying to access private field %s of model %s" ide name)
-            | None ->
-                raise_type_error expr
-                  (Printf.sprintf "Field %s not found in model %s" ide name))
-        | _, ArchetypeSum archetypes, _ -> (
-            let archs_with_idents =
-              List.map
-                (fun a ->
-                  match resolve_type a with
-                  | _, ArcheType (_aid, decls), [] ->
-                      List.map (fun (t, id) -> (a, t, id)) decls
-                  | _ ->
-                      failwith
-                        "Impossible: Model is implementing a non-archetype")
-                archetypes
-              |> List.flatten
+            Invalid_summon
+      | None ->
+          raise_type_error expr
+            (Printf.sprintf "Unknown type: %s" typeid)
+            Unknown_identifier)
+  | Access (expr, ide, _, _) -> (
+      match ( $ ) expr with
+      (* Type extension functions *)
+      | Var id when is_type id ->
+          let ext_typ = ([], Basetype id, []) in
+          let ext_fun = lookup_extension_function ext_typ ide in
+          if Option.is_none ext_fun then
+            raise_type_error expr
+              (Printf.sprintf "No definition of function %s for type %s" ide id)
+              Unknown_identifier;
+          let synthesized_expr = Var (ext_fun_name ext_typ ide) in
+          let exp_a, exp_t =
+            typecheck_expr (annot_copy expr synthesized_expr)
+          in
+          (exp_a, exp_t)
+      | _ ->
+          let expr_res, expr_type = typecheck_expr expr in
+          let ( (res_type : perktype),
+                (access_type : perktype option),
+                (rightype : perktype option) ) =
+            let is_self =
+              match ( $ ) expr_res with Var "self" -> true | _ -> false
             in
-            match
-              List.find_opt (fun (_arch, _t, id) -> id = ide) archs_with_idents
-            with
-            | Some (arch, t, _id) -> (t, Some arch, Some t)
-            | None ->
-                raise_type_error expr
-                  (Printf.sprintf
-                     "Field %s not found in archetypes implemented by variable"
-                     ide))
-        (* | _, ArcheType (_name, decls), _ -> (
+            let expr_type' = resolve_type expr_type in
+            match expr_type' with
+            | ( _,
+                Modeltype
+                  (name, _archetypes, fields, _constr_params, _member_funcs),
+                _ ) -> (
+                let field =
+                  List.find_opt (fun (_, (_, id)) -> id = ide) fields
+                in
+                match field with
+                | Some (attrs, (typ, _))
+                  when is_self || not (List.mem Private attrs) ->
+                    (typ, Some expr_type, Some typ)
+                | Some (_, (_, _)) ->
+                    raise_type_error expr
+                      (Printf.sprintf
+                         "Trying to access private field %s of model %s" ide
+                         name)
+                      Private_access
+                | None ->
+                    raise_type_error expr
+                      (Printf.sprintf "Field %s not found in model %s" ide name)
+                      Unknown_identifier)
+            | _, ArchetypeSum archetypes, _ -> (
+                let archs_with_idents =
+                  List.map
+                    (fun a ->
+                      match resolve_type a with
+                      | _, ArcheType (_aid, decls), [] ->
+                          List.map (fun (t, id) -> (a, t, id)) decls
+                      | _ ->
+                          failwith
+                            "Impossible: Model is implementing a non-archetype")
+                    archetypes
+                  |> List.flatten
+                in
+                match
+                  List.find_opt
+                    (fun (_arch, _t, id) -> id = ide)
+                    archs_with_idents
+                with
+                | Some (arch, t, _id) -> (t, Some arch, Some t)
+                | None ->
+                    raise_type_error expr
+                      (Printf.sprintf
+                         "Field %s not found in archetypes implemented by \
+                          variable"
+                         ide)
+                      Unknown_identifier)
+            (* | _, ArcheType (_name, decls), _ -> (
             match List.find_opt (fun (_t, id) -> id = ide) decls with
             | Some (t, _id) -> (t, Some (resolve_type expr_type))
             | None ->
@@ -1417,24 +2130,31 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                   (Printf.sprintf
                      "Field %s not found in archetypes implemented by variable"
                      ide)) *)
-        | _, Arraytype (_t, Some _n), _ when ide = "length" ->
-            (([], Basetype "int", []), Some expr_type, None)
-        | _, Arraytype (_t, None), _ when ide = "length" ->
-            raise_type_error expr
-              "Cannot access length of an array with unknown size"
-        | _, Structtype (name, fields), _ -> (
-            let field = List.find_opt (fun ((_, id), _) -> id = ide) fields in
-            match field with
-            | Some ((typ, _), _) -> (typ, Some expr_type', Some typ)
-            | None ->
+            | _, Arraytype (_t, Some _n), _ when ide = "length" ->
+                (([], Basetype "int", []), Some expr_type, None)
+            | _, Arraytype (_t, None), _ when ide = "length" ->
                 raise_type_error expr
-                  (Printf.sprintf "Field %s not found in struct %s" ide name))
-        | _ ->
-            raise_type_error expr
-              (Printf.sprintf "Cannot access field %s of non-model type %s" ide
-                 (show_perktype expr_type))
-      in
-      (annot_copy expr (Access (expr_res, ide, access_type, rightype)), res_type)
+                  "Cannot access length of an array with unknown size"
+                  Invalid_subscript
+            | _, Structtype (name, fields), _ -> (
+                let field =
+                  List.find_opt (fun ((_, id), _) -> id = ide) fields
+                in
+                match field with
+                | Some ((typ, _), _) -> (typ, Some expr_type', Some typ)
+                | None ->
+                    raise_type_error expr
+                      (Printf.sprintf "Field %s not found in struct %s" ide name)
+                      Unknown_identifier)
+            | _ ->
+                print_extension_functions();
+                raise_type_error expr
+                  (Printf.sprintf "Cannot access field %s of non-model type %s"
+                     ide (show_perktype expr_type))
+                  Invalid_access
+          in
+          ( annot_copy expr (Access (expr_res, ide, access_type, rightype)),
+            res_type ))
   | Tuple (exprs, _) ->
       let exprs_res = List.map typecheck_expr exprs in
       let exprs_res = List.map (fun (a, b) -> fill_nothing a b b) exprs_res in
@@ -1472,7 +2192,8 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
             | None ->
                 raise_type_error expr
                   (Printf.sprintf "Archetype %s not found in entity of type %s"
-                     arch (show_perktype typ)))
+                     arch (show_perktype typ))
+                  Invalid_type_as)
           archs_idents;
         ( annot_copy expr (As (expr, archs, Some typ)),
           ([], ArchetypeSum archs, []) )
@@ -1497,7 +2218,8 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           raise_type_error expr
             (Printf.sprintf
                "Cannot ~> on this entity, as it is neither a model type nor an \
-                archetype sum"))
+                archetype sum")
+            Invalid_type_as)
   | Something (e, _) ->
       let e_res, e_type = typecheck_expr e in
       (annot_copy expr (Something (e_res, e_type)), ([], Optiontype e_type, []))
@@ -1514,7 +2236,17 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
           (* let exprs_t = List.map snd exprs_res in *)
           let _ =
             try match_type_list constant_list exprs_res
-            with Type_match_error msg -> raise_type_error expr msg
+            with Type_match_error msg ->
+              raise_type_error expr msg Type_mismatch
+          in
+          let xtyp =
+            match discard_type_aq xtyp with
+            | INum _s ->
+                Option.fold ~none:int_type
+                  ~some:(function
+                    | _, Arraytype (t, _), _ -> t | _ -> failwith "impossible")
+                  expected_return (* TODO: Check that inum fits *)
+            | _ -> xtyp
           in
           let arraytype =
             ([], Arraytype (xtyp, Some (List.length xs + 1)), [])
@@ -1537,12 +2269,13 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
       | _ ->
           raise_type_error expr
             (Printf.sprintf "If guard must be a boolean or an int, got %s"
-               (show_perktype guard_type)));
+               (show_perktype guard_type))
+            If_non_boolean_guard);
       let then_e_res, then_e_type = typecheck_expr then_e in
       let else_e_res, else_e_type = typecheck_expr else_e in
       let res_type =
         try match_types then_e_type else_e_type
-        with Type_match_error msg -> raise_type_error else_e msg
+        with Type_match_error msg -> raise_type_error else_e msg Type_mismatch
       in
       let then_e_res, _then_e_type =
         fill_nothing then_e_res then_e_type res_type
@@ -1558,7 +2291,9 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
         match structype with
         | Some t -> t
         | None ->
-            raise_type_error expr (Printf.sprintf "Struct %s is not defined" id)
+            raise_type_error expr
+              (Printf.sprintf "Struct %s is not defined" id)
+              Unknown_identifier
       in
 
       match structype with
@@ -1570,7 +2305,8 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                 (try bind_var_local local_symbol_table id ([], Infer, [])
                  with Double_declaration _msg ->
                    raise_type_error expr
-                     (Printf.sprintf "Trying to initialize field %s twice" id));
+                     (Printf.sprintf "Trying to initialize field %s twice" id)
+                     Double_declaration);
                 let field =
                   List.assoc_opt id
                     (List.map (fun ((typ, id), _) -> (id, typ)) fields)
@@ -1581,16 +2317,19 @@ and typecheck_expr ?(expected_return : perktype option = None) (expr : expr_a) :
                     try
                       match_types typ expr_type |> ignore;
                       (id, expr_res)
-                    with Type_match_error msg -> raise_type_error expr msg)
+                    with Type_match_error msg ->
+                      raise_type_error expr msg Type_mismatch)
                 | _ ->
                     raise_type_error expr
-                      (Printf.sprintf "Field %s not found in struct %s" id _name))
+                      (Printf.sprintf "Field %s not found in struct %s" id _name)
+                      Unknown_identifier)
               inits
           in
           (annot_copy expr (Make (id, inits)), structype)
       | _ ->
           raise_type_error expr
-            (Printf.sprintf "Cannot make struct %s, as it is not defined" id))
+            (Printf.sprintf "Cannot make struct %s, as it is not defined" id)
+            Unknown_identifier)
 
 (** Typechecks parameters *)
 and typecheck_expr_list (exprs : expr_a list) (types : perktype list) :
@@ -1620,10 +2359,12 @@ and fill_nothing (expr : expr_a) (exprtyp : perktype) (typ : perktype) :
   | Nothing _, Optiontype _ -> (annot_copy expr (Nothing typ), typ)
   | Nothing _, Infer ->
       raise_compilation_error expr "Cannot infer type for Nothing"
+        Cannot_infer_type_for_nothing
   | Nothing _, t ->
       raise_type_error expr
         (Printf.sprintf "Nothing can only be used with Optiontype, not %s"
            (show_perktype ([], t, [])))
+        Type_mismatch
   | _ -> (expr, exprtyp)
 
 (* Add more type checking logic as needed: pepperepeppe     peppè! culo*)
@@ -1632,18 +2373,25 @@ and check_type_constraint_for_inference g candidate_inferred =
   if List.mem Numeric_Bound g.bounds then is_numerical candidate_inferred
   else true
 
-(** Checks if two types are the same or not. *)
+(** Checks if two types are the same or not. First type is expected, second is
+    actual*)
 and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
     (expected : perktype) (actual : perktype) : perktype =
+  say_here
+    (Printf.sprintf "Matching types: exp=%s, act=%s" (show_perktype expected)
+       (show_perktype actual));
   let expected = resolve_type expected in
   let actual = resolve_type actual in
 
-  let rec match_types_aux expected actual =
+  let rec match_types_aux (expected : perktype) (actual : perktype) =
     (* This catches the case where one type has not been bound yet and thus results as a basetype *)
     let equal =
       try
-        type_descriptor_of_perktype expected
-        = type_descriptor_of_perktype actual
+        match (discard_type_aq expected, discard_type_aq actual) with
+        | INum _, _ | _, INum _ -> false
+        | _ ->
+            type_descriptor_of_perktype expected
+            = type_descriptor_of_perktype actual
       with Not_inferred _ -> false
     in
     if equal then actual
@@ -1652,6 +2400,9 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
         (expected, actual)
       in
       match (expected', actual') with
+      | _, INum s when is_integral expected && inum_fits expected s -> expected
+      | Infer, INum _ ->
+          int_type (* TODO: Issue warning/error if the inum is too bigue *)
       | _, Infer -> expected
       | Infer, _ -> actual
       | Basetype t1, Basetype t2 when t1 = t2 -> actual
@@ -1679,6 +2430,9 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
                       len1
                       (if int2 then "integral" else "floating")
                       len2))
+      | Basetype _, INum _ when Polymorphism.is_type_generic expected ->
+          expected
+          (* TODO: Check if this should be some other kind of int type, or if we should add a numerical bound to the poly var *)
       | _, Basetype _ ->
           (* Printf.printf "actual: %s, expected: %s\n" (show_perktype actual)
             (show_perktype expected); *)
@@ -1727,8 +2481,7 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
             raise
               (Type_match_error
                  (Printf.sprintf "Type mismatch 1: expected %s,\ngot %s instead"
-                    (Codegen.codegen_type ~expand:true expected)
-                    (Codegen.codegen_type ~expand:true actual)))
+                    (show_perktype expected) (show_perktype actual)))
       | Pointertype t1, Pointertype _t2 when t1 = void_type -> actual
       | Pointertype _t1, Pointertype t2 when t2 = void_type -> expected
       | Pointertype t1, Pointertype t2 ->
@@ -1840,12 +2593,46 @@ and match_types ?(coalesce : bool = false) ?(array_init : bool = false)
           let ret_type = match_types_aux ret1 ret2 in
           ([], Lambdatype (param_types, ret_type, free1), [])
       | Pointertype (_, Basetype "void", _), Modeltype _ -> actual
+      | AlgebraicType (namel, _, None), AlgebraicType (namer, _, None)
+        when namel = namer ->
+          actual
+      | ( AlgebraicType (namel, _, Some paraml),
+          AlgebraicType (namer, ctors, Some paramr) ) ->
+          (* let polyadt_declared = File_info.get_polyadt_declared () in *)
+          (* let namel =
+            if Hashtbl.mem polyadt_declared namel then
+              concrete_constructor_name namel paraml
+            else namel
+          in
+          let namer =
+            if Hashtbl.mem polyadt_declared namer then
+              concrete_constructor_name namer paramr
+            else namer
+          in *)
+          let namel = subst_ctor_name namel paraml paraml in
+          let namer = subst_ctor_name namer paramr paramr in
+          if namel = namer then
+            try
+              match_types paraml paramr |> ignore;
+              say_here (Printf.sprintf "Match ô cazz: %s" namer);
+              (act_attr, AlgebraicType (namer, ctors, Some paraml), act_qual)
+            with Type_match_error _msg ->
+              raise
+                (Type_match_error
+                   (Printf.sprintf
+                      "Type mismatch in ADT parameters: expected %s,got %s \
+                       instead"
+                      (show_perktype paraml) (show_perktype paramr)))
+          else
+            raise
+              (Type_match_error
+                 (Printf.sprintf "Type mismatch 4: expected %s, got %s instead"
+                    (show_perktype expected) (show_perktype actual)))
       | _ ->
           raise
             (Type_match_error
-               (Printf.sprintf "Type mismatch 4: expected %s,\ngot %s instead"
-                  (Codegen.codegen_type ~expand:true expected)
-                  (Codegen.codegen_type ~expand:true actual)))
+               (Printf.sprintf "Type mismatch 5: expected %s, got %s instead"
+                  (show_perktype expected) (show_perktype actual)))
     (* (show_perktype expected)
                   (show_perktype actual))) *)
   in
@@ -1870,6 +2657,7 @@ and match_type_list (expected : perktype list)
         raise_type_error
           (fst (List.hd actual'))
           "Function has a vararg with other parameters after it"
+          Function_vararg_not_last
     | [], [] -> []
     | [ ([], Vararg, []) ], [] -> []
     | [], _ ->
@@ -1877,6 +2665,7 @@ and match_type_list (expected : perktype list)
           (fst (List.hd actual'))
           (Printf.sprintf "Expected %d parameters, but got %d"
              (List.length expected) (List.length actual))
+          Wrong_number_parameters
     | _, [] ->
         raise
           (Type_match_error
@@ -1887,7 +2676,8 @@ and match_type_list (expected : perktype list)
     | e :: et, a :: at ->
         let typ =
           try match_types e (snd a)
-          with Type_match_error msg -> raise_type_error (fst a) msg
+          with Type_match_error msg ->
+            raise_type_error (fst a) msg Type_mismatch
         in
         typ :: match_type_list_aux et at
   in
@@ -1904,3 +2694,7 @@ and autoas (expr : expr_a) (actual : perktype) (expected : perktype) : expr_a =
   | ArchetypeSum a1, ArchetypeSum _ | ArchetypeSum a1, Modeltype _ ->
       annot_copy expr (As (expr, a1, Some actual))
   | _ -> expr
+;;
+
+Utils.typecheck_tldf_ptr :=
+  fun tldf -> tldf |> typecheck_topleveldef |> typecheck_deferred_function

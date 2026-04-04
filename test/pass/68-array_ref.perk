@@ -1,0 +1,15 @@
+import "stdio.h"
+
+fun print_by_reference (a : [int]*, n : int) : void {
+    for (let i : int = 0; i < n; i++) {
+        printf("%d\n", (*a)[i])
+    }
+}
+
+fun main () : void {
+    let a : [int 10] = [0]
+    let b : [int] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    a [5] = 69;
+    print_by_reference(&a, 10);
+    print_by_reference(&b, 10);
+}

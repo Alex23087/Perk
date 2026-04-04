@@ -2,21 +2,17 @@
 
 open Ast
 open Errors
+open Error_codes
 open Utils
 open Type_symbol_table
 open Polymorphism
 
 exception TypeError of string
 
-let fst_4 (x, _, _, _) = x
-let snd_4 (_, x, _, _) = x
-let fst_3 (x, _, _) = x
-let snd_3 (_, x, _) = x
-let thrd_3 (_, _, x) = x
-let swizzle (x, y) = (y, x)
-let hashtbl_forall f h = Hashtbl.fold (fun k v acc -> f k v && acc) h true
-let hashtbl_exists f h = Hashtbl.fold (fun k v acc -> f k v || acc) h false
 let fresh_var_counter = ref 0
+
+let polymorphic_fundef_definitions : (topleveldef_t, string) Hashtbl.t =
+  Hashtbl.create 10
 
 (** creates a new fresh variable __perk_s_n *)
 let fresh_var (s : string) : string =
@@ -181,6 +177,7 @@ and codegen_program (header_name : string) (prog_is_main : bool)
        (fun (id, typ) ->
          Printf.printf "%s: %s\n" id (type_descriptor_of_perktype typ))
        !all_vars; *)
+  List.iter codegen_anticipated_polyfundefs tldfs;
   let body =
     String.concat "\n"
       (List.map
@@ -195,7 +192,7 @@ and codegen_program (header_name : string) (prog_is_main : bool)
     "#pragma once\n"
     (* Write includes *)
     ^ (if !Utils.static_compilation then ""
-       else "#include <malloc.h>\n#include <string.h>\n#include <stdbool.h>\n")
+       else "#include <gc/gc.h>\n#include <string.h>\n#include <stdbool.h>\n")
     ^ String.concat "\n"
         (List.rev
            (List.map
@@ -222,6 +219,11 @@ and codegen_program (header_name : string) (prog_is_main : bool)
           Printf.sprintf "%s%s;\n" acc (codegen_fundecl id typ))
         (File_info.get_public_fundecl_symbol_table ())
         ""
+    (* ^ Hashtbl.fold
+        (fun _ v acc ->
+          if fth_5 v then Printf.sprintf "%s\n%s\n" acc (snd_5 v) else "")
+        (File_info.get_lambdas_hashmap ())
+        "" *)
     (* Write program code *)
     ^ "\n"
   in
@@ -248,6 +250,63 @@ and codegen_program (header_name : string) (prog_is_main : bool)
        !called_counter !used_counter !unused_counter;
      Printf.printf "resolve_type called: %d\nused: %d\nunused: %d\n" !resolve_count
        !resolve_hit !resolve_miss; *)
+
+and codegen_anticipated_polyfundefs (tldf : topleveldef_a) : unit =
+  match ( $ ) tldf with
+  | PolymorphicFundef ((t_res, id, args, body), _kind, t_param) as pfun ->
+      if not (Hashtbl.mem (File_info.get_polyfun_instances ()) id) then
+        say_here
+          (Printf.sprintf
+             "codegen_polymorphic_fundef: THERE ARE NO INSTANCES of %s\n" id)
+        (* there are no instances *)
+      else
+        let instances = Hashtbl.find (File_info.get_polyfun_instances ()) id in
+        say_here
+          (Printf.sprintf "codegen_polymorphic_fundef: %s, %d instances" id
+             (List.length instances));
+        let instanced_funs =
+          List.map
+            (fun (t_actual, was_instantiated) ->
+              if was_instantiated then
+                (* Printf.printf "function %s<%s> was already instantiated\n" id
+                  (show_perktype t_actual); *)
+                None
+              else
+                (* let _ =
+                  Printf.printf
+                    "function %s<%s> was not instantiated, now it is\n" id
+                    (show_perktype t_actual)
+                in *)
+                let concrete_fundef =
+                  annot_copy tldf
+                    (Fundef
+                       ( ( subst_type t_res t_param t_actual,
+                           id ^ "_perk_polym_"
+                           ^ type_descriptor_of_perktype t_actual,
+                           List.map
+                             (fun x -> subst_perkvardesc x t_param t_actual)
+                             args,
+                           subst_type_command body t_param t_actual ),
+                         _kind,
+                         false ))
+                in
+                say_here
+                  (Printf.sprintf
+                     "codegen_topleveldef: codegenning concrete function: %s \
+                      %s %s"
+                     id
+                     (show_topleveldef_a concrete_fundef)
+                     (show_topleveldef_a concrete_fundef));
+                Some (( $ ) (!Utils.typecheck_tldf_ptr concrete_fundef)))
+            instances
+        in
+        Hashtbl.add polymorphic_fundef_definitions pfun
+          (String.concat "\n\n"
+             (List.map
+                (fun x -> codegen_topleveldef (annot_copy tldf x))
+                (List.filter Option.is_some instanced_funs
+                |> List.map Option.get)))
+  | _ -> ()
 
 (** Generates code for a top level definition. *)
 and codegen_topleveldef (tldf : topleveldef_a) : string =
@@ -325,6 +384,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                 | (_, Funtype (_, _), _), Lambda (_, _, _, _, _) ->
                     raise_type_error expr
                       "impossible: free vars should be empty in funtype"
+                      Function_contains_free_vars
                 | _ -> annot_copy def (DefVar (attrs, ((typ, id), expr)))))
           defs
       in
@@ -338,6 +398,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
             | DefVar (_, ((_, id), expr)) ->
                 if id = "constructor" then
                   raise_type_error expr "Constructor cannot be a lambda"
+                    Constructor_is_lambda
                 else false)
           defs
         |> Option.map ( $ ) (* NDR: remove annotation *)
@@ -353,7 +414,8 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
               with Failure _ ->
                 raise_type_error tldf
                   "constructor has 0 arguments. If you see this error, please \
-                   open an issue at https://github.com/Alex23087/Perk"
+                   open an issue at https://github.com/Alex23087/Perk/issues"
+                  Constructor_has_zero_arguments
             in
             let params = List.map fst params in
             ( String.concat ", "
@@ -368,6 +430,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
             raise_compilation_error tldf
               "Impossible: constructor is not a function. This should not \
                happen"
+              Constructor_is_not_function
       in
 
       (* Discard information about function/not-function definition *)
@@ -466,7 +529,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                        indent_string a id (codegen_type t) id
                  | _a, Lambdatype (_params, _retype, _free_vars), _q ->
                      raise_type_error tldf
-                       "lambdas not yet supported in models 2"
+                       "lambdas not yet supported in models 2" Not_implemented
                  | _ ->
                      Printf.sprintf "%s    self->%s.%s = (%s*) &self->%s"
                        indent_string a id (codegen_type t) id)
@@ -476,7 +539,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
       (* Construct the initializer definition using the previously defined strings *)
       Printf.sprintf
         "%s%s %s_init(%s) {\n\
-        \    %s%s self = malloc(sizeof(struct %s));\n\
+        \    %s%s self = GC_malloc(sizeof(struct %s));\n\
          %s\n\
          %s\n\
          %s    %sreturn self;\n\
@@ -484,11 +547,24 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
         indent_string name name params_str_with_types indent_string name name
         initializers_str archetypes_substruct_str constructor_call_str
         indent_string
-  | Struct (id, fields) ->
+  | Struct (id, fields, attr_list) ->
       let fields_decl = List.map fst fields in
+      let cg_attributes al =
+        if List.is_empty al then ""
+        else
+          Printf.sprintf "__attribute__((%s)) "
+            (List.map
+               (fun a ->
+                 match a with
+                 | Packed -> "packed"
+                 | Aligned n -> "aligned(" ^ string_of_int n ^ ")")
+               al
+            |> String.concat ", ")
+      in
       add_code_to_type_binding
         ([], Structtype (id, fields), [])
-        (Printf.sprintf "\n%stypedef struct %s {\n%s\n} %s;\n" indent_string id
+        (Printf.sprintf "\n%stypedef struct %s {\n%s\n} %s%s;\n" indent_string
+           id
            (if List.length fields_decl = 0 then ""
             else
               (indent_string ^ "    "
@@ -496,10 +572,11 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                   (";\n" ^ indent_string ^ "    ")
                   (List.map codegen_decl fields_decl))
               ^ ";")
-           id);
+           (cg_attributes attr_list) id);
       ""
-  | ADT (id, constructors) ->
-      let adt_type = ([], AlgebraicType (id, constructors), []) in
+      (* TODO for now treating the two cases separately, which results in some code duplication. Should factor out the common code *)
+  | ADT (id, constructors, None) ->
+      let adt_type = ([], AlgebraicType (id, constructors, None), []) in
       let adt_desc = type_descriptor_of_perktype adt_type in
       add_code_to_type_binding adt_type
         (Printf.sprintf
@@ -542,6 +619,8 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
 
           Hashtbl.add
             (File_info.get_lambdas_hashmap ())
+            (* Since the constructor is a synthesised function,
+              it does not have a corresponding perk expression *)
             (annotate_dummy (Int 1))
             ( c,
               (match t with
@@ -567,7 +646,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
                           (List.mapi
                              (fun i t ->
                                Printf.sprintf
-                                 "out.data.%s._%d = malloc(sizeof(%s));\n\
+                                 "out.data.%s._%d = GC_malloc(sizeof(%s));\n\
                                  \    *(out.data.%s._%d) = arg_%d;"
                                  c i (codegen_type t) c i i)
                              t)))),
@@ -577,46 +656,143 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
           |> ignore)
         constructors;
       ""
+  | ADT (id, _, Some _t) ->
+      let instance_table = File_info.get_polyadt_instances () in
+      let instances =
+        try Hashtbl.find instance_table id with Not_found -> []
+      in
+      say_here
+        (Printf.sprintf "n instances of polymorphic ADT %s: %d" id
+           (List.length instances));
+      File_info.print_polyadt_instances ();
+
+      let constructor_table = File_info.get_polyadt_constructors () in
+
+      List.iter
+        (fun (t, b) ->
+          if not b then
+            match discard_type_aq t with
+            | Basetype "__perk_alphafun_param" ->
+                say_here
+                  (Printf.sprintf
+                     "Skipping generation of type %s due to spurious parameter \
+                      version"
+                     (show_perktype t))
+            | _ ->
+                say_here (Printf.sprintf "Generating type %s" (show_perktype t));
+                let constructors =
+                  (try Hashtbl.find constructor_table (id, t)
+                   with Not_found -> failwith "some shite wrong")
+                  |> List.map (fun (c, azzo) ->
+                         (concrete_constructor_name c t, azzo))
+                in
+                let adt_type =
+                  ([], AlgebraicType (id, constructors, Some t), [])
+                in
+                say_here
+                  (Printf.sprintf "codegenning constructors for type %s"
+                     (show_perktype adt_type));
+                let adt_desc = type_descriptor_of_perktype adt_type in
+
+                add_code_to_type_binding adt_type
+                  (Printf.sprintf
+                     "\n\
+                      %stypedef enum __perk_%s_Tag {\n\
+                      %s\n\
+                      %s} __perk_%s_Tag;\n\n\
+                      %stypedef struct %s {\n\
+                     \    %s\n\
+                      %s} %s;\n"
+                     indent_string adt_desc
+                     (String.concat ",\n"
+                        (List.map
+                           (fun (c, _) ->
+                             Printf.sprintf "%s    __perk_%s_Tag" indent_string
+                               c)
+                           constructors))
+                     indent_string adt_desc indent_string adt_desc
+                     (Printf.sprintf
+                        "__perk_%s_Tag tag;\n    union {\n%s\n    } data;"
+                        adt_desc
+                        (String.concat "\n"
+                           (List.map
+                              (fun (c, t) ->
+                                Printf.sprintf
+                                  "%s        struct {\n\
+                                  \            %s;\n\
+                                  \        } %s;"
+                                  indent_string
+                                  (String.concat ";\n            "
+                                     (List.mapi
+                                        (fun i t ->
+                                          Printf.sprintf "%s* _%d" t i)
+                                        t))
+                                  c)
+                              (List.filter_map
+                                 (fun (_c, t) ->
+                                   match t with
+                                   | [] -> None
+                                   | _ -> Some (_c, List.map codegen_type t))
+                                 constructors))))
+                     indent_string adt_desc);
+                List.iter
+                  (fun (c, (t : perktype list)) ->
+                    bind_function_type c ([], Funtype (t, adt_type), []);
+
+                    Hashtbl.add
+                      (File_info.get_lambdas_hashmap ())
+                      (annotate_dummy (Int 1))
+                      ( c,
+                        (match t with
+                        | [] ->
+                            Printf.sprintf "%s %s() {\n    %s\n}" adt_desc c
+                              (Printf.sprintf
+                                 "%s out;\n\
+                                 \    out.tag = __perk_%s_Tag;\n\
+                                 \    return out;"
+                                 adt_desc c)
+                        | _ ->
+                            Printf.sprintf "%s %s(%s) {\n    %s\n}" adt_desc c
+                              (String.concat ", "
+                                 (List.mapi
+                                    (fun i t ->
+                                      Printf.sprintf "%s arg_%d"
+                                        (codegen_type t) i)
+                                    t))
+                              (Printf.sprintf
+                                 "%s out;\n\
+                                 \    out.tag = __perk_%s_Tag;\n\
+                                 \    %s\n\
+                                 \    return out;"
+                                 adt_desc c
+                                 (String.concat "\n    "
+                                    (List.mapi
+                                       (fun i t ->
+                                         Printf.sprintf
+                                           "out.data.%s._%d = \
+                                            GC_malloc(sizeof(%s));\n\
+                                           \    *(out.data.%s._%d) = arg_%d;"
+                                           c i (codegen_type t) c i i)
+                                       t)))),
+                        [],
+                        type_descriptor_of_perktype
+                          ( [],
+                            Funtype (List.map pointer_of_type t, adt_type),
+                            [] ) )
+                    |> ignore)
+                  constructors)
+        instances;
+
+      ""
   | InlineC s -> s
-  | Fundef ((t, id, args, body), public) ->
+  | Fundef ((t, id, args, body), _, public) ->
+      say_here (Printf.sprintf "codegen_fundef: %s" id);
       indent_string ^ codegen_fundef ~public t id args body
-  | PolymorphicFundef ((t_res, id, args, body), t_param) ->
-      if not (Hashtbl.mem (File_info.get_polyfun_instances ()) id) then
-        (* let _ = Printf.printf "THERE ARE NO INSTANCES of %s\n" id in *)
-        (* there are no instances *)
-        ""
-      else
-        let instances = Hashtbl.find (File_info.get_polyfun_instances ()) id in
-        let instanced_funs =
-          List.map
-            (fun (t_actual, was_instantiated) ->
-              if was_instantiated then
-                (* Printf.printf "function %s<%s> was already instantiated\n" id
-                  (show_perktype t_actual); *)
-                None
-              else
-                (* let _ =
-                  Printf.printf
-                    "function %s<%s> was not instantiated, now it is\n" id
-                    (show_perktype t_actual)
-                in *)
-                Some
-                  (Fundef
-                     ( ( subst_type t_res t_param t_actual,
-                         id ^ "perk_polym_"
-                         ^ type_descriptor_of_perktype t_actual,
-                         List.map
-                           (fun x -> subst_perkvardesc x t_param t_actual)
-                           args,
-                         subst_type_command body t_param t_actual ),
-                       false )))
-            instances
-        in
-        String.concat "\n\n"
-          (List.map
-             (fun x -> codegen_topleveldef (annot_copy tldf x))
-             (List.filter Option.is_some instanced_funs |> List.map Option.get))
-  | Extern _ -> ""
+  | PolymorphicFundef _ as pfun -> (
+      try Hashtbl.find polymorphic_fundef_definitions pfun
+      with Not_found -> "")
+  | Extern (n, t) -> Printf.sprintf "extern %s %s;" (codegen_type t) n
+  | Pretend _ -> ""
   (* Externs are only useful for type checking. No need to keep it for codegen step *)
   | Def ((t, e), deftype) ->
       indent_string ^ codegen_def t e deftype indent_string
@@ -627,6 +803,7 @@ and codegen_topleveldef (tldf : topleveldef_a) : string =
       raise_compilation_error tldf
         "Opens should not reach this point (codegen). If you see this error, \
          please open an issue at https://github.com/Alex23087/Perk/issues"
+        Impossible
 (* with Not_inferred s -> raise_type_error tldf s *)
 
 (** Generates code for perk commands. *)
@@ -729,7 +906,7 @@ and codegen_command (cmd : command_a) (indentation : int) : string =
         indent_string expr_str cases_str indent_string
   | Banish name ->
       (* TODO: Automatically banish children (possibly add autobanish keyword to models members) *)
-      Printf.sprintf "%sfree(%s);\n%s%s = NULL;" indent_string name
+      Printf.sprintf "%sGC_free(%s);\n%s%s = NULL;" indent_string name
         indent_string name
   | Return None -> indent_string ^ Printf.sprintf "return;"
   | Return (Some e) ->
@@ -741,7 +918,7 @@ and codegen_command (cmd : command_a) (indentation : int) : string =
   | Match (e, l, opt_type) ->
       let t =
         try Option.get opt_type
-        with _ -> failwith "should not happen - was set in the codegen"
+        with _ -> failwith "should not happen - was set in the typecheck"
       in
       let x = fresh_var "switch_var" in
       let label = fresh_var "label" in
@@ -962,9 +1139,18 @@ and codegen_type ?(expand : bool = false) (t : perktype) : string =
   let quals_str = String.concat " " (List.map codegen_qual quals) in
   let type_str =
     match t' with
+    | INum _ ->
+        failwith
+          (Printf.sprintf
+             "Cannot codegenerate type %s. If you find this issue please file \
+              an issue at https://github.com/Alex23087/Perk/issues"
+             (show_perktype t))
     | Basetype s -> s
     | Structtype (id, _) -> id
-    | AlgebraicType (id, _constructors) -> id
+    | AlgebraicType (id, _constructors, None) -> id
+    | AlgebraicType (id, _constructors, Some t_param) ->
+        let id = subst_ctor_name id t_param t_param in
+        id ^ "_perk_polym_" ^ codegen_type t_param
     | Funtype _ -> type_descriptor_of_perktype t
     | Lambdatype _ -> type_descriptor_of_perktype t
     | Pointertype ([], Structtype _, _) when expand -> "void*"
@@ -978,6 +1164,7 @@ and codegen_type ?(expand : bool = false) (t : perktype) : string =
     | Infer ->
         raise
           (Not_inferred "Impossible: type has not been inferred in codegen_type")
+    | PolyADTPlaceholder _ -> type_descriptor_of_perktype t
     | Optiontype _t -> type_descriptor_of_perktype t
     | Tupletype _ts -> type_descriptor_of_perktype t
   in
@@ -1014,7 +1201,7 @@ and codegen_expr (e : expr_a) : string =
   | Bool b -> string_of_bool b
   | Int i -> string_of_int i
   | Float f -> string_of_float f
-  | Char c -> Printf.sprintf "'%c'" c
+  | Char c -> Printf.sprintf "'%s'" (Char.escaped c)
   | String s -> Printf.sprintf "\"%s\"" (String.escaped s)
   | Var id -> id
   | PolymorphicVar (id, param) ->
@@ -1032,7 +1219,7 @@ and codegen_expr (e : expr_a) : string =
         (* Printf.printf "Instance of %s found\n" id; *)
         if List.mem param (List.map fst instances) then
           codegen_expr
-            (Var (id ^ "perk_polym_" ^ type_descriptor_of_perktype param)
+            (Var (id ^ "_perk_polym_" ^ type_descriptor_of_perktype param)
             |> annot_copy e)
         else
           failwith
@@ -1041,6 +1228,7 @@ and codegen_expr (e : expr_a) : string =
       else
         raise_compilation_error e
           (Printf.sprintf "polymorphic variable %s was not found" id)
+          Polymorphic_var_not_found
   | Apply (e, args, _app_type) -> (
       (* Printf.printf "Applying lambda with type %s\n"
          (match _app_type with
@@ -1071,7 +1259,7 @@ and codegen_expr (e : expr_a) : string =
                     args_str (* this is for archetype sums *)
               | None ->
                   raise_compilation_error e
-                    "Impossible: no acctype for access 1"
+                    "Impossible: no acctype for access 1" Impossible
               (* this is for models *))
           | _ -> Printf.sprintf "%s(%s)" expr_str args_str)
       | Some lamtype -> (
@@ -1155,19 +1343,33 @@ and codegen_expr (e : expr_a) : string =
       | Reference ->
           let fresh_ide = fresh_var "ref" in
           let e1_str = codegen_expr e in
-          let e1_decl_string =
-            Printf.sprintf "%s %s = %s;\n" (codegen_type typ) fresh_ide e1_str
+          let e1_decl_string, optional_cast, ampersand_if_required =
+            match typ with
+            | _, Arraytype (t, _), _ ->
+                let ptrtype = codegen_type (pointer_of_type t) in
+                ( Printf.sprintf "%s %s = (%s)%s;\n" ptrtype fresh_ide ptrtype
+                    e1_str,
+                  "(" ^ (typ |> pointer_of_type |> codegen_type) ^ ")",
+                  "" )
+            | _ ->
+                ( Printf.sprintf "%s %s = %s;\n" (codegen_type typ) fresh_ide
+                    e1_str,
+                  "",
+                  codegen_preunop op )
           in
           generated_freevars := !generated_freevars ^ e1_decl_string;
 
-          Printf.sprintf "%s%s" (codegen_preunop op) fresh_ide
+          Printf.sprintf "%s(%s%s)" optional_cast ampersand_if_required
+            fresh_ide
       | _ -> Printf.sprintf "%s%s" (codegen_preunop op) (codegen_expr e))
   | PostUnop (op, e) -> (
       match op with
       | OptionGet (Some t) ->
           Printf.sprintf "((%s)%s%s)" (c_type_of_perktype t) (codegen_expr e)
             (codegen_postunop op)
-      | OptionGet None -> raise_type_error e "Option get type was not inferred"
+      | OptionGet None ->
+          raise_type_error e "Option get type was not inferred"
+            Option_not_inferred
       | _ -> Printf.sprintf "%s%s" (codegen_expr e) (codegen_postunop op))
   | Parenthesised e -> Printf.sprintf "(%s)" (codegen_expr e)
   | Lambda _ -> codegen_functional ~is_lambda:true e
@@ -1188,7 +1390,8 @@ and codegen_expr (e : expr_a) : string =
         raise_compilation_error e
           "The type for 'as' expression has not been tagged during typecheck. \
            If this happens, please open an issue at \
-           https://github.com/Alex23087/Perk/issues";
+           https://github.com/Alex23087/Perk/issues"
+          Untagged_as;
       let typ = Option.get typ in
       let sum_type_descr = codegen_type ([], ArchetypeSum typlist, []) in
       let code = codegen_expr expr in
@@ -1215,7 +1418,8 @@ and codegen_expr (e : expr_a) : string =
                   | _ ->
                       raise_compilation_error e
                         "as expression can only be used with models or \
-                         archetypes")
+                         archetypes"
+                        Invalid_type_as)
                 typlist)
            ^ ", ")
         (* If the variable is an archetype sum, the internal self pointer is passed *)
@@ -1224,7 +1428,8 @@ and codegen_expr (e : expr_a) : string =
         | _, ArchetypeSum _, _ -> Printf.sprintf "%s.self" new_id
         | _ ->
             raise_compilation_error e
-              "as expression can only be used with models or archetypes")
+              "as expression can only be used with models or archetypes"
+              Invalid_type_as)
   | Nothing t -> (
       match t with
       | _, Infer, _ ->
@@ -1267,6 +1472,7 @@ and codegen_expr (e : expr_a) : string =
         | _ ->
             raise_type_error e
               (Printf.sprintf "There is no struct with name %s" id)
+              Struct_not_found
       in
       Printf.sprintf "((%s){%s})" id
         (String.concat ", "
@@ -1299,6 +1505,10 @@ and codegen_binop (op : binop) : string =
   | Neq -> "!="
   | ShL -> "<<"
   | ShR -> ">>"
+  | Modulo -> "%"
+  | Band -> "&"
+  | Bor -> "|"
+  | Bxor -> "^"
 
 (** generates code for prefix unary operators *)
 and codegen_preunop (op : preunop) : string =
@@ -1309,6 +1519,7 @@ and codegen_preunop (op : preunop) : string =
   | Reference -> "&"
   | PreIncrement -> "++"
   | PreDecrement -> "--"
+  | Bnot -> "~"
 
 (** generates code for postfix unary operators *)
 and codegen_postunop (op : postunop) : string =
@@ -1338,8 +1549,17 @@ and generate_types () =
     ref
       (Hashtbl.fold
          (fun k ((typ, code), from) acc ->
-           if is_builtin_type k (typ, code) || from != !Utils.fnm then acc
+           if is_builtin_type k (typ, code) || from <> !Utils.fnm then (
+             say_here
+               (Printf.sprintf "skipping type generation %s due to %s" k
+                  (if is_builtin_type k (typ, code) then "builtin"
+                   else "wrong file: " ^ from ^ "!=" ^ !Utils.fnm));
+             acc)
            else (
+             say_here
+               (Printf.sprintf
+                  "Adding type generation %s file = %s defined in %s" k
+                  !Utils.fnm from);
              out := !out ^ generate_forward_declaration typ;
              (k, (typ, code, dependencies_of_type typ)) :: acc))
          type_symbol_table [])
@@ -1508,13 +1728,18 @@ and codegen_type_definition (t : perktype) : string =
           Hashtbl.replace type_symbol_table key ((_t, Some compiled), from);
           compiled
       | _, Lambdatype _, _ -> codegen_lambda_capture t
+      | _, AlgebraicType _, _ ->
+          (* TODO figure out why ADTs types are not here in the first place*)
+          ""
       | _ ->
           raise_type_error
             (annotate_dummy ([], Int (-1), []))
             (Printf.sprintf
                "Unexpected type generation request: got %s. If you see this \
-                error, please file an issue at https://github.com/"
-               (show_perktype t)))
+                error, please file an issue at \
+                https://github.com/Alex23087/Perk/issues"
+               (show_perktype t))
+            Unexpected_codegen_type)
 
 and codegen_lambda_environment (free_vars : perkvardesc list) :
     bool * string * string =
@@ -1605,7 +1830,11 @@ and generate_forward_declaration (t : perktype) : string =
   | Tupletype _ ->
       let type_str = type_descriptor_of_perktype t in
       Printf.sprintf "typedef struct %s %s;\n" type_str type_str
-  | AlgebraicType (id, _constructors) ->
+  | AlgebraicType (id, _constructors, Some t_param) ->
+      let type_str = type_descriptor_of_perktype t in
+      Printf.sprintf "typedef struct %s %s;\n" type_str
+        (id ^ "_perk_polym_" ^ type_descriptor_of_perktype t_param)
+  | AlgebraicType (id, _constructors, None) ->
       let type_str = type_descriptor_of_perktype t in
       Printf.sprintf "typedef struct %s %s;\n" type_str id
   | _ -> ""

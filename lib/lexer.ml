@@ -53,7 +53,12 @@ let unescape ch lexbuf =
           - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol )
       in
       raise
-        (Lexing_error (start_pos, end_pos, !fnm, "Invalid escape character"))
+        (Lexing_error
+           ( start_pos,
+             end_pos,
+             !fnm,
+             "Invalid escape character",
+             Invalid_escape_character ))
 
 let rec token lexbuf =
   let tracking =
@@ -72,10 +77,12 @@ let rec token lexbuf =
     | "<<" -> ShL
     | ">" -> Gt
     | "-" -> Minus
+    | "%" -> Percent
     | "!" | 0x00AC -> Bang (* ¬ *)
     | "and" | 0x2227 | "&&" -> Land (* ∧ *)
     | "or" | 0x2228 | "||" -> Lor (* ∨ *)
     | "fun" -> Fun
+    | "type_fun" -> TypeFun
     | "=" -> Assign
     | "++" -> PlusPlus
     | "--" -> MinusMinus
@@ -104,6 +111,7 @@ let rec token lexbuf =
     | "private" -> Private
     | "static" -> Static
     | "extern" -> Extern
+    | "pretend" -> Pretend
     | "const" -> Const
     | "volatile" -> Volatile
     | "restrict" -> Restrict
@@ -120,6 +128,8 @@ let rec token lexbuf =
     | "summon" -> Summon
     | "banish" -> Banish
     | "struct" -> Struct
+    | "@packed" -> Packed
+    | "@aligned" -> Aligned
     | "make" -> Make
     | "type" -> ADT
     | "|" -> Pipe
@@ -167,6 +177,8 @@ let rec token lexbuf =
     | "!" -> Bang
     | "*" | 0x00D7 -> Star (* × *)
     | "/" -> Div
+    | "^" -> Wedge
+    | "~" -> Tilde
     | "//" -> comment lexbuf
     | "/*" -> multiline_comment lexbuf
     | eof -> EOF
@@ -188,7 +200,8 @@ let rec token lexbuf =
                end_pos,
                !fnm,
                Printf.sprintf "Unrecognised character: '%s'"
-                 (Sedlexing.Utf8.lexeme lexbuf) ))
+                 (Sedlexing.Utf8.lexeme lexbuf),
+               Unrecognised_character ))
     | _ -> failwith "Impossible!"
   in
   (* Dynamic keyword detection *)
@@ -220,6 +233,7 @@ and multiline_comment lexbuf =
 and char lexbuf =
   match%sedlex lexbuf with
   | character, "'" -> Character (Sedlexing.Utf8.lexeme lexbuf).[0]
+  | "\\n", "'" -> Character '\n' (* Makeshift solution, TODO make more general *)
   | _ ->
       let start_pos =
         ( (fst (Sedlexing.lexing_positions lexbuf)).pos_lnum,
@@ -233,7 +247,11 @@ and char lexbuf =
       in
       raise
         (Lexing_error
-           (start_pos, end_pos, !fnm, "Character not closed by a quote!"))
+           ( start_pos,
+             end_pos,
+             !fnm,
+             "Character not closed by a quote!",
+             Invalid_character_literal ))
 
 and inlineC lexbuf =
   match%sedlex lexbuf with
@@ -253,7 +271,12 @@ and inlineC lexbuf =
           - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol )
       in
       raise
-        (Lexing_error (start_pos, end_pos, !fnm, "Inline C not closed by END_C!"))
+        (Lexing_error
+           ( start_pos,
+             end_pos,
+             !fnm,
+             "Inline C not closed by END_C!",
+             Unterminated_inline_C ))
 
 and string_literal lexbuf =
   match%sedlex lexbuf with
@@ -269,7 +292,9 @@ and string_literal lexbuf =
           (snd (Sedlexing.lexing_positions lexbuf)).pos_cnum
           - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol )
       in
-      raise (Lexing_error (start_pos, end_pos, !fnm, "Unterminated string"))
+      raise
+        (Lexing_error
+           (start_pos, end_pos, !fnm, "Unterminated string", Unterminated_string))
   | escape ->
       let chara = Sedlexing.Utf8.lexeme lexbuf in
       Buffer.add_char string_buffer
@@ -292,6 +317,10 @@ and string_literal lexbuf =
       in
       raise
         (Lexing_error
-           (start_pos, end_pos, !fnm, "Invalid character in string literal"))
+           ( start_pos,
+             end_pos,
+             !fnm,
+             "Invalid character in string literal",
+             Invalid_character_in_string ))
 
 let tokenize (lexbuf : Sedlexing.lexbuf) = token lexbuf

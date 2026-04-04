@@ -13,6 +13,9 @@ type generic_type = {
 (** Hash table of currently generic types, their bounds and inferred exact type*)
 let generic_types_table : (perktype, generic_type) Hashtbl.t = Hashtbl.create 10
 
+(** Hash table of the defined ADT constructors*)
+let defined_constructors : (perkident, unit) Hashtbl.t = Hashtbl.create 10
+
 type file_info = {
   lambdas_hashmap : (expr_a, string * string * string list * string) Hashtbl.t;
       (** table of lambdas: Lambda expression, identifier, generated code,
@@ -20,11 +23,21 @@ type file_info = {
   public_fundecl_symbol_table : (perkident, perktype) Hashtbl.t;
   private_fundecl_symbol_table : (perkident, perktype) Hashtbl.t;
   import_list : string list ref;
+  import_paths : string list ref;
   polyfun_instances : (string, (perktype * bool) list) Hashtbl.t;
       (** id -> (type, was_codegen'd) list *)
   file_local_polyfuns : (string, perktype list * perktype * perktype) Hashtbl.t;
   polyfuns_to_be_defined : (topleveldef_a * perktype) list ref;
   polyfun_bounds : (string, generic_type) Hashtbl.t;
+  polyadt_instances : (string, (perktype * bool) list) Hashtbl.t;
+  polyadt_declared :
+    (string, perktype * (perkident * perktype list) list) Hashtbl.t;
+      (** (id -> generic definition of polyadt) *)
+  polyadt_constructors :
+    (string * perktype, (perkident * perktype list) list) Hashtbl.t;
+      (** (id, param) -> constructors *)
+  polyadt_adt_from_constructor : (string, perktype) Hashtbl.t;
+      (** (constructor -> its adt) *)
 }
 
 let allocate_file_info () =
@@ -34,10 +47,15 @@ let allocate_file_info () =
       public_fundecl_symbol_table = Hashtbl.create 10;
       private_fundecl_symbol_table = Hashtbl.create 10;
       import_list = ref [];
+      import_paths = ref [];
       polyfun_instances = Hashtbl.create 10;
       file_local_polyfuns = Hashtbl.create 10;
       polyfuns_to_be_defined = ref [];
       polyfun_bounds = Hashtbl.create 10;
+      polyadt_declared = Hashtbl.create 10;
+      polyadt_instances = Hashtbl.create 10;
+      polyadt_constructors = Hashtbl.create 10;
+      polyadt_adt_from_constructor = Hashtbl.create 10;
     }
 
 let current_file_info = allocate_file_info ()
@@ -55,10 +73,17 @@ let get_private_fundecl_symbol_table () =
   !current_file_info.private_fundecl_symbol_table
 
 let get_import_list () = !current_file_info.import_list
+let get_import_paths () = !current_file_info.import_paths
 let get_polyfun_instances () = !current_file_info.polyfun_instances
 let get_file_local_polyfuns () = !current_file_info.file_local_polyfuns
 let get_polyfuns_to_be_defined () = !current_file_info.polyfuns_to_be_defined
 let get_polyfun_bounds () = !current_file_info.polyfun_bounds
+let get_polyadt_instances () = !current_file_info.polyadt_instances
+let get_polyadt_declared () = !current_file_info.polyadt_declared
+let get_polyadt_constructors () = !current_file_info.polyadt_constructors
+
+let get_polyadt_adt_from_constructor () =
+  !current_file_info.polyadt_adt_from_constructor
 
 let set_polyfun_as_codegened id t =
   let remove_first x lst =
@@ -77,3 +102,7 @@ let polyfun_is_already_codegened id t =
   let pi = get_polyfun_instances () in
   let instances = try Hashtbl.find pi id with Not_found -> [] in
   List.mem (t, true) instances
+
+let print_polyadt_instances () =
+  Utils.say_here "Polyadt Instances:\n";
+  Hashtbl.iter (fun k v -> Utils.say_here (Printf.sprintf "%s: %s" k (String.concat ", " (List.map (fun a -> a |> fst |> show_perktype) v)))) (get_polyadt_instances())

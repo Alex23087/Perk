@@ -1,16 +1,24 @@
 open Ast
 open Codegen
 open Errors (*EWWOWS*)
+open Error_codes
 open Typecheck
 open File_info
 
 let opens_hashmap : (string, unit) Hashtbl.t = Hashtbl.create 16
+let opens_stack : string list ref = ref []
 
 let add_import (import : string) : bool =
   let import = Fpath.to_string (Fpath.normalize (Fpath.v import)) in
-  (* Printf.printf "%s" (Printf.sprintf "Adding import to hashmap: %s\n" import); *)
-  if Hashtbl.mem opens_hashmap import then false
+  (* if Hashtbl.mem opens_hashmap import then false *)
+  if List.mem import !opens_stack then false
   else (
+    if !Utils.verbose then (
+      Utils.say_here (Printf.sprintf "Adding import to hashmap: %s" import);
+      Utils.say_here "Open hashmap entries:";
+      Hashtbl.iter
+        (fun key _ -> Printf.sprintf "%s" key |> Utils.say_here)
+        opens_hashmap);
     Hashtbl.add opens_hashmap import ();
     true)
 
@@ -30,16 +38,15 @@ let gather_numerical_lengths () : unit =
   res |> String.split_on_char '\n'
   |> List.filter (fun line -> String.trim line <> "")
   |> List.iter (fun line ->
-         match String.split_on_char ' ' (String.trim line) with
-         | [ def; macro; value ] when String.starts_with ~prefix:"#define" def
-           ->
-             let key = macro in
-             let value = int_of_string value in
-             Utils.say_here (Printf.sprintf "Added size type: %s %d" key value);
-             Hashtbl.add Utils.numerical_sizes key value
-         | _ as s ->
-             failwith
-               ("Unexpected format in numerical lengths: " ^ String.concat " " s))
+      match String.split_on_char ' ' (String.trim line) with
+      | [ def; macro; value ] when String.starts_with ~prefix:"#define" def ->
+          let key = macro in
+          let value = int_of_string value in
+          Utils.say_here (Printf.sprintf "Added size type: %s %d" key value);
+          Hashtbl.add Utils.numerical_sizes key value
+      | _ as s ->
+          failwith
+            ("Unexpected format in numerical lengths: " ^ String.concat " " s))
 
 let ast_of_filename filename =
   let inchn = open_in filename in
@@ -51,7 +58,7 @@ let ast_of_filename filename =
       MenhirLib.Convert.Simplified.traditional2revised Parser.program
     in
     try parser lexer with
-    | ParseError (f, e) ->
+    | ParseError (f, e, code) ->
         raise
           (Syntax_error
              ( ( (fst (Sedlexing.lexing_positions lexbuf)).pos_lnum,
@@ -61,7 +68,8 @@ let ast_of_filename filename =
                  (snd (Sedlexing.lexing_positions lexbuf)).pos_cnum
                  - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol ),
                f,
-               e ))
+               e,
+               code ))
     | Parser.Error ->
         raise
           (Syntax_error
@@ -73,16 +81,17 @@ let ast_of_filename filename =
                  - (snd (Sedlexing.lexing_positions lexbuf)).pos_bol ),
                filename,
                "Unhandled parsing error. If this happens to you, please open \
-                an issue on https://github.com/Alex23087/Perk/issues" ))
+                an issue on https://github.com/Alex23087/Perk/issues",
+               Unknown_error ))
   in
   let ast = ast_of_channel inchn in
   close_in inchn;
   ast
 
-let singletonamble =
+let singletonamble () =
   if !Utils.static_compilation then ""
   else
-    "#include <malloc.h>\n#include <string.h>\n#include <stdbool.h>\n"
+    "#include <gc/gc.h>\n#include <string.h>\n#include <stdbool.h>\n"
     ^ "#ifndef LAMBDUMMY_PERK\n#define LAMBDUMMY_PERK\n"
     ^ "typedef struct _lambdummy_type {\n\
       \    void *env;\n\
@@ -91,8 +100,8 @@ let singletonamble =
        static __lambdummy_type *__lambdummy;\n\n\
       \ __lambdummy_type *alloclabmd(int size, void *labmda, void *env)\n\
        {\n\
-      \    __lambdummy_type *ptr = malloc(sizeof(__lambdummy_type));\n\
-      \    ptr->env = malloc(size);\n\
+      \    __lambdummy_type *ptr = GC_malloc(sizeof(__lambdummy_type));\n\
+      \    ptr->env = GC_malloc(size);\n\
       \    memcpy(ptr->env, env, size);\n\
       \    ptr->func = labmda;\n\
       \    return ptr;\n\
@@ -102,15 +111,39 @@ let singletonamble =
        #define CALL_LAMBDA(l, t, ...) (__lambdummy = (__lambdummy_type \
        *)l,       ((t)(__lambdummy->func))(__VA_ARGS__))" ^ "\n\n" ^ "#endif\n"
 
+let error_out json_format error_class start_line start_col end_line end_col msg
+    file code exn record_stack_trace =
+  Parse_tags.remove_libs_expanded ();
+  Parse_tags.remove_tags ();
+  if record_stack_trace then
+    Printf.eprintf "Exception: %s\n%s\n" (Printexc.to_string exn)
+      (Printexc.get_backtrace ());
+  if json_format then (
+    Printf.printf
+      "{\"error\": \"%s\", \"start_line\": %d, \"start_col\": %d, \
+       \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
+       \"%s\", \"error_code\": {\"description\": \"%s\", \"code\": %d}}\n"
+      (fst error_class) start_line start_col end_line end_col
+      (String.escaped msg) file (show_error_code code) (error_code_to_enum code);
+    exit 0)
+  else
+    Printf.eprintf
+      "\027[31m%s error at line %d, column %d: %s, ending at line %d, column \
+       %d in file %s\027[0m\n"
+      (snd error_class) start_line start_col msg end_line end_col file;
+  exit 1
+
 let rec compile_program ?(dir : string option) ?(dry_run = false)
     ?(json_format = false) (static_compilation : bool) (verbose : bool)
-    (input_file : string) (output_dir : string option) (c_compiler : string)
-    (c_flags : string) =
+    (record_stack_trace : bool) (retain_tmp_files : bool) (input_file : string)
+    (output_dir : string option) (c_compiler : string) (c_flags : string) =
   (* let out_ast_file = Filename.chop_suffix input_file ".perk" ^ ".ast" in *)
+  if record_stack_trace then Printexc.record_backtrace true;
   gather_numerical_lengths ();
 
   Utils.static_compilation := static_compilation;
   Utils.verbose := verbose;
+  Utils.retain_tmp_files := retain_tmp_files;
   Utils.c_compiler := c_compiler;
   Utils.c_flags := c_flags;
 
@@ -151,80 +184,41 @@ let rec compile_program ?(dir : string option) ?(dry_run = false)
       output_string oc compiled_preamble;
       close_out oc;
       let oc = open_out lambdummy_h in
-      output_string oc singletonamble;
+      output_string oc (singletonamble ());
       close_out oc)
   with
-  | Syntax_error ((start_line, start_col), (end_line, end_col), input_file, msg)
-    ->
-      if json_format then (
-        Printf.printf
-          "{\"error\": \"syntax\", \"start_line\": %d, \"start_col\": %d, \
-           \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
-           \"%s\"}\n"
-          start_line start_col end_line end_col (String.escaped msg) input_file;
-        exit 0)
-      else
-        Printf.eprintf
-          "\027[31mSyntax error at line %d, column %d: %s, ending at line %d, \
-           column %d in file %s\027[0m\n"
-          start_line start_col msg end_line end_col input_file;
-      exit 1
-  | Lexing_error ((start_line, start_col), (end_line, end_col), input_file, msg)
-    ->
-      if json_format then (
-        Printf.printf
-          "{\"error\": \"lexing\", \"start_line\": %d, \"start_col\": %d, \
-           \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
-           \"%s\"}\n"
-          start_line start_col end_line end_col (String.escaped msg) input_file;
-        exit 0)
-      else
-        Printf.eprintf
-          "\027[31mLexing error at line %d, column %d: %s, ending at line %d, \
-           column %d in file %s\027[0m\n"
-          start_line start_col msg end_line end_col input_file;
-      exit 1
-  | Type_error ((start_line, start_col), (end_line, end_col), input_file, msg)
-    ->
-      if json_format then (
-        Printf.printf
-          "{\"error\": \"typecheck\", \"start_line\": %d, \"start_col\": %d, \
-           \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
-           \"%s\"}\n"
-          start_line start_col end_line end_col (String.escaped msg) input_file;
-        exit 0)
-      else
-        Printf.eprintf
-          "\027[31mType error at line %d, column %d: %s, ending at line %d, \
-           column %d in file %s\027[0m\n"
-          start_line start_col msg end_line end_col input_file;
-      exit 1
-  | Parser.Error ->
-      if json_format then (
-        Printf.printf
-          "{\"error\": \"parse\", \"message\": \"Unexpected token in file %s\"}\n"
-          !Utils.fnm;
-        exit 0)
-      else
-        Printf.eprintf
-          "\027[31mParsing error: unexpected token in file %s\027[0m\n"
-          input_file;
-      exit 1
+  | Syntax_error
+      ((start_line, start_col), (end_line, end_col), input_file, msg, code) as
+    exn ->
+      error_out json_format ("syntax", "Syntax") start_line start_col end_line
+        end_col msg input_file code exn record_stack_trace
+  | Lexing_error
+      ((start_line, start_col), (end_line, end_col), input_file, msg, code) as
+    exn ->
+      error_out json_format ("lexing", "Lexing") start_line start_col end_line
+        end_col msg input_file code exn record_stack_trace
+  | Type_error
+      ((start_line, start_col), (end_line, end_col), input_file, msg, code) as
+    exn ->
+      error_out json_format ("typecheck", "Type") start_line start_col end_line
+        end_col msg input_file code exn record_stack_trace
+  | Parser.Error as exn ->
+      error_out json_format ("parse", "parsing") (-1) (-1) (-1) (-1)
+        "Unexpected token" input_file Unknown_error exn record_stack_trace
   | Compilation_error
-      ((start_line, start_col), (end_line, end_col), input_file, msg) ->
-      if json_format then (
-        Printf.printf
-          "{\"error\": \"compilation\", \"start_line\": %d, \"start_col\": %d, \
-           \"end_line\": %d, \"end_col\": %d, \"message\": \"%s\", \"file\": \
-           \"%s\"}\n"
-          start_line start_col end_line end_col (String.escaped msg) input_file;
-        exit 0)
-      else
-        Printf.eprintf
-          "\027[31mCompilation error at line %d, column %d: %s, ending at line \
-           %d, column %d in file %s\027[0m\n"
-          start_line start_col msg end_line end_col input_file;
-      exit 1
+      ((start_line, start_col), (end_line, end_col), input_file, msg, code) as
+    exn ->
+      error_out json_format
+        ("compilation", "Compilation")
+        start_line start_col end_line end_col msg input_file code exn
+        record_stack_trace
+  | exn ->
+      error_out json_format ("internal", "Internal") (-1) (-1) (-1) (-1)
+        (Printf.sprintf
+           "Unhandled exception: \"%s\". If you see this error, please open an \
+            issue at https://github.com/Alex23087/Perk/issues"
+           (Printexc.to_string exn))
+        input_file Internal_error exn record_stack_trace
 
 (** Generates the global polyfun definitions that are not local to the current
     file *)
@@ -234,7 +228,7 @@ and add_polydefs ast =
       (fun (tld, t_actual) acc ->
         annot_copy tld
           (match ( $ ) tld with
-          | PolymorphicFundef ((t_res, id, args, body), t_param) ->
+          | PolymorphicFundef ((t_res, id, args, body), _kind, t_param) ->
               if not (polyfun_is_already_codegened id t_actual) then (
                 let param_types = List.map fst args in
                 (* the definition is added to the file-local polyfun hashtable *)
@@ -252,13 +246,14 @@ and add_polydefs ast =
                 let x =
                   Fundef
                     ( ( Polymorphism.subst_type t_res t_param t_actual,
-                        id ^ "perk_polym_"
+                        id ^ "_perk_polym_"
                         ^ Type_symbol_table.type_descriptor_of_perktype t_actual,
                         List.map
                           (fun x ->
                             Polymorphism.subst_perkvardesc x t_param t_actual)
                           args,
                         Polymorphism.subst_type_command body t_param t_actual ),
+                      Normal,
                       false )
                 in
                 let t = typecheck_topleveldef (annot_copy tld x) in
@@ -279,10 +274,11 @@ and add_polydefs ast =
 (** for each polydef, typedefs all of its instances. TODO check if this is
     necessary *)
 and check_polydefs_pass (ast : topleveldef_a list) =
+  Var_symbol_table.push_symbol_table ();
   List.map
     (fun tld ->
       match ( $ ) tld with
-      | PolymorphicFundef ((t_res, id, args, body), t_param) ->
+      | PolymorphicFundef ((t_res, id, args, body), _kind, t_param) ->
           let instances =
             try Hashtbl.find (File_info.get_polyfun_instances ()) id
             with Not_found -> []
@@ -293,13 +289,14 @@ and check_polydefs_pass (ast : topleveldef_a list) =
               let fundef =
                 Fundef
                   ( ( Polymorphism.subst_type t_res t_param t_actual,
-                      id ^ "perk_polym_"
+                      id ^ "_perk_polym_"
                       ^ Type_symbol_table.type_descriptor_of_perktype t_actual,
                       List.map
                         (fun x ->
                           Polymorphism.subst_perkvardesc x t_param t_actual)
                         args,
                       Polymorphism.subst_type_command body t_param t_actual ),
+                    Normal,
                     false )
               in
               let t = typecheck_topleveldef (annot_copy tld fundef) in
@@ -308,7 +305,8 @@ and check_polydefs_pass (ast : topleveldef_a list) =
           |> ignore
       | _ -> ())
     ast
-  |> ignore
+  |> ignore;
+  Var_symbol_table.pop_symbol_table ()
 
 and process_file ?(dir : string option) (filename : string) (is_main : bool) :
     string * (string * string) =
@@ -335,23 +333,35 @@ and process_file ?(dir : string option) (filename : string) (is_main : bool) :
   let header_name =
     Filename.chop_suffix (Filename.basename filename_canonical) ".perk" ^ ".h"
   in
-  (* Printf.printf "%s"
+  Utils.say_here
     (Printf.sprintf "Processing file: %s (canonical: %s)\n" filename
-       filename_canonical); *)
+       filename_canonical);
   add_import filename_canonical |> ignore;
 
   let old_fnm = !Utils.fnm in
   Utils.fnm := filename;
   let ast = ast_of_filename filename in
+  Var_symbol_table.push_symbol_table ();
+  process_C_imports ast;
   let ast = opens_to_imports dirname ast in
   let ast = remove_opens ast in
   let ast = typecheck_program ast in
   let ast = add_polydefs ast in
-  check_polydefs_pass ast;
+  (* check_polydefs_pass ast; *)
   let out =
     ( String.concat "\n" (List.map show_topleveldef_a ast),
       ast |> codegen_program header_name is_main )
   in
+
+  (* Utils.say_here "TYPECHECK IMPORTS:";
+  List.iter
+    (fun path -> Utils.say_here (Printf.sprintf "Import path: %s\n" path))
+    !(File_info.get_import_paths ());
+  Utils.say_here "FILE_INFO IMPORTS:";
+  List.iter
+    (fun path -> Utils.say_here (Printf.sprintf "Import path: %s\n" path))
+    !(File_info.get_import_list ()); *)
+
   (* Hashtbl.clear Codegen.lambdas_hashmap;
   Hashtbl.clear Codegen.public_fundecl_symbol_table;
   Hashtbl.clear Codegen.private_fundecl_symbol_table;
@@ -360,7 +370,6 @@ and process_file ?(dir : string option) (filename : string) (is_main : bool) :
   Hashtbl.clear Polymorphism.polyfun_instances;
   Hashtbl.clear Polymorphism.file_local_polyfuns;
   Polymorphism.polyfuns_to_be_defined := []; *)
-
   if old_fnm <> "" then Utils.fnm := old_fnm;
   out
 
@@ -396,17 +405,50 @@ and process_opens (dir : string) (ast : topleveldef_a list) :
       in
       (* let open_filename = i in *)
       let did_add = add_import open_filename in
-      if not (Sys.file_exists open_filename) then
-        raise_compilation_error node
-          (Printf.sprintf "File %s does not exist" open_filename);
       if did_add then (
+        if not (Sys.file_exists open_filename) then
+          raise_compilation_error node
+            (Printf.sprintf "File %s does not exist" open_filename)
+            File_not_found;
+        opens_stack := open_filename :: !opens_stack;
         let fi = save_file_info () in
+
+        (* Store symbol table: the inner library shouldn't have access to the current symbol table,
+          So we save it and reset it *)
+        let symtable = ref !Var_symbol_table.var_symbol_table in
+        Var_symbol_table.var_symbol_table := [];
+        let constructor_hashmap = Hashtbl.copy File_info.defined_constructors in
+        Hashtbl.clear File_info.defined_constructors;
+
+        (* TODO: Type symbol table should be  *)
         let _ast, (compiled_preamble, compiled_body) =
           (* Printf.printf "%s"
             (Printf.sprintf "Processing open file: %s\n" open_filename); *)
           process_file open_filename false
         in
+
+        (* Restore symbol table and add all global symbols defined in the opened library.
+          Symbols included via C headers are allowed to be doubly declared. *)
+        (* TODO: instead of blindly allowing C symbols to be doubly declared, there should be a finer check
+          To ensure that they come from the same library as the symbol already declared (ideally checking if
+          said library is also a #pragma once lib...) *)
+        let new_constructor_hashmap =
+          Hashtbl.copy File_info.defined_constructors
+        in
+        Hashtbl.clear File_info.defined_constructors;
+        Hashtbl.iter
+          (fun k v -> Hashtbl.add File_info.defined_constructors k v)
+          new_constructor_hashmap;
+        Hashtbl.iter
+          (fun k v -> Hashtbl.add File_info.defined_constructors k v)
+          constructor_hashmap;
+        Var_symbol_table.append_symbol_table symtable
+          ~filter:(fun (_, _fnm) -> true)
+          (List.hd !Var_symbol_table.var_symbol_table);
+        Var_symbol_table.var_symbol_table := !symtable;
+
         restore_file_info fi;
+        opens_stack := List.tl !opens_stack;
 
         (* TODO makeshift implementation, does not work for nested opens *)
         let out_file_c =
@@ -430,45 +472,39 @@ and process_opens (dir : string) (ast : topleveldef_a list) :
         output_string oc compiled_preamble;
         close_out oc;
         [ (i, node) ] @ process_opens dir rest)
-      else process_opens dir rest
+      else failwith "Circular import detected!"
+      (* process_opens dir rest *)
   | _ :: rest -> process_opens dir rest
   | [] -> []
 
-and expand_opens (dir : string) (ast : topleveldef_a list) : topleveldef_a list
-    =
-  match ast with
-  | ({ loc = _; node = Open i } as node) :: rest ->
-      let open_filename =
-        if Fpath.is_rel (Fpath.v i) then
-          Fpath.(to_string (normalize (v dir // v i)))
-        else Fpath.(to_string (normalize (v i)))
-      in
-      let did_add = add_import open_filename in
-      if not (Sys.file_exists open_filename) then
-        raise_compilation_error node
-          (Printf.sprintf "File %s does not exist" open_filename);
-      if did_add then
-        expand_opens
-          (Filename.dirname open_filename)
-          (ast_of_filename open_filename)
-        @ expand_opens dir rest
-      else expand_opens dir rest
-  (* | ({ loc = _; node = Import i } as node) :: rest ->
-      if String.starts_with ~prefix:"\"" i then (
-        let i = String.sub i 1 (String.length i - 2) in
-        let import_filename =
-          if Fpath.is_rel (Fpath.v i) then
-            Fpath.(to_string (normalize (v dir // v i)))
-          else Fpath.(to_string (normalize (v i)))
-        in
-        let did_add = add_import import_filename in
-        if not (Sys.file_exists import_filename) then
-          raise_compilation_error node
-            (Printf.sprintf "File %s does not exist" import_filename);
-        if did_add then
-          let import_filename = "\"" ^ import_filename ^ "\"" in
-          annot_copy node (Import import_filename) :: expand_opens dir rest
-        else expand_opens dir rest)
-      else node :: expand_opens dir rest *)
-  | x :: rest -> x :: expand_opens dir rest
-  | [] -> []
+and process_C_imports (ast : topleveldef_a list) =
+  List.iter
+    (fun tldf ->
+      match ( $ ) tldf with
+      | Import s ->
+          File_info.get_import_paths ()
+          := Typecheck.get_lib_path s :: !(File_info.get_import_paths ())
+      | _ -> ())
+    ast;
+  if List.length !(File_info.get_import_paths ()) = 0 then ()
+  else (
+    (* Printf.printf "%d\n%s\n\n"
+      (List.length !(File_info.get_import_paths ()))
+      (String.concat ":" !(File_info.get_import_paths ())); *)
+    Parse_tags.generate_tags !(File_info.get_import_paths ());
+    Typecheck.library_functions := Parse_tags.get_prototype_types ();
+    (* for each library function, if it is not already defined define it *)
+    (* TODO solve conditionally compiled definitions *)
+    (* TODO hoist these*)
+    (* TODO: get filename of definition *)
+    List.iter
+      (fun (id, t) ->
+        Utils.say_here
+          (Printf.sprintf "Adding library function %s of type %s" id
+             (show_perktype t));
+        if Option.is_none (Var_symbol_table.lookup_var id) then
+          Var_symbol_table.bind_var id ~fnm:"C_libs.h" t
+        else Utils.say_here "Skipping")
+      !Typecheck.library_functions;
+    Parse_tags.remove_tags ();
+    Parse_tags.remove_libs_expanded ())

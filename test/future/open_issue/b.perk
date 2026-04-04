@@ -1,0 +1,5 @@
+open "a.perk"
+
+fun smth(): Idk {
+    return Nil;
+}

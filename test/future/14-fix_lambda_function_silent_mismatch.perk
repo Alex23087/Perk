@@ -1,0 +1,42 @@
+import "stdio.h"
+
+type List = Nil | Cons(int, List)
+
+// This function expects a function. Below, a lambda is passed.
+// The typechecker does not complain, but results in a segmentation fault at runtime.
+fun List.iter (self: List, func: (int) -> void): void {
+    match (self) {
+        Nil {
+            skip
+        },
+        Cons (var hd, var tl) {
+            func(hd);
+            tl.iter(func)
+        }
+    }
+}
+
+type_fun List.make_empty(): List {
+    return Nil;
+}
+
+type_fun List.make_decreasing(from: int): List {
+    match (from) {
+        `{0} {
+            return Nil
+        },
+        _ {
+            return Cons(from, List.make_decreasing(from - 1))
+        }
+    }
+}
+
+fun main() : void {
+    let l := Cons(10, List.make_empty());
+    l.iter(
+        (a: int): bool {
+            printf("%d\n", a);
+            return false
+        }
+    )
+}

@@ -1,0 +1,6 @@
+// Test that using a reserved keyword as a function name fails
+// Should produce: keyword 'else' cannot be used as function identifier
+
+fun else() : void {
+    let x : int = 0
+}

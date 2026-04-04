@@ -9,12 +9,14 @@ let rec subst_perkvardesc ((pt, piden) : perkvardesc) (placeholder : perktype)
   let subst_maybe t = subst_type t placeholder actual in
   (subst_maybe pt, piden)
 
+(** Substitutes a type with a type in a type. Args are type, placeholder, actual *)
 and subst_type (t : perktype) (placeholder : perktype) (actual : perktype) =
   let base_subst t = if t = placeholder then actual else t in
   let subst_pvd t = subst_perkvardesc t placeholder actual in
   let subst_e e = subst_type_expr e placeholder actual in
   let subst_def (pvd, e) = (subst_pvd pvd, subst_e e) in
   match t with
+  | _, INum _, _ -> t
   | _, Basetype _, _ -> base_subst t
   | a, Funtype (tl, t), b ->
       (a, Funtype (List.map base_subst tl, base_subst t), b)
@@ -36,17 +38,21 @@ and subst_type (t : perktype) (placeholder : perktype) (actual : perktype) =
             List.map base_subst tl,
             idl1 ),
         b )
-  | a, AlgebraicType (id, id_and_tl_list), b ->
+  | a, AlgebraicType (id, id_and_tl_list, t_param), b ->
       ( a,
         AlgebraicType
           ( id,
             List.map
-              (fun (id, tl) -> (id, List.map base_subst tl))
-              id_and_tl_list ),
+              (fun (id, tl) ->
+                (id, List.map (fun t -> subst_type t placeholder actual) tl))
+              id_and_tl_list,
+            Option.map (fun x -> subst_type x placeholder actual) t_param ),
         b )
   | a, Optiontype t, b -> (a, Optiontype (base_subst t), b)
   | a, Tupletype tl, b -> (a, Tupletype (List.map base_subst tl), b)
   | a, ArchetypeSum tl, b -> (a, ArchetypeSum (List.map base_subst tl), b)
+  | a, PolyADTPlaceholder (i, t), b ->
+      (a, PolyADTPlaceholder (i, base_subst t), b)
   | _, Vararg, _ | _, Infer, _ -> t
 
 and subst_perkdef (pvd, e) (placeholder : perktype) (actual : perktype) :
@@ -71,7 +77,14 @@ and subst_mc (mc : match_case_a) (placeholder : perktype) (actual : perktype) :
     | MatchVar (id, t) -> MatchVar (id, Option.map subst_maybe t)
     | MatchExpr e -> MatchExpr (subst_e e)
     | CompoundCase (id, mc1) ->
-        CompoundCase (id, List.map (fun x -> subst_mc x placeholder actual) mc1))
+        let subtituted_ctor = Utils.subst_ctor_name id placeholder actual in
+        Utils.say_here
+          (Printf.sprintf
+             "Substituting constructor name %s with %s in match case" id
+             subtituted_ctor);
+        CompoundCase
+          ( subtituted_ctor,
+            List.map (fun x -> subst_mc x placeholder actual) mc1 ))
 
 and subst_type_expr (e : expr_a) (placeholder : perktype) (actual : perktype) =
   let subst_e = fun x -> subst_type_expr x placeholder actual in
@@ -81,7 +94,8 @@ and subst_type_expr (e : expr_a) (placeholder : perktype) (actual : perktype) =
     (match ( $ ) e with
     | Nothing t -> Nothing (subst_maybe t)
     | Something (e1, t) -> Something (subst_e e1, subst_maybe t)
-    | Bool _ | Int _ | Float _ | Char _ | String _ | Var _ -> ( $ ) e
+    | Var id -> Var (Utils.subst_ctor_name id placeholder actual)
+    | Bool _ | Int _ | Float _ | Char _ | String _ -> ( $ ) e
     | PolymorphicVar (id, t) -> PolymorphicVar (id, subst_maybe t)
     | Apply (e1, e1l, ret_t) ->
         Apply (subst_e e1, List.map subst_e e1l, Option.map subst_maybe ret_t)
@@ -140,7 +154,14 @@ and subst_type_command (c : command_a) (placeholder : perktype)
     | Switch (e1, ecl) ->
         Switch (subst_e e1, List.map (fun (e, c) -> (subst_e e, subst_c c)) ecl)
     | Return eo -> Return (Option.map subst_e eo)
-    | Match (e1, mel, t) -> Match (subst_e e1, mel, Option.map subst_maybe t))
+    | Match (e1, mel, t) ->
+        Match
+          ( subst_e e1,
+            List.map
+              (fun me ->
+                annot_copy me (subst_mel (( $ ) me) placeholder actual))
+              mel,
+            Option.map subst_maybe t ))
 
 let rec is_type_generic (t : perktype) : bool =
   match t with

@@ -1,0 +1,12 @@
+import "stdio.h"
+open "a.perk"
+open "b.perk"
+
+fun main(): void {
+    let test := Nil;
+    match (test) {
+        Nil {
+            printf("Success!")
+        }
+    }
+}

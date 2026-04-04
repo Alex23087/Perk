@@ -46,6 +46,7 @@ type perktype_qualifier =
 
 (* type of the perk -- giangpt *)
 type perktype_partial =
+  | INum of int
   | Basetype of string
   | Funtype of perktype list * perktype  (** types of args, return type *)
   | Lambdatype of
@@ -63,7 +64,9 @@ type perktype_partial =
       * perktype list
       * perkident list
     (* name, archetypes, fields (with access attributes), constructor_params, member functions*)
-  | AlgebraicType of perkident * (perkident * perktype list) list
+  | AlgebraicType of
+      perkident * (perkident * perktype list) list * perktype option
+  | PolyADTPlaceholder of perkident * perktype
   | Optiontype of perktype
   | Tupletype of perktype list
   | ArchetypeSum of perktype list
@@ -94,7 +97,10 @@ and binop =
   | Lor
   | ShL
   | ShR
-(*  ... boolean and bitwise ops and all that  *)
+  | Modulo
+  | Band
+  | Bor (* 🐗 *)
+  | Bxor
 [@@deriving show, eq]
 
 and preunop =
@@ -104,6 +110,7 @@ and preunop =
   | Reference
   | PreIncrement
   | PreDecrement
+  | Bnot
 [@@deriving show, eq]
 
 and postunop =
@@ -114,6 +121,12 @@ and postunop =
 [@@deriving show, eq]
 
 and perkdef = perkdecl * expr_a [@@deriving show, eq]
+
+and funkind =
+  | Normal
+  | TypeExt of perkident
+  | TypeMemExt of perkident
+[@@deriving show, eq]
 
 and perkfundef =
   perktype
@@ -188,18 +201,25 @@ and match_case_t =
   | CompoundCase of perkident * match_case_a list
 [@@deriving show, eq]
 
+and struct_attr = 
+  | Packed
+  | Aligned of int
+
 and topleveldef_t =
   | InlineC of string
   | Import of string
   | Open of string
   | Extern of perkident * perktype
+  | Pretend of perkident * perktype
   | Def of perkdef * perktype option
-  | Fundef of perkfundef * bool  (** fundef, is public?*)
-  | PolymorphicFundef of perkfundef * perktype
+  | Fundef of perkfundef * funkind * bool
+      (** fundef, what kind of function is it? is it public?*)
+  | PolymorphicFundef of perkfundef * funkind * perktype
   | Archetype of perkident * declorfun_a list
   | Model of perkident * perkident list * deforfun_a list
-  | Struct of perkident * perkdef list
-  | ADT of perkident * (perkident * perktype list) list
+  | Struct of perkident * perkdef list * (struct_attr list)
+  | ADT of perkident * (perkident * perktype list) list * perktype option
+      (** name, params, type param *)
   | TLSkip
 
 and deforfun_t =
@@ -233,6 +253,7 @@ and discard_type_aq (typ : perktype) : perktype_partial =
 
 let rec show_perktype (typ : perktype) : string =
   match discard_type_aq typ with
+  | INum i -> Printf.sprintf "inum(%d)" i
   | Basetype s -> s
   | Funtype (args, ret) ->
       Printf.sprintf "(%s) -> %s"
@@ -253,7 +274,12 @@ let rec show_perktype (typ : perktype) : string =
   | Modeltype (name, _, _, _, _) -> name
   | ArcheType (name, _) -> name
   | Structtype (name, _) -> name
-  | AlgebraicType (name, _) -> name
+  | AlgebraicType (name, _, None) -> name
+  | AlgebraicType (name, _, Some t) ->
+    (* TODO: cleanse name of _perk_polym_ *)
+      Printf.sprintf "%s<%s>" name (show_perktype t)
+  | PolyADTPlaceholder (name, t) ->
+      Printf.sprintf "%s<%s>(unresolved)" name (show_perktype t)
   | Optiontype t -> Printf.sprintf "%s?" (show_perktype t)
   | ArchetypeSum ts ->
       Printf.sprintf "<%s>" (String.concat " + " (List.map show_perktype ts))

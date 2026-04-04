@@ -22,6 +22,14 @@ let verbose =
   let doc = "Enable verbose output" in
   Arg.(value & flag & info [ "v"; "verbose" ] ~doc)
 
+let record_stack_trace =
+  let doc = "Enable stack trace recording (for debugs purposes only)" in
+  Arg.(value & flag & info [ "rst"; "record-stack-trace" ] ~doc)
+
+let retain_tmp_files =
+  let doc = "Retain temporary files generated during compilation" in
+  Arg.(value & flag & info [ "rtf"; "retain-temp-files" ] ~doc)
+
 let output_dir =
   let doc = "Output directory name (default: \"\")" in
   Arg.(
@@ -44,8 +52,9 @@ let include_paths =
   Arg.(value & opt_all string [] & info [ "I"; "include-dir" ] ~docv:"DIR" ~doc)
 
 (* Main command implementation *)
-let perkc_cmd check_only json_format static_compilation verbose output_dir
-    input_file (dir : string option) (c_compiler : string) (c_flags : string)
+let perkc_cmd check_only json_format static_compilation verbose
+    (record_stack_trace : bool) (retain_tmp_files : bool) output_dir input_file
+    (dir : string option) (c_compiler : string) (c_flags : string)
     (include_paths : string list) =
   let base_dir =
     let cwd = Sys.getcwd () in
@@ -85,17 +94,13 @@ let perkc_cmd check_only json_format static_compilation verbose output_dir
     Perk.Utils.verbose := true);
 
   if check_only then (
-    if verbose then Printf.printf "Running syntax and type check only\n";
-    ignore
-      (compile_program ?dir ?dry_run:(Some check_only)
-         ?json_format:(Some json_format) static_compilation verbose input_file
-         None c_compiler combined_c_flags);
-    `Ok ())
-  else (
-    if verbose then Printf.printf "Compiling to C\n";
-    compile_program ?dir ?json_format:(Some json_format) static_compilation
-      verbose input_file output_dir c_compiler combined_c_flags;
-    `Ok ())
+    if verbose then Printf.printf "Running syntax and type check only\n")
+  else if verbose then Printf.printf "Compiling to C\n";
+  compile_program ?dir ?dry_run:(Some check_only)
+    ?json_format:(Some json_format) static_compilation verbose
+    record_stack_trace retain_tmp_files input_file output_dir c_compiler
+    combined_c_flags;
+  `Ok ()
 
 (* Command definition *)
 let cmd =
@@ -121,7 +126,7 @@ let cmd =
     Term.(
       ret
         (const perkc_cmd $ check_only $ json_format $ static_compilation
-       $ verbose $ output_dir $ input_file $ dir $ c_compiler $ c_flags
-       $ include_paths))
+       $ verbose $ record_stack_trace $ retain_tmp_files $ output_dir
+       $ input_file $ dir $ c_compiler $ c_flags $ include_paths))
 
 let () = exit (Cmd.eval cmd)

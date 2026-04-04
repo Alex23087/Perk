@@ -2,6 +2,25 @@
 
 open Ast
 open Errors
+open Error_codes
+
+let fst_4 (x, _, _, _) = x
+let snd_4 (_, x, _, _) = x
+let fst_3 (x, _, _) = x
+let snd_3 (_, x, _) = x
+let thrd_3 (_, _, x) = x
+let swizzle (x, y) = (y, x)
+let hashtbl_forall f h = Hashtbl.fold (fun k v acc -> f k v && acc) h true
+let hashtbl_exists f h = Hashtbl.fold (fun k v acc -> f k v || acc) h false
+
+(** shite lazy hack *)
+let bind_var_ptr : (perkident -> perktype -> unit) ref = ref (fun _ _ -> ())
+
+let add_constructor_name_ptr : (perkident -> unit) ref = ref (fun _ -> ())
+let typecheck_tldf_ptr : (topleveldef_a -> topleveldef_a) ref = ref (fun x -> x)
+
+let type_descriptor_of_perktype_ptr : (perktype -> string) ref =
+  ref (fun _ -> "")
 
 (** Filename of the current perk file being processed *)
 let fnm = ref ""
@@ -11,6 +30,9 @@ let static_compilation : bool ref = ref false
 
 (** Internal flag to enable verbose compilation *)
 let verbose : bool ref = ref false
+
+(** Retain temporary files generated during compilation *)
+let retain_tmp_files : bool ref = ref false
 
 let include_paths : string list ref = ref [ "/usr/include" ]
 let c_compiler : string ref = ref "gcc"
@@ -178,6 +200,7 @@ and decl_of_declorfun (def : declorfun_a) : perkdecl =
         | a, Lambdatype (params, ret, free_vars), d ->
             if free_vars <> [] then
               raise_type_error def "function contains free vars"
+                Function_contains_free_vars
             else (a, Funtype (params, ret), d)
         | _ -> typ
       in
@@ -206,9 +229,9 @@ and get_member_functions (defs : deforfun_a list) : perkident list =
       | DefVar (_, ((_, _), _)) -> false)
     defs
   |> List.map (fun f ->
-         match ( $ ) f with
-         | DefFun (_, (_, id, _, _)) -> id
-         | _ -> failwith "impossible: vars have been already filtered away")
+      match ( $ ) f with
+      | DefFun (_, (_, id, _, _)) -> id
+      | _ -> failwith "impossible: vars have been already filtered away")
 
 and add_attrs_to_deforfun (attrs : perktype_attribute list) (def : deforfun_a) :
     deforfun_a =
@@ -279,3 +302,46 @@ let rec copy_non_perk_files src_dir dst_dir =
         (* If directory, copy recursively *)
         copy_non_perk_files src_path dst_path)
     files
+
+let () = Random.self_init ()
+
+let random_string n =
+  let chars =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+  in
+  let len = String.length chars in
+  String.init n (fun _ -> chars.[Random.int len])
+
+let execution_UUID = random_string 10
+let is_C_file f = String.ends_with ~suffix:".h" f
+
+let replace_if_end str old_sub new_sub =
+  let old_len = String.length old_sub in
+  let str_len = String.length str in
+  if old_len > str_len then str
+    (* old_sub is longer than str, no replacement possible *)
+  else if String.sub str (str_len - old_len) old_len = old_sub then
+    String.sub str 0 (str_len - old_len) ^ new_sub (* replace *)
+  else str (* no replacement needed *)
+
+(** Remove spurious type variable concretisations from the constructors *)
+let subst_ctor_name (id : perkident) (placeholder : perktype)
+    (_actual : perktype) : perkident =
+  let pstr = "_perk_polym_" ^ !type_descriptor_of_perktype_ptr placeholder in
+  (* let astr = "_perk_polym_" ^ !type_descriptor_of_perktype_ptr actual in *)
+  let astr = "" in
+  replace_if_end id pstr astr
+
+let print_polyadt_instances (instances : (string, (perktype * bool) list) Hashtbl.t) : unit =
+  if !verbose then (
+    Printf.printf "PolyADT instances:\n";
+    Hashtbl.iter
+      (fun adt_name inst_list ->
+        Printf.printf "ADT: %s\n" adt_name;
+        List.iter
+          (fun (typ, is_concrete) ->
+            let typ_desc = !type_descriptor_of_perktype_ptr typ in
+            Printf.printf "  Type: %s, Concrete: %b\n" typ_desc is_concrete)
+          inst_list)
+      instances;
+    flush stdout)
